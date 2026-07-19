@@ -1,0 +1,166 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { MobileShell, PageHeader } from "@/components/MobileShell";
+import { fetchModules } from "@/lib/modules-api";
+import { cn } from "@/lib/utils";
+import { useStreakGrid, useReadMaterialIds, moduleCompletion } from "@/hooks/use-activity";
+
+export const Route = createFileRoute("/progress")({
+  loader: () => fetchModules(),
+  head: () => ({
+    meta: [
+      { title: "Progress — eLearn" },
+      {
+        name: "description",
+        content:
+          "A quiet record of the reading you actually did — modules, chapters, streaks, and rank.",
+      },
+    ],
+  }),
+  component: ProgressPage,
+});
+
+function ProgressPage() {
+  const modules = Route.useLoaderData();
+  const streak = useStreakGrid();
+  const readMaterialIds = useReadMaterialIds();
+
+  const totalMaterials = modules.reduce((sum, m) => sum + m.materials.length, 0);
+  const totalMaterialsOpened = modules.reduce(
+    (sum, m) => sum + moduleCompletion(m.materials, m.id, readMaterialIds).opened,
+    0,
+  );
+  const overallPct = totalMaterials === 0 ? 0 : totalMaterialsOpened / totalMaterials;
+  const pct = Math.round(overallPct * 100);
+  const dash = 2 * Math.PI * 44;
+  const offset = dash * (1 - overallPct);
+
+  return (
+    <MobileShell>
+      <PageHeader eyebrow="Twelve weeks" title="Your record" />
+
+      <div className="grid gap-8 px-6 lg:grid-cols-3 lg:gap-10 lg:px-10 lg:pb-16">
+        {/* Ring */}
+        <section className="animate-rise rounded-2xl bg-prestige-deep p-6 text-prestige-cream lg:col-span-1 lg:p-8">
+          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prestige-gold">
+            Overall completion
+          </p>
+          <div className="mt-6 flex items-center justify-center">
+            <div className="relative">
+              <svg width="180" height="180" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  className="text-prestige-cream/10"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  strokeDasharray={dash}
+                  strokeDashoffset={offset}
+                  strokeLinecap="round"
+                  transform="rotate(-90 50 50)"
+                  className="text-prestige-gold transition-all"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="font-display text-4xl">{pct}%</span>
+                <span className="text-[10px] uppercase tracking-widest text-prestige-cream/50">
+                  across {modules.length} modules
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Streak */}
+        <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:col-span-2 lg:p-8">
+          <div className="mb-6 flex items-end justify-between">
+            <div>
+              <p className="eyebrow">Study streak</p>
+              <p className="mt-1 font-display text-lg text-prestige-deep">
+                Twelve weeks, day by day
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span>Low</span>
+              <div className="h-2.5 w-2.5 rounded-[2px] bg-prestige-gold/20" />
+              <div className="h-2.5 w-2.5 rounded-[2px] bg-prestige-gold/50" />
+              <div className="h-2.5 w-2.5 rounded-[2px] bg-prestige-gold/80" />
+              <div className="h-2.5 w-2.5 rounded-[2px] bg-prestige-gold" />
+              <span>High</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-12 gap-1.5">
+            {streak.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-1.5">
+                {week.map((intensity, di) => (
+                  <div
+                    key={di}
+                    className={cn(
+                      "aspect-square rounded-[3px]",
+                      intensity === 0 && "bg-prestige-deep/[0.06]",
+                      intensity === 1 && "bg-prestige-gold/25",
+                      intensity === 2 && "bg-prestige-gold/60",
+                      intensity === 3 && "bg-prestige-gold",
+                    )}
+                    title={`Week ${wi + 1}, day ${di + 1}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Per module bars */}
+        <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:col-span-3 lg:p-8">
+          <div className="flex items-end justify-between gap-4">
+            <p className="eyebrow">By module</p>
+            <p className="text-[11px] text-muted-foreground">
+              {totalMaterialsOpened} of {totalMaterials} materials opened overall
+            </p>
+          </div>
+          <ul className="mt-6 divide-y divide-border/60">
+            {modules.map((m) => {
+              const completion = moduleCompletion(m.materials, m.id, readMaterialIds);
+              return (
+                <li
+                  key={m.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-4 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)_auto] lg:gap-6"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-prestige-mid">
+                      {m.code}
+                    </p>
+                    <p className="truncate font-display text-sm text-prestige-deep">
+                      {m.title}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {completion.opened}/{completion.total} materials opened
+                    </p>
+                  </div>
+                  <div className="col-span-2 h-1 w-full overflow-hidden rounded-full bg-prestige-deep/10 lg:col-auto lg:col-start-2">
+                    <div
+                      className="h-full bg-prestige-gold"
+                      style={{ width: `${completion.pct * 100}%` }}
+                    />
+                  </div>
+                  <p className="font-display text-sm text-prestige-deep lg:col-start-3">
+                    {Math.round(completion.pct * 100)}%
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
+    </MobileShell>
+  );
+}

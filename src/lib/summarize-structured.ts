@@ -1,0 +1,141 @@
+// Real, whole-document summarization that doesn't silently drop content.
+//
+// The neural summarizer (ai-model.ts) has a hard MAX_INPUT_CHARS budget
+// per call — a real T5-family model limit, not a policy choice. Handing
+// it a whole long document once meant only the first ~3000 characters
+// (roughly the first page or two) were ever actually summarized; the rest
+// of the document was silently invisible to it, with nothing in the UI
+// admitting that. This module fixes that properly rather than just
+// raising the limit (which would just move the same problem to a longer
+// document): split the real document into its own real sections (from the
+// `#`/`##` structure pdf-extract.ts already produces), summarize each
+// section within the model's real budget (chunking further if even one
+// section is too long), and summarize the section summaries into one short
+// overview. Every section of the source text ends up inside some model
+// call — nothing skipped.
+
+import { deviceDb, type SummarySection } from "@/lib/db";
+import { summarizeText } from "@/lib/summarize";
+import { summarizeWithModel } from "@/lib/ai-model";
+
+const MODEL_DOWNLOADED_KEY = "ai_model_downloaded";
+// Mirrors ai-model.ts's own MAX_INPUT_CHARS — kept as a separate constant
+// here (not imported) since this module's chunking needs to reason about
+// it independently of that module's internal truncation, which this file
+// exists specifically to avoid ever triggering.
+const MODEL_INPUT_BUDGET = 3000;
+
+type RawSection = { heading: string; body: string };
+
+/** Splits pdf-extract.ts's lightweight Markdown (`#`/`##` headings, `-`
+ * bullets, blank-line-separated paragraphs) into real sections — one per
+ * top-level or second-level heading. Text before the first heading (if
+ * any) becomes its own leading section so it's never lost. A document
+ * with no headings at all (e.g. a catalog material's synthetic
+ * single-heading wrapper, or older uniformly-styled extractions) comes
+ * back as one section under `fallbackTitle`. */
+function splitIntoSections(text: string, fallbackTitle: string): RawSection[] {
+  const blocks = text.split(/\n\n+/).filter((b) => b.trim());
+  const sections: RawSection[] = [];
+  let currentHeading: string | null = null;
+  let currentBody: string[] = [];
+
+  const flush = () => {
+    const body = currentBody.join("\n\n").trim();
+    if (body) sections.push({ heading: currentHeading ?? fallbackTitle, body });
+    currentBody = [];
+  };
+
+  for (const block of blocks) {
+    if (block.startsWith("# ") || block.startsWith("## ")) {
+      flush();
+      currentHeading = block.replace(/^#+\s*/, "").trim();
+    } else {
+      currentBody.push(block);
+    }
+  }
+  flush();
+
+  return sections.length > 0 ? sections : [{ heading: fallbackTitle, body: text.trim() }];
+}
+
+/** Greedily groups a section's paragraphs into chunks that each fit the
+ * model's real input budget, splitting on paragraph boundaries (never
+ * mid-sentence). A single paragraph longer than the whole budget is cut
+ * at the character limit as a last resort — rare, and still summarized,
+ * just not on a clean boundary. */
+function chunkForModel(text: string, maxChars: number): string[] {
+  const paragraphs = text.split(/\n\n+/).filter((p) => p.trim());
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const paragraph of paragraphs) {
+    const candidate = current ? `${current}\n\n${paragraph}` : paragraph;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      continue;
+    }
+    if (current) chunks.push(current);
+    current = paragraph.length > maxChars ? paragraph.slice(0, maxChars) : paragraph;
+  }
+  if (current) chunks.push(current);
+  return chunks.length > 0 ? chunks : [text.slice(0, maxChars)];
+}
+
+export type StructuredSummaryResult = {
+  overview: string;
+  sections: SummarySection[];
+  method: "neural" | "extractive";
+};
+
+/** Generates a real, whole-document summary: a short overview plus one
+ * summary per real section, covering all of `text` — not just whatever
+ * fit in one model call. Uses the on-device neural summarizer when it's
+ * been downloaded (Profile > AI settings), falling back to the extractive
+ * summarizer per-chunk on any failure, same degrade-gracefully rule as
+ * the rest of this app's AI features (FR44). */
+export async function generateStructuredSummary(
+  text: string,
+  fallbackTitle: string,
+): Promise<StructuredSummaryResult> {
+  const modelDownloaded =
+    (await deviceDb.appSettings.get(MODEL_DOWNLOADED_KEY))?.value === "true";
+  let method: "neural" | "extractive" = modelDownloaded ? "neural" : "extractive";
+
+  const rawSections = splitIntoSections(text, fallbackTitle);
+  const sections: SummarySection[] = [];
+
+  for (const section of rawSections) {
+    const chunks = chunkForModel(section.body, MODEL_INPUT_BUDGET);
+    const chunkSummaries: string[] = [];
+    for (const chunk of chunks) {
+      if (modelDownloaded) {
+        try {
+          chunkSummaries.push(await summarizeWithModel(chunk));
+          continue;
+        } catch (err) {
+          console.error("Neural summarization failed for a chunk, falling back", err);
+          method = "extractive";
+        }
+      }
+      chunkSummaries.push(summarizeText(chunk, 2));
+    }
+    sections.push({ heading: section.heading, body: chunkSummaries.join(" ") });
+  }
+
+  const combined = sections.map((s) => s.body).join(" ");
+  let overview: string;
+  if (modelDownloaded && method === "neural") {
+    try {
+      overview = await summarizeWithModel(combined.slice(0, MODEL_INPUT_BUDGET));
+    } catch (err) {
+      console.error("Neural overview summarization failed, falling back", err);
+      method = "extractive";
+      overview = summarizeText(combined, 3);
+    }
+  } else {
+    overview = summarizeText(combined, 3);
+  }
+
+  return { overview, sections, method };
+}

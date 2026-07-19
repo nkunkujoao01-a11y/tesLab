@@ -1,0 +1,214 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --font-sora: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-manrope: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+
+  --color-prestige-deep: var(--prestige-deep);
+  --color-prestige-mid: var(--prestige-mid);
+  --color-prestige-gold: var(--prestige-gold);
+  --color-prestige-cream: var(--prestige-cream);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* Locked palette */
+  --prestige-deep: oklch(0.35 0.06 165);       /* #064e3b */
+  --prestige-mid: oklch(0.48 0.09 165);        /* #0d7a5f */
+  --prestige-gold: oklch(0.75 0.11 85);        /* #c9a84c */
+  --prestige-cream: oklch(0.955 0.02 90);      /* #f5f0e0 */
+
+  --background: var(--prestige-cream);
+  --foreground: var(--prestige-deep);
+
+  --card: oklch(0.985 0.012 95);
+  --card-foreground: var(--prestige-deep);
+
+  --popover: oklch(0.985 0.012 95);
+  --popover-foreground: var(--prestige-deep);
+
+  --primary: var(--prestige-deep);
+  --primary-foreground: var(--prestige-cream);
+
+  --secondary: oklch(0.92 0.02 90);
+  --secondary-foreground: var(--prestige-deep);
+
+  --muted: oklch(0.93 0.018 90);
+  --muted-foreground: oklch(0.48 0.03 160);
+
+  --accent: var(--prestige-gold);
+  --accent-foreground: var(--prestige-deep);
+
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.985 0.003 90);
+
+  --border: oklch(0.35 0.06 165 / 12%);
+  --input: oklch(0.35 0.06 165 / 15%);
+  --ring: var(--prestige-gold);
+
+  --sidebar: oklch(0.97 0.015 90);
+  --sidebar-foreground: var(--prestige-deep);
+  --sidebar-primary: var(--prestige-deep);
+  --sidebar-primary-foreground: var(--prestige-cream);
+  --sidebar-accent: oklch(0.93 0.02 90);
+  --sidebar-accent-foreground: var(--prestige-deep);
+  --sidebar-border: oklch(0.35 0.06 165 / 10%);
+  --sidebar-ring: var(--prestige-gold);
+}
+
+/* Defined but currently unused: nothing in the app ever applies this class
+   (no theme toggle exists — see DEV_LOG.md, Feature 22, which removed
+   Profile's fake "Appearance: Light" row rather than build a real toggle
+   under a cleanup task). A real dark-mode feature could reuse these
+   values, but would need its own contrast audit first — the WCAG pass in
+   Feature 18 only ever validated the light palette above. */
+.dark {
+  --background: oklch(0.22 0.03 165);
+  --foreground: var(--prestige-cream);
+  --card: oklch(0.28 0.04 165);
+  --card-foreground: var(--prestige-cream);
+  --popover: oklch(0.28 0.04 165);
+  --popover-foreground: var(--prestige-cream);
+  --primary: var(--prestige-gold);
+  --primary-foreground: var(--prestige-deep);
+  --secondary: oklch(0.32 0.04 165);
+  --secondary-foreground: var(--prestige-cream);
+  --muted: oklch(0.3 0.03 165);
+  --muted-foreground: oklch(0.75 0.03 90);
+  --accent: var(--prestige-gold);
+  --accent-foreground: var(--prestige-deep);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: var(--prestige-gold);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-manrope);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sora);
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--prestige-gold) 35%, transparent);
+    color: var(--prestige-deep);
+  }
+
+  /* Custom scrollbar (Phase K, requested explicitly) — thin, brand-colored,
+     transparent track, applied globally so every internal scroll container
+     (dialogs' overflow-y-auto lists, the mobile bottom nav's
+     overflow-x-auto row, etc.) gets it with no per-element opt-in. Uses
+     --prestige-deep directly rather than a semantic --color-* token: the
+     palette tokens are the same fixed brand colors in both the light
+     theme and the currently-unused .dark block above, so this reads
+     correctly either way without needing its own dark-mode branch. */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--prestige-deep) 28%, transparent) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--prestige-deep) 25%, transparent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--prestige-deep) 45%, transparent);
+  }
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  /* Was --prestige-mid @ 85%: measured ~3.0:1 against the cream background
+     at this font size, below WCAG AA's 4.5:1 minimum for text this small
+     (see DEV_LOG.md, Feature 18). --prestige-deep gives the same muted,
+     translucent eyebrow treatment with real contrast margin. */
+  color: color-mix(in oklab, var(--prestige-deep) 85%, transparent);
+}
+
+@utility hairline {
+  border: 1px solid color-mix(in oklab, var(--prestige-deep) 10%, transparent);
+}
+
+@utility gold-underline {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--prestige-gold) 60%, transparent);
+  text-underline-offset: 4px;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility animate-rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
