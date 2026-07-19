@@ -1519,6 +1519,33 @@ No `.env`/Supabase project exists in this environment (same constraint as Featur
 
 ---
 
+## Feature 46: a real garbled-pull-quote bug on `swecom.pdf` (Feature 44 regression), plus a user-adjustable reading width
+
+**Status: both fixed and verified.**
+
+User uploaded a real, dense reference document (`TestDoc/swecom.pdf`, 168 pages, an IEEE competency-model standard full of multi-column tables) through the real running app and reported the pull-quote — the "— From this document" element — was showing raw, unrendered table markup instead of real prose: `Creates | | --- | --- | | prototype | prototypes | | construction | of different | ...`.
+
+**Root cause**: a real regression from Feature 44. `document-lead.ts`'s `isPlainParagraph()` — the filter both the lead-picker and the pull-quote candidate pool (`extractPlainProseText`) use to exclude non-prose blocks — only knew about the `#`/`##`/`- ` prefixes that existed when Feature 41/43 wrote it. Feature 44 later introduced a fourth block prefix, `| ` (tables), without updating this filter, so a raw table block could still pass as "plain paragraph" material and get selected as the pull-quote (or, in a different document, the lead) — rendered as a plain `<p>`/`<figure>` (not through `StructuredText`'s real table parser), so its `\n`-joined rows visually collapsed into exactly the flat, pipe-riddled text the user saw.
+
+**Fix**: `isPlainParagraph()` now also excludes `| `-prefixed blocks.
+
+**How it was validated**: real Playwright run against a production build, using the actual `TestDoc/swecom.pdf` that exposed this — via a temporary unauthenticated test-harness route (same pattern as Feature 44/45, removed afterward) that ran the real `extractPdfText` → `deriveDocumentLead` pipeline and printed the result.
+- **Before the fix**: `lead` was already clean; `pullQuote` was the exact garbled table text from the bug report, confirming it's the pull-quote (not the lead) that broke for this specific document.
+- **After the fix**: `pullQuote` is real prose (a heading/bullet-fragment artifact elsewhere in this document's extraction — "Process Assessment and • Analyze process assessment data and implement Improvement improvement of team software processes." — replaced it; still slightly disjointed but real English words, not raw markup. **Flagged, not fixed**: this looks like a separate, lower-severity extraction-quality issue — a two-column crosscutting-skill-area table not confidently detected as a table (likely short of `MIN_TABLE_ROWS` or using a `•` bullet glyph `BULLET_PATTERN` doesn't recognize) — worth a dedicated look if it recurs on other dense reference documents, not chased further this session since it's coherent text, not broken UI.
+
+### Separately: user-adjustable reading width
+
+User also pointed out the reading column (`documents.$docId.index.tsx` and `courses.$moduleId.read.$docId.tsx`, both using a hard-coded `max-w-[680px]` `<article>`) looks unnecessarily narrow on a wide desktop viewport, with the outer layout (`MobileShell`'s `lg:w-[calc(100%-16rem)] lg:max-w-none`) otherwise having no cap of its own. 680px was a deliberate readable-line-length choice, not a bug, but not adjustable.
+
+Added a per-device reading-width preference, following the same `appSettings` liveQuery-backed key/value pattern `use-ai-model.ts`/`use-ai-chat.ts` already use (not per-document — this is a reading-comfort preference about the person):
+- **`src/hooks/use-reading-width.ts`** (new) — `"narrow" | "medium" | "wide"` → `680px | 880px | 100%`. Defaults to `"narrow"` (the original fixed value), so nobody's existing reading experience shifts unless they deliberately change it.
+- **`src/components/ReadingWidthControl.tsx`** (new) — a small segmented Narrow/Medium/Wide control, shared between both reading routes.
+- Both routes: `<article>`'s `max-w-[680px]` class replaced with an inline `style={{ maxWidth: READING_WIDTH_STYLE[readingWidth] }}` (same dynamic-style pattern this codebase already uses for the reading-progress bar's width), and the control placed in each page's existing header row next to the "X% read" indicator.
+
+`npx tsc --noEmit` and `eslint` clean on all changed/new files.
+
+---
+
 ## What to build next
 
 1. **Deployment**: still `BLOCKED` per Vercel's own deployment status (not `ERROR` — the build itself succeeds), consistently across every recent deployment checked, not just the latest. Most likely a Deployment Protection setting or a plan-level gate in Project Settings, not a code problem. User is checking their dashboard.

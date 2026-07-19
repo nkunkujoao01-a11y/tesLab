@@ -30,6 +30,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { FlashcardDeck, QuizPanel } from "@/components/QuizFlashcards";
+import { ReadingWidthControl } from "@/components/ReadingWidthControl";
+import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
 
 export const Route = createFileRoute("/courses/$moduleId/read/$docId")({
   loader: async ({ params }) => {
@@ -82,6 +84,7 @@ function Reader() {
     [user, doc.id, module.id],
   );
   const readProgress = useReadingProgress(!!content, storedProgress, persistProgress);
+  const [readingWidth, setReadingWidth] = useReadingWidth();
 
   const summary = useMaterialSummary(module.id, doc.id);
   const { generateSummary, pendingIds: summarizingIds } = useGenerateSummary();
@@ -204,9 +207,12 @@ function Reader() {
             <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
             {module.code}
           </Link>
-          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prestige-deep/85">
-            {readProgress}% read
-          </p>
+          <div className="flex shrink-0 items-center gap-3">
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prestige-deep/85">
+              {readProgress}% read
+            </p>
+            <ReadingWidthControl width={readingWidth} onChange={setReadingWidth} />
+          </div>
         </div>
         <div className="h-0.5 w-full bg-prestige-deep/5">
           <div
@@ -217,7 +223,10 @@ function Reader() {
       </header>
 
       {/* Article body */}
-      <article className="mx-auto max-w-[680px] px-6 pb-40 pt-12 lg:pt-16">
+      <article
+        className="mx-auto px-6 pb-40 pt-12 lg:pt-16"
+        style={{ maxWidth: READING_WIDTH_STYLE[readingWidth] }}
+      >
         {content ? (
           <>
             <p className="eyebrow">

@@ -15,9 +15,11 @@ import {
 import { MobileShell } from "@/components/MobileShell";
 import { StructuredText } from "@/components/StructuredText";
 import { FlashcardDeck, QuizPanel } from "@/components/QuizFlashcards";
+import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { formatMb } from "@/lib/mock-data";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { deriveDocumentLead } from "@/lib/document-lead";
+import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
 import {
   usePersonalDocument,
   usePersonalDocumentFile,
@@ -63,6 +65,7 @@ function DocumentDetail() {
     [user, docId],
   );
   const readProgress = useReadingProgress(!!doc, doc?.readProgressPct ?? 0, persistProgress);
+  const [readingWidth, setReadingWidth] = useReadingWidth();
 
   const flashcardSet = useFlashcardSet(docId);
   const { generate: generateFlashcardsFor, pendingIds: flashcardPendingIds } =
@@ -127,10 +130,16 @@ function DocumentDetail() {
         </Link>
       </div>
 
-      <article className="mx-auto max-w-[680px] px-6 pb-40 pt-8 lg:pt-10">
-        <p className="eyebrow">
-          {doc.pageCount} pages · {formatMb(doc.sizeMb)}
-        </p>
+      <article
+        className="mx-auto px-6 pb-40 pt-8 lg:pt-10"
+        style={{ maxWidth: READING_WIDTH_STYLE[readingWidth] }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <p className="eyebrow">
+            {doc.pageCount} pages · {formatMb(doc.sizeMb)}
+          </p>
+          <ReadingWidthControl width={readingWidth} onChange={setReadingWidth} />
+        </div>
         <h1 className="mt-3 font-display text-3xl font-medium leading-[1.15] tracking-tight text-prestige-deep lg:text-4xl">
           {doc.title}
         </h1>

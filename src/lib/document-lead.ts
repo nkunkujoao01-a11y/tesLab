@@ -97,7 +97,12 @@ function looksLikeProse(text: string): boolean {
 }
 
 function isPlainParagraph(block: string): boolean {
-  return !block.startsWith("# ") && !block.startsWith("## ") && !block.startsWith("- ");
+  return (
+    !block.startsWith("# ") &&
+    !block.startsWith("## ") &&
+    !block.startsWith("- ") &&
+    !block.startsWith("| ")
+  );
 }
 
 /** Concatenates only a document's plain-paragraph blocks — excluding
