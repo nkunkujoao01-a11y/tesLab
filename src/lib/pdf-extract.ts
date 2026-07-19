@@ -447,17 +447,99 @@ export async function extractPdfText(
     }
   }
 
+  // A running header/footer (a chapter name reprinted at the top of every
+  // page in that chapter, a page number, a multi-page table's own header
+  // row reprinted at the top of each continuation page) repeats
+  // near-verbatim across several pages; real body prose essentially never
+  // does. Found via real testing on TestDoc/swecom.pdf, whose dense
+  // multi-page competency tables reprint their column-header row ("Skill
+  // Entry Technical ... Practitioner Leader Engineer") at the top of every
+  // continuation page — without this, that row (and the chapter-name
+  // running header beside it) fell through table detection as ordinary
+  // "body" text and polluted both the reading view and the AI summary.
+  // Page numbers vary between occurrences, so digits are normalized away
+  // before comparing. An absolute minimum page count (not a fraction of
+  // the whole document) is deliberate: many of these repeat only within
+  // one chapter's short page span, not across the entire document.
+  const NOISE_MIN_PAGE_COUNT = 3;
+  const NOISE_MAX_LINE_LENGTH = 100;
+  // A running header is styled distinctly from body text often enough
+  // (bold, a touch larger) that classifyLine reads it as "subheading" —
+  // found via real testing on swecom.pdf, whose chapter-name running
+  // footer ("Software Requirements Skill Area 27") survived a body-only
+  // check for exactly this reason. Subheading-kind repeats are only
+  // treated as noise when they additionally *cluster* within a narrow page
+  // span: a running header repeats throughout one short chapter, while a
+  // real repeated section title (this same document's "References"
+  // heading appears in all 11 skill-area chapters) recurs once every
+  // several dozen pages, spread across the whole document — a real
+  // heading, not noise, even though it also repeats 3+ times. "bullet" is
+  // treated the same as "body" (no clustering needed, a real bullet list
+  // item essentially never repeats verbatim 3+ times across separate
+  // pages) — also found via real testing: the same running-footer caption
+  // above alternated between "body" and "bullet" classification from page
+  // to page (a stray leading-character quirk), which split its already-few
+  // occurrences across two kinds and let it slip under the threshold
+  // before this was accounted for.
+  const NOISE_SUBHEADING_MAX_CLUSTER_SPAN = 15;
+
+  function normalizeForNoiseDetection(text: string): string {
+    return text.replace(/\d+/g, "#").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  function classifyPageLines(
+    lines: RawLine[],
+  ): { kind: LineKind; text: string; cells?: string[] }[] {
+    const tableFlags = detectTableRows(lines);
+    return lines.map((line, i) =>
+      tableFlags[i]
+        ? { kind: "table-row" as const, text: line.text, cells: line.cells }
+        : { kind: classifyLine(line, bodySize, bodyX), text: line.text },
+    );
+  }
+
+  const NOISE_ELIGIBLE_KINDS = new Set<LineKind>(["body", "bullet", "subheading"]);
+  const NOISE_UNCLUSTERED_KINDS = new Set<LineKind>(["body", "bullet"]);
+
+  const lineOccurrences = new Map<string, { kinds: Set<LineKind>; pages: Set<number> }>();
+  pageLines.forEach((lines, pageIdx) => {
+    for (const line of classifyPageLines(lines)) {
+      if (!NOISE_ELIGIBLE_KINDS.has(line.kind)) continue;
+      const trimmed = stripBulletPrefix(line.text).trim();
+      if (!trimmed || trimmed.length > NOISE_MAX_LINE_LENGTH) continue;
+      const norm = normalizeForNoiseDetection(trimmed);
+      if (!norm) continue;
+      const existing = lineOccurrences.get(norm);
+      if (existing) {
+        existing.kinds.add(line.kind);
+        existing.pages.add(pageIdx);
+      } else {
+        lineOccurrences.set(norm, { kinds: new Set([line.kind]), pages: new Set([pageIdx]) });
+      }
+    }
+  });
+  const noiseNormalizedTexts = new Set(
+    [...lineOccurrences.entries()]
+      .filter(([, { kinds, pages }]) => {
+        if (pages.size < NOISE_MIN_PAGE_COUNT) return false;
+        if ([...kinds].some((k) => NOISE_UNCLUSTERED_KINDS.has(k))) return true;
+        const sorted = [...pages].sort((a, b) => a - b);
+        const span = sorted[sorted.length - 1] - sorted[0];
+        return span <= NOISE_SUBHEADING_MAX_CLUSTER_SPAN;
+      })
+      .map(([norm]) => norm),
+  );
+
   const pageTexts = pageLines.map((lines, idx) => {
     const ocrText = ocrTexts.get(idx + 1);
     if (ocrText !== undefined) return formatOcrText(ocrText);
-    const tableFlags = detectTableRows(lines);
-    return formatStructuredText(
-      lines.map((line, i) =>
-        tableFlags[i]
-          ? { kind: "table-row" as const, text: line.text, cells: line.cells }
-          : { kind: classifyLine(line, bodySize, bodyX), text: line.text },
-      ),
-    );
+    const classified = classifyPageLines(lines).filter((line) => {
+      if (!NOISE_ELIGIBLE_KINDS.has(line.kind)) return true;
+      const trimmed = stripBulletPrefix(line.text).trim();
+      if (trimmed.length > NOISE_MAX_LINE_LENGTH) return true;
+      return !noiseNormalizedTexts.has(normalizeForNoiseDetection(trimmed));
+    });
+    return formatStructuredText(classified);
   });
 
   const joined = pageTexts.join("\n\n").trim();

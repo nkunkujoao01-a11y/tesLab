@@ -7,8 +7,12 @@ import {
   loadChatModel,
   askChatModel,
   isModelCachedForOffline,
+  getSelectedChatModel,
+  setSelectedChatModel,
+  DEFAULT_CHAT_MODEL,
   type ModelProgress,
   type ChatTurn,
+  type ChatModelChoice,
 } from "@/lib/ai-chat";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -18,6 +22,73 @@ const SETTING_KEY = "ai_chat_model_downloaded";
 // isModelCachedForOffline's own comment for why these can genuinely
 // differ.
 const OFFLINE_CACHED_KEY = "ai_chat_model_offline_cached";
+
+/** These two flags describe the *currently selected* model (see
+ * useChatModelChoice, Feature 47) — SmolLM2 and Gemma 3 are independent
+ * downloads, each with its own real Cache Storage entry, but this app
+ * only ever runs one at a time, so a single pair of "is it ready" flags
+ * is enough as long as they're kept in sync with whichever model is
+ * selected. That resync happens once, right when the selection changes
+ * (see useChatModelChoice's setter) — everywhere else in the app that
+ * already reads these two flags via useChatModelStatus/
+ * useChatModelOfflineCapable keeps working unmodified. */
+async function syncModelStatusFlags(choice: ChatModelChoice): Promise<void> {
+  const cached = await isModelCachedForOffline(choice);
+  await deviceDb.appSettings.put({ key: SETTING_KEY, value: cached ? "true" : "false" });
+  await deviceDb.appSettings.put({
+    key: OFFLINE_CACHED_KEY,
+    value: cached ? "true" : "false",
+  });
+}
+
+/** The chat model the user has selected in Profile > AI Settings, and a
+ * setter that also re-syncs the shared "is it ready" flags (see
+ * syncModelStatusFlags) so switching models never leaves a stale
+ * "Downloaded" status pointing at the model that's no longer selected. */
+export function useChatModelChoice(): [ChatModelChoice, (choice: ChatModelChoice) => void] {
+  const [choice, setChoiceState] = useState<ChatModelChoice>(DEFAULT_CHAT_MODEL);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getSelectedChatModel().then((c) => {
+      if (!cancelled) setChoiceState(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const setChoice = useCallback((next: ChatModelChoice) => {
+    setChoiceState(next);
+    void (async () => {
+      await setSelectedChatModel(next);
+      await syncModelStatusFlags(next);
+    })();
+  }, []);
+
+  return [choice, setChoice];
+}
+
+/** Whether a specific model (not necessarily the currently selected one)
+ * is already cached for offline use — checked directly against Cache
+ * Storage each time, since this is what lets the Profile picker show a
+ * real "Downloaded" chip on *either* option, not just the active one. */
+export function useChatModelCachedStatus(choice: ChatModelChoice): boolean | null {
+  const [cached, setCached] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCached(null);
+    void isModelCachedForOffline(choice).then((c) => {
+      if (!cancelled) setCached(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [choice]);
+
+  return cached;
+}
 
 export type ChatModelStatus = "not-downloaded" | "downloading" | "ready" | "error";
 

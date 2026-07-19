@@ -27,6 +27,24 @@ const MODEL_INPUT_BUDGET = 3000;
 
 type RawSection = { heading: string; body: string };
 
+// A bullet or table block isn't sentence prose — summarizeText's
+// splitSentences has no markup awareness at all, so handing it a raw
+// `| cell | cell |` table block (or a bare `- A` bullet) produces
+// garbled, punctuation-spliced "sentences" instead of a real summary.
+// Found via real testing on TestDoc/swecom.pdf, whose crosscutting-skill
+// tables produced exactly this in the AI summary. Skipping non-prose
+// blocks here means a section that's *entirely* tables/bullets honestly
+// has no summary rather than a corrupted one — the same standard
+// document-lead.ts already applies to the lead/pull-quote.
+function isPlainParagraph(block: string): boolean {
+  return (
+    !block.startsWith("# ") &&
+    !block.startsWith("## ") &&
+    !block.startsWith("- ") &&
+    !block.startsWith("| ")
+  );
+}
+
 /** Splits pdf-extract.ts's lightweight Markdown (`#`/`##` headings, `-`
  * bullets, blank-line-separated paragraphs) into real sections — one per
  * top-level or second-level heading. Text before the first heading (if
@@ -50,7 +68,7 @@ function splitIntoSections(text: string, fallbackTitle: string): RawSection[] {
     if (block.startsWith("# ") || block.startsWith("## ")) {
       flush();
       currentHeading = block.replace(/^#+\s*/, "").trim();
-    } else {
+    } else if (isPlainParagraph(block)) {
       currentBody.push(block);
     }
   }

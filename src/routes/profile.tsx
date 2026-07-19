@@ -25,6 +25,13 @@ import {
 import { useStorageQuota, isStorageLow } from "@/hooks/use-storage-quota";
 import { useAuth } from "@/hooks/use-auth";
 import { useAIModelStatus, useDownloadAIModel } from "@/hooks/use-ai-model";
+import {
+  useChatModelStatus,
+  useDownloadChatModel,
+  useChatModelChoice,
+  useChatModelCachedStatus,
+} from "@/hooks/use-ai-chat";
+import { CHAT_MODELS, type ChatModelChoice } from "@/lib/ai-chat";
 import { useSummariesStorageMb } from "@/hooks/use-summaries";
 import { useLastSyncedAt, useManualSync } from "@/hooks/use-sync";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -71,6 +78,20 @@ function Profile() {
   const navigate = useNavigate();
   const modelStatus = useAIModelStatus();
   const { downloadModel, status: downloadStatus, progress, finalizing } = useDownloadAIModel();
+  const chatModelStatus = useChatModelStatus();
+  const [chatModelChoice, setChatModelChoice] = useChatModelChoice();
+  const {
+    downloadModel: downloadChatModel,
+    status: chatDownloadStatus,
+    progress: chatProgress,
+    finalizing: chatFinalizing,
+  } = useDownloadChatModel();
+  const smollm2Cached = useChatModelCachedStatus("smollm2");
+  const gemma3Cached = useChatModelCachedStatus("gemma3-1b");
+  const chatModelCachedByChoice: Record<ChatModelChoice, boolean | null> = {
+    smollm2: smollm2Cached,
+    "gemma3-1b": gemma3Cached,
+  };
   const fullName = profile?.full_name || user?.email || "Student";
   const university = profile?.university || "Namibia University of Science and Technology";
   const program = profile?.program || user?.email || "";
@@ -174,6 +195,112 @@ function Profile() {
                     {!isOnline
                       ? "You're offline — reconnect to download the model."
                       : "Until downloaded, summaries use a fast built-in fallback — no download required."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* AI chat model (Feature 47) — a genuinely separate download from
+              the summarizer above: this is what powers Ask AI and quiz
+              generation. Two selectable models, not one, so upgrading to a
+              larger, more capable model is opt-in rather than forced on
+              everyone regardless of connection/storage. */}
+          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                <Brain className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-prestige-deep">Ask AI chat model</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Powers Ask AI and quiz generation &middot; runs fully offline once downloaded
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {(Object.keys(CHAT_MODELS) as ChatModelChoice[]).map((choice) => {
+                const info = CHAT_MODELS[choice];
+                const selected = chatModelChoice === choice;
+                const cached = chatModelCachedByChoice[choice];
+                return (
+                  <button
+                    key={choice}
+                    type="button"
+                    onClick={() => setChatModelChoice(choice)}
+                    className={cn(
+                      "w-full rounded-lg p-3 text-left ring-1 transition-colors",
+                      selected
+                        ? "bg-prestige-deep/5 ring-prestige-deep/30"
+                        : "ring-border/70 hover:bg-secondary",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-prestige-deep">{info.label}</p>
+                      <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">
+                        ~{info.approxSizeMb} MB
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{info.description}</p>
+                    {cached && (
+                      <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-prestige-mid">
+                        <CircleCheck className="h-3 w-3 text-prestige-gold" strokeWidth={1.75} />
+                        Downloaded on this device
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4">
+              {chatModelStatus === "ready" ? (
+                <div className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
+                  <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
+                  {CHAT_MODELS[chatModelChoice].label} downloaded &middot; used automatically
+                </div>
+              ) : chatDownloadStatus === "downloading" ? (
+                <div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-prestige-deep/10">
+                    <div
+                      className={cn(
+                        "h-full bg-prestige-gold transition-all",
+                        chatFinalizing && "animate-pulse",
+                      )}
+                      style={{ width: `${chatFinalizing ? 100 : chatProgress}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {chatFinalizing
+                      ? "Finishing up — almost there…"
+                      : `Downloading ${CHAT_MODELS[chatModelChoice].label}… ${chatProgress}%`}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <button
+                    type="button"
+                    disabled={!isOnline}
+                    aria-disabled={!isOnline}
+                    title={
+                      !isOnline ? "Downloading the model needs a network connection" : undefined
+                    }
+                    onClick={() => void downloadChatModel()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+                  >
+                    <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Download {CHAT_MODELS[chatModelChoice].label}
+                  </button>
+                  {chatDownloadStatus === "error" && (
+                    <p className="mt-2 text-[11px] text-destructive">
+                      Download failed. Check your connection and try again.
+                    </p>
+                  )}
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {!isOnline
+                      ? "You're offline — reconnect to download the model."
+                      : "Until downloaded, Ask AI and quiz generation aren't available."}
                   </p>
                 </div>
               )}

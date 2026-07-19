@@ -4,19 +4,89 @@
 // existing summarizer is a T5 model fine-tuned specifically for
 // summarization, not built for open-ended Q&A — using it to "chat" would
 // produce poor, off-task output. This uses a small instruction-tuned
-// model instead (see MODEL_ID below), purpose-built for exactly this.
+// model instead, purpose-built for exactly this.
 //
-// Chosen for size, not raw capability: this app's whole premise is
-// working on poor/limited connectivity (see DEV_LOG.md, the Roadmap 2
-// planning round), and the existing 155MB summarizer already measured as
-// a multi-minute download that read as "broken" to a real user (Feature
-// 31) before a UX fix. A frontier-quality chat model would be many times
-// that size. HuggingFaceTB's SmolLM2 family is built specifically for
-// on-device/edge deployment — this is an honest quality-for-size
-// tradeoff, not the best possible chat experience, and the UI must say so
-// plainly rather than imply this is ChatGPT-grade.
-const MODEL_ID = "onnx-community/SmolLM2-360M-Instruct-ONNX";
-const MODEL_DTYPE = "q4";
+// Two selectable models, not one — see CHAT_MODELS below. The default,
+// SmolLM2-360M, is chosen for size, not raw capability: this app's whole
+// premise is working on poor/limited connectivity (see DEV_LOG.md, the
+// Roadmap 2 planning round), and the existing 155MB summarizer already
+// measured as a multi-minute download that read as "broken" to a real
+// user (Feature 31) before a UX fix. HuggingFaceTB's SmolLM2 family is
+// built specifically for on-device/edge deployment — an honest
+// quality-for-size tradeoff, not the best possible chat experience.
+// Gemma 3 1B (added Feature 47) is a real, larger, higher-quality
+// alternative for anyone willing to spend the extra download/storage —
+// confirmed via HuggingFace's own file listing at
+// onnx-community/gemma-3-1b-it-ONNX: its smallest usable quantization
+// (q4) is ~859MB, more than double SmolLM2's ~387MB q4 file, so it's an
+// explicit opt-in (Profile > AI Settings), never the default.
+import { deviceDb } from "@/lib/db";
+
+export type ChatModelChoice = "smollm2" | "gemma3-1b";
+
+// Matches transformers.js's own PretrainedOptions["dtype"] union — spelled
+// out here rather than imported so this file doesn't need a static,
+// top-level import of the (deliberately dynamically-imported) library
+// just for a type.
+type ModelDtype =
+  | "auto"
+  | "fp32"
+  | "fp16"
+  | "q8"
+  | "int8"
+  | "uint8"
+  | "q4"
+  | "bnb4"
+  | "q4f16"
+  | "q2"
+  | "q2f16"
+  | "q1"
+  | "q1f16";
+
+export type ChatModelInfo = {
+  id: string;
+  dtype: ModelDtype;
+  label: string;
+  description: string;
+  approxSizeMb: number;
+};
+
+export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
+  smollm2: {
+    id: "onnx-community/SmolLM2-360M-Instruct-ONNX",
+    dtype: "q4",
+    label: "SmolLM2 (360M)",
+    description: "Small and fast — the default. Good for quick answers and quiz generation.",
+    approxSizeMb: 387,
+  },
+  "gemma3-1b": {
+    id: "onnx-community/gemma-3-1b-it-ONNX",
+    dtype: "q4",
+    label: "Gemma 3 (1B)",
+    description: "Larger and more capable, at more than double the download size.",
+    approxSizeMb: 859,
+  },
+};
+
+export const DEFAULT_CHAT_MODEL: ChatModelChoice = "smollm2";
+const CHAT_MODEL_CHOICE_KEY = "chat_model_choice";
+
+function isChatModelChoice(value: string): value is ChatModelChoice {
+  return value === "smollm2" || value === "gemma3-1b";
+}
+
+/** The model the user has selected in Profile > AI Settings (see Feature
+ * 47) — same `appSettings` key/value pattern as every other on-device-AI
+ * preference in this app. Defaults to the small model so a fresh install
+ * never silently prefers the larger download. */
+export async function getSelectedChatModel(): Promise<ChatModelChoice> {
+  const row = await deviceDb.appSettings.get(CHAT_MODEL_CHOICE_KEY);
+  return row && isChatModelChoice(row.value) ? row.value : DEFAULT_CHAT_MODEL;
+}
+
+export async function setSelectedChatModel(choice: ChatModelChoice): Promise<void> {
+  await deviceDb.appSettings.put({ key: CHAT_MODEL_CHOICE_KEY, value: choice });
+}
 
 export type ModelProgress = {
   status: string;
@@ -44,59 +114,81 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-let pipelinePromise: Promise<Generator> | null = null;
+// Keyed per model choice — not a single slot — so switching the Profile
+// setting doesn't discard an already-loaded model still usable this
+// session, and loading one model never blocks or clobbers the other.
+const pipelinePromises = new Map<ChatModelChoice, Promise<Generator>>();
 
-export function loadChatModel(onProgress?: (p: ModelProgress) => void): Promise<Generator> {
-  if (!pipelinePromise) {
-    pipelinePromise = (async () => {
-      const { pipeline } = await import("@huggingface/transformers");
-      for (let attempt = 0; ; attempt++) {
-        try {
-          return await pipeline("text-generation", MODEL_ID, {
-            dtype: MODEL_DTYPE,
-            progress_callback: onProgress,
-          });
-        } catch (err) {
-          if (attempt >= TRANSIENT_RETRY_ATTEMPTS || !isTransientFetchError(err)) throw err;
-          console.error(
-            `Transient failure loading chat model (attempt ${attempt + 1}), retrying`,
-            err,
-          );
-          await delay(TRANSIENT_RETRY_DELAY_MS);
-        }
+/** Loads the given model (or, if omitted, whichever the user has selected
+ * in Profile > AI Settings — see getSelectedChatModel). Existing callers
+ * that don't care which model — they just want "the current one" — don't
+ * need to change. */
+export async function loadChatModel(
+  onProgress?: (p: ModelProgress) => void,
+  modelChoice?: ChatModelChoice,
+): Promise<Generator> {
+  const choice = modelChoice ?? (await getSelectedChatModel());
+  const existing = pipelinePromises.get(choice);
+  if (existing) return existing;
+
+  const { id, dtype } = CHAT_MODELS[choice];
+  const promise = (async () => {
+    const { pipeline } = await import("@huggingface/transformers");
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await pipeline("text-generation", id, {
+          dtype,
+          progress_callback: onProgress,
+        });
+      } catch (err) {
+        if (attempt >= TRANSIENT_RETRY_ATTEMPTS || !isTransientFetchError(err)) throw err;
+        console.error(
+          `Transient failure loading chat model (attempt ${attempt + 1}), retrying`,
+          err,
+        );
+        await delay(TRANSIENT_RETRY_DELAY_MS);
       }
-    })();
-    // Same reasoning as ai-model.ts: don't cache a rejected promise, so
-    // the next attempt retries clean instead of failing forever.
-    pipelinePromise.catch(() => {
-      pipelinePromise = null;
-    });
-  }
-  return pipelinePromise;
+    }
+  })();
+  pipelinePromises.set(choice, promise);
+  // Same reasoning as ai-model.ts: don't cache a rejected promise, so the
+  // next attempt retries clean instead of failing forever.
+  promise.catch(() => {
+    pipelinePromises.delete(choice);
+  });
+  return promise;
 }
 
-/** Whether the model's actual weight file (the large one, not the small
- * config/tokenizer files) made it into Cache Storage — found to matter by
- * real testing, not assumed: transformers.js's own cache-write for that
- * file can fail with a caught, non-fatal "Unexpected internal error" from
- * the browser's Cache API (observed in this project's sandboxed test
- * environment; storage quota was nowhere near exhausted at the time, so
- * this isn't a quota problem — it looks like a real Cache API limitation
- * for a single very large entry). transformers.js swallows that error and
- * proceeds — the model still works for the rest of *this* session, but
- * nothing was actually saved for next time, silently, despite the UI
- * otherwise saying "downloaded." This lets the UI tell the difference
- * instead of overselling offline-readiness that wasn't achieved. Not yet
- * confirmed whether this is sandbox-specific or reproduces on a real
- * device — see REAL_DEVICE_TESTING.md. */
-export async function isModelCachedForOffline(): Promise<boolean> {
+/** Whether the given model's actual weight file (the large one, not the
+ * small config/tokenizer files) made it into Cache Storage — found to
+ * matter by real testing, not assumed: transformers.js's own cache-write
+ * for that file can fail with a caught, non-fatal "Unexpected internal
+ * error" from the browser's Cache API (observed in this project's
+ * sandboxed test environment; storage quota was nowhere near exhausted at
+ * the time, so this isn't a quota problem — it looks like a real Cache
+ * API limitation for a single very large entry). transformers.js swallows
+ * that error and proceeds — the model still works for the rest of *this*
+ * session, but nothing was actually saved for next time, silently,
+ * despite the UI otherwise saying "downloaded." This lets the UI tell the
+ * difference instead of overselling offline-readiness that wasn't
+ * achieved. Not yet confirmed whether this is sandbox-specific or
+ * reproduces on a real device — see REAL_DEVICE_TESTING.md. */
+export async function isModelCachedForOffline(modelChoice?: ChatModelChoice): Promise<boolean> {
   if (typeof caches === "undefined") return false;
+  const choice = modelChoice ?? (await getSelectedChatModel());
+  const modelId = CHAT_MODELS[choice].id;
   try {
     const cacheNames = await caches.keys();
     for (const name of cacheNames) {
       const cache = await caches.open(name);
       const keys = await cache.keys();
-      if (keys.some((req) => req.url.includes(MODEL_ID) && req.url.endsWith(".onnx"))) {
+      // A model whose quantized weights exceed ~2GB (Gemma 3 1B's q4
+      // export does) splits into a tiny ".onnx" stub plus the real
+      // weights in a separate ".onnx_data" file — checking only ".onnx"
+      // would only ever see the stub for a model shaped that way and
+      // wrongly report it never cached. Confirmed via the real file
+      // listing at onnx-community/gemma-3-1b-it-ONNX.
+      if (keys.some((req) => req.url.includes(modelId) && /\.onnx(_data)?$/.test(req.url))) {
         return true;
       }
     }
