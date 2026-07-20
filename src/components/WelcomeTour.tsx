@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import {
   CloudDownload,
   Sparkles,
@@ -66,8 +67,17 @@ export function WelcomeTour() {
   const { user, profile, completeOnboarding } = useAuth();
   const [step, setStep] = useState(0);
   const [dismissing, setDismissing] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const shouldShow = Boolean(user && profile && !profile.onboarding_completed_at && !dismissing);
+  // This walks through student-only features (Library downloads,
+  // on-device summaries) and is meaningless on /admin/* — but worse, its
+  // modal backdrop intercepts every click underneath it, so a lecturer
+  // who hasn't dismissed it yet would find the entire admin console
+  // unusable until they happened to notice and dismiss this dialog.
+  const onAdminConsole = pathname.startsWith("/admin");
+  const shouldShow = Boolean(
+    user && profile && !profile.onboarding_completed_at && !dismissing && !onAdminConsole,
+  );
   const current = STEPS[step];
   const last = step === STEPS.length - 1;
 

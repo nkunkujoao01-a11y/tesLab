@@ -112,6 +112,26 @@ export type FeedbackRow = {
   created_at: string;
 };
 
+// An admin-authored quiz question for a module — see Feature 57. Distinct
+// from the client-generated, per-student quizzes in `db.ts`; this is
+// shared catalog content, same access model as `materials`.
+export type ModuleQuizQuestionRow = {
+  id: string;
+  module_id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
+  created_at: string;
+};
+
+// A student's self-service enrollment in a module — a roster concept, not
+// an access gate (every module stays publicly readable). See Feature 58.
+export type ModuleEnrollmentRow = {
+  user_id: string;
+  module_id: string;
+  enrolled_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -130,6 +150,18 @@ export type Database = {
       materials: {
         Row: MaterialRow;
         Insert: Omit<MaterialRow, "created_at">;
+        Update: never;
+        Relationships: [];
+      };
+      module_quizzes: {
+        Row: ModuleQuizQuestionRow;
+        Insert: Omit<ModuleQuizQuestionRow, "created_at">;
+        Update: never;
+        Relationships: [];
+      };
+      module_enrollments: {
+        Row: ModuleEnrollmentRow;
+        Insert: Omit<ModuleEnrollmentRow, "enrolled_at">;
         Update: never;
         Relationships: [];
       };

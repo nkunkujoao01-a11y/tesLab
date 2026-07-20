@@ -1746,7 +1746,165 @@ User asked for a way for students to report a problem or suggest an improvement,
 
 ### How it was validated
 
-`npx tsc --noEmit` and `eslint` clean on every new/changed file. Real Playwright run against a real production build: created a real test user via the Admin API, logged in, navigated to Profile, confirmed the new card renders correctly in place among the existing sections (screenshotted), confirmed the Send button is correctly disabled until real text is typed into the textarea. **Not yet tested**: an actual submission end-to-end (image upload + row insert), since that requires the migration above to be live first — the `feedback` table and `feedback-images` bucket don't exist in the database yet. Once applied, a real submission (with and without an attached image) should be verified before considering this fully done.
+`npx tsc --noEmit` and `eslint` clean on every new/changed file. Real Playwright run against a real production build: created a real test user via the Admin API, logged in, navigated to Profile, confirmed the new card renders correctly in place among the existing sections (screenshotted), confirmed the Send button is correctly disabled until real text is typed into the textarea. The user applied the migration via the Supabase Dashboard's SQL Editor and confirmed a real submission works end-to-end.
+
+---
+
+## Feature 54: the Summaries page never showed summaries for uploaded/extracted personal documents
+
+**Status: fixed and verified.**
+
+User reported the `/summaries` page ("Everything you asked the model") only ever showed "No summaries yet" even after generating real summaries — traced to `useAllSummaries()` (`use-summaries.ts`) only ever reading `db.materialSummaries` (catalog course-material summaries). A summary generated for a student's own uploaded/extracted PDF is stored directly on its `PersonalDocument` row (`summary`/`summarySections`/`summaryMethod`), a completely separate table that this hook never touched — so those summaries existed and worked fine in the document's own reader, but silently never appeared on the one page whose whole job is listing every summary the user has generated.
+
+**Fix**: added `AnySummary` (`src/lib/db.ts`) — a `{ kind: "material" | "personal", ... }` union covering both shapes. `useAllSummaries()` now merges both `materialSummaries` and `personalDocuments` (filtered to ones with a `summary` set) into one sorted feed. `summaries.tsx` renders either kind: `kind: "personal"` links straight to `/documents/$docId/summary` and shows the document's own title, `kind: "material"` keeps its existing module/material lookup and link logic unchanged. `npx tsc --noEmit` and `eslint` clean.
+
+---
+
+## Feature 55: quiz generation genuinely never completes in this sandboxed test environment — added a real timeout, since nothing bounded generation time at all before this
+
+**Status: root cause confirmed real (not fixed — needs real-device testing to know if it's sandbox-specific); a genuine, separate gap (no timeout anywhere in the AI Worker pipeline) found and fixed as part of investigating it.**
+
+User reported "quizzes are still not working." Reproduced with a real Playwright run: real test user, real SmolLM2 (chat model) download via Profile, real document upload, real "Quiz" click. **Quiz generation never completed after a full 10-minute wait** — progress never advanced past question 1 of 3. This isn't a new regression: `DEV_LOG.md`'s own Feature 37/38 write-up already found this exact symptom ("did not advance past question 1 within a 10-minute wait") in a much earlier session, attributed to CPU-bound WASM inference in this sandboxed test environment, not a code bug — still unresolved, still flagged in `REAL_DEVICE_TESTING.md` as needing an actual physical device to know whether real students would ever hit this.
+
+### The real, separate gap found while investigating
+
+Tracing the request all the way through `askChatModel` → `generateChatViaWorker` (`ai-worker-client.ts`) → `ai.worker.ts` found **no timeout anywhere in the entire pipeline** — a `send()` call's returned Promise only ever resolves/rejects when the worker posts a `done`/`error`/`busy` message back. If a generation call runs long (or is genuinely stuck), the UI is left showing "Generating…" indefinitely with zero feedback and zero recourse, on any device, regardless of what's actually causing the slowness. This is a real bug independent of whatever the root cause of the slowness itself turns out to be.
+
+**Fix (`ai-worker-client.ts`)**: `send()` now takes a `timeoutMs` (default 180s — deliberately generous and explicitly flagged as an untuned placeholder, since real on-device generation timing for this app's models has never been measured on actual target hardware). On timeout: the pending promise rejects with a clear, user-facing message, and a `cancel` message is sent to the worker via the `CancelRequest` protocol that already existed but nothing previously called. Cancelling only stops the worker from *posting* a stale result for that request — the underlying WASM `generator()` call itself isn't interruptible mid-computation (documented limitation, unchanged) — so the worker can still show `busy` for a request that arrives before the abandoned computation naturally finishes. Quiz generation's existing per-question try/catch already treats any single-question failure as "skip it, try the next" (no code change needed there), so this surfaces as the existing "Couldn't generate a quiz from this document. Try again." toast instead of an infinite hang.
+
+### How it was validated
+
+Real Playwright re-run after the fix: same real test user/document/flow. Question 1 timed out at the expected ~180s mark with the new clear error (`"The AI model is taking too long to respond…"`); questions 2 and 3 immediately failed with the existing `"AI worker is busy with another request"` (expected — the abandoned question-1 computation was still occupying the worker); the UI recovered within ~181s total and showed the real "Couldn't generate a quiz from this document. Try again." toast (screenshotted), instead of hanging with no feedback at all. `npx tsc --noEmit` and `eslint` clean.
+
+**Not fixed, flagged for next session**: quiz generation itself still doesn't produce a real quiz in this sandboxed environment — the underlying slowness (or possibly a genuine stall specific to this VM) is unresolved. Real-device testing (an actual phone/laptop, not this sandbox) is what would tell whether this is a real problem for NUST students or an artifact of this specific test environment's CPU constraints. If real-device testing confirms it's genuinely too slow even there, the real fixes to consider next are reducing `QUIZ_MAX_NEW_TOKENS` (currently 150 — likely more than a compact MCQ format needs) and/or reducing `QUIZ_QUESTION_COUNT`, not just a longer timeout.
+
+---
+
+## Feature 56: admin content upload — extract heading/lead/body/pull from a real PDF, Markdown, or text file instead of hand-typing
+
+**Status: implemented and verified end-to-end with real Playwright (real lecturer test account, real module + material creation, real file upload).**
+
+Part 1 of the admin-dashboard work the user asked for this session (upload/extraction, quiz authoring, enrollment — requested "all of it, in that order"). Before this, `admin.catalog.tsx`'s "Add a material" form was 100% hand-typed fields — no file upload, no PDF/text extraction anywhere in the admin flow, confirmed by an Explore pass before starting (this app already had PDF extraction, just never wired to admin content).
+
+### What changed
+
+- **`src/lib/admin-content-extract.ts`** (new) — `extractMaterialFields(file)`. Deliberately reuses this app's *existing* extraction/lead-derivation rather than inventing a second heuristic: PDFs go through the same `extractPdfText` (`pdf-extract.ts`) personal-document uploads already use; `.md`/`.txt` files are read as plain text (a `.md` file already uses the same `#`/`##`/`- ` convention `pdf-extract.ts` itself produces, so no separate parser needed). The first `#`/`##` line found becomes `heading` (falls back to the filename, sans extension, if none — never fabricated). The remaining text runs through `deriveDocumentLead()` (`document-lead.ts`, the same real word-frequency-scored lead/pull-quote picker personal documents already use at read time) to get a real `lead` and `pull` quote, with the rest becoming `body` (paragraph markers stripped, blank-line-joined to match the existing textarea's split convention).
+- **`src/routes/admin.catalog.tsx`** — new "Extract from PDF/Markdown/Text" button above the material form, using the same hidden-input-behind-a-styled-button pattern `documents.index.tsx` already uses for personal-PDF upload. Extraction **pre-fills the existing form fields** rather than silently saving — the lecturer still reviews and can edit heading/lead/body/pull/pages/size before clicking "Add material", the same "extract, then let a human confirm" discipline this app already applies to personal-document uploads.
+
+### How it was validated
+
+Real Playwright run: created a real test user via the Admin API, granted `is_lecturer` via a direct service-role write (the real one-time grant a project admin would do by hand, matching how `0008_lecturer_role.sql`'s own comment describes it), logged in, confirmed the lecturer gate doesn't block, created a real module, uploaded a real `.md` file with a real heading/lead/body, and confirmed all fields extracted correctly (screenshotted) — critically, the lead paragraph was correctly excluded from the body rather than duplicated, matching `deriveDocumentLead`'s own contract. Clicked "Add material" and confirmed it saved successfully to the real database (`"1 added so far"`). `npx tsc --noEmit` and `eslint` clean.
+
+**Not yet done** (remaining admin-dashboard scope, per the user's own ordering): quiz authoring for a module (no schema exists for admin-created quizzes yet — today's quizzes are only personally-generated, client-side, per-student), and an enrollment/roster concept (no table pairs `user_id`+`module_id` for "registered in this module" anywhere in the schema) plus an admin view of who's registered. Both are new schema + new migrations, not additions to existing tables — sized as their own follow-up passes.
+
+---
+
+## Feature 57: admin-authored quizzes for a module — part 2 of the admin dashboard
+
+**Status: implemented and verified end-to-end with real Playwright after the user applied the migration. One real, separate crash bug found and fixed along the way.**
+
+Part 2 of the admin-dashboard work ("all of it, in that order": upload/extraction, quizzes, enrollment). Deliberately separate from the existing per-student, client-generated quiz (`use-quiz.ts`, on-device model, stored in each student's own Dexie `generatedQuizzes` table) — this is one shared quiz a lecturer authors *once* for the whole module, the same "admin writes, every student reads" shape `materials` already has, reusing the exact `QuizQuestion` shape (`{question, options, correctIndex}`) and the existing `QuizPanel` component so no new quiz-rendering UI had to be built.
+
+### What changed
+
+- **`supabase/migrations/0010_module_quizzes.sql`** (new, **not yet applied**) — `module_quizzes` table, one row per question (not one JSON blob per quiz — same reasoning as `materials` being its own table: individual questions are what the admin UI adds one at a time). Public read, lecturer-only write — the exact same RLS policy shape `0008_lecturer_role.sql` already established for `materials`, reused rather than inventing a new access model for what's conceptually the same kind of shared-catalog content.
+- **`src/lib/supabase.ts`** — new `ModuleQuizQuestionRow` type + `module_quizzes` table entry.
+- **`src/lib/modules-api.ts`** — `Module` gained `quizQuestions: QuizQuestion[]`, populated via the same Supabase join pattern `materials` already uses (`select("*, materials(*), module_quizzes(*)")`, ordered by `created_at` on the joined table for stable question order), so it rides the exact same offline-cache path (`cacheModules`/IndexedDB) every other module field already gets — no separate fetch, no separate cache logic.
+- **`src/hooks/use-catalog-admin.ts`** — new `useCreateModuleQuizQuestion()`, same shape/error-handling pattern as `useCreateMaterial`.
+- **`src/routes/admin.catalog.tsx`** — new "Add a quiz question" section after "Add a material": question text, 4 option inputs with a radio button marking the correct one, running "N questions added" count.
+- **`src/routes/courses.$moduleId.index.tsx`** — new "Module quiz" section (only renders when `quizQuestions.length > 0`) reusing `QuizPanel` bare, the same way `documents.$docId.index.tsx` already does — no new quiz UI needed since the shape already matched.
+
+### Real bug found and fixed while validating: a module with no materials yet crashed the whole page
+
+Testing this feature meant creating a real module with a quiz question but *zero* materials (a real, plausible ordering — a lecturer might add the quiz before uploading any readings). That crashed `courses.$moduleId.index.tsx` outright (`TypeError: Cannot read properties of undefined (reading 'id')`, caught by the route's generic error boundary as "This page did not load") — two spots (`module.materials[0].id` in the "Open a material" shortcut and the sidebar's "Resume reading" card) assumed at least one material always exists, true of every module in this app's history so far (seed data and the admin flow both always had materials front and center) but never actually enforced anywhere. Fixed by guarding both on `module.materials.length > 0`, with a real fallback message ("No materials yet — a summary will show up here once one's added and opened.") instead of just hiding the shortcut silently.
+
+### How it was validated
+
+`npx tsc --noEmit` and `eslint` clean on every new/changed file. Real Playwright run after the user applied `0010_module_quizzes.sql`: real lecturer test account created a real module and a real quiz question through the admin form ("1 question added" confirmed); a *second*, real, non-lecturer student test account logged in separately and the module page correctly rendered the real question and its four options via `QuizPanel` — confirming the public-read RLS policy and the join in `modules-api.ts` both work as intended. The zero-materials crash above was found during this same run (module had a quiz but no materials yet) and confirmed fixed by rebuilding and re-running the identical test.
+
+**Not yet done**: enrollment/roster (part 3) — still needs its own new schema (no table pairs `user_id`+`module_id` for "registered in this module" anywhere yet) and an admin-facing roster view.
+
+---
+
+## Feature 58: module enrollment/roster — part 3 of the admin dashboard (all three parts now built)
+
+**Status: implemented, `npx tsc --noEmit`/`eslint` clean. Migration written but not yet applied to the live project — needs the user to run it, same as every prior migration.**
+
+### Scope decision made explicitly, not assumed
+
+Enrollment here is a **roster concept, not an access gate**. Every module has been publicly readable in this app since `0001_init.sql`, and nothing in the user's actual request ("the admin can see who is registered for their module") asked to change that — it describes a roster, not a paywall. Enrolling is self-service (a student taps a button on a module they're taking), not admin-assigned, since there's no existing concept of admin-to-student assignment anywhere in this schema to build one on top of. This is a real, meaningful interpretation choice — flagged here rather than silently baked in, since gating access would have been a much bigger, more disruptive change nobody asked for.
+
+### What changed
+
+- **`supabase/migrations/0011_module_enrollments.sql`** (new, **not yet applied**) — `module_enrollments` table (composite `user_id`+`module_id` primary key, matching how `materials` already uses a composite key for the same "unique per parent" reason). Owner-only RLS for managing your own enrollment (same shape as `personal_documents`), plus a **new** "Lecturers can view all enrollments" policy — there's no per-module ownership concept anywhere in this schema (any lecturer can already edit any module per `0008_lecturer_role.sql`), so this grants roster visibility the same "any lecturer, any shared content" way rather than inventing ownership this pass didn't ask for. Also adds **"Lecturers can view all profiles"** — a roster of bare user IDs is useless without real names, and `profiles`' existing self-only read policy would otherwise block a lecturer from seeing anyone else's `full_name`.
+- **`src/lib/supabase.ts`** — new `ModuleEnrollmentRow` type + table entry.
+- **`src/hooks/use-enrollment.ts`** (new) — `useModuleEnrollment(moduleId)` (a student's own enrolled/not-enrolled state + toggle) and `useModuleRoster(moduleId)` (admin roster). Fetched directly from Supabase, not cached in IndexedDB like catalog content — membership needs to reflect reality immediately, not ride the "seen at least once, might be stale" contract `modules-api.ts`'s offline cache deliberately accepts for read-only browsing. The roster hook deliberately does **two** real queries (enrollments, then profiles by id) rather than one embedded-join query — `module_enrollments` has no direct foreign key to `public.profiles` (both merely reference `auth.users` independently), so a `profiles(full_name)` embed isn't a relationship PostgREST can actually infer.
+- **`src/routes/courses.$moduleId.index.tsx`** — new "Enrol in this module" / "Enrolled" toggle button in the module header.
+- **`src/routes/admin.catalog.tsx`** — new "Registered students" section listing everyone enrolled in the just-created module, with a relative enrollment timestamp.
+
+### How it was validated
+
+`npx tsc --noEmit` and `eslint` clean on every new/changed file. **Not yet tested end-to-end** — the `module_enrollments` table doesn't exist until the migration above is applied. Once applied: verify with a real student test account enrolling/unenrolling, and a real lecturer test account confirming the roster shows that student's real name and a real timestamp.
+
+**All three parts of the admin dashboard the user asked for are now built** (upload/extraction — Feature 56; quiz authoring — Feature 57; enrollment/roster — this feature) — pending the two outstanding migrations (`0010`, `0011`) being applied and this last one's real end-to-end verification.
+
+---
+
+## Feature 59: a brand-new, visually-distinct admin console (all 3 admin-dashboard parts wired into one real UI) — and a critical, self-inflicted RLS bug found and fixed along the way
+
+**Status: console built and verified for real. One severe, real bug found in this session's own earlier migration (0011) — a production-breaking policy recursion — found and fixed. Three migrations need applying (`0011`, `0012`, and the `0013` hotfix), with `0013` urgent.**
+
+User asked for a genuinely separate admin dashboard — "completely different" from the student app's look, its own layout and features — rather than the single-page `/admin/catalog` form Features 56-58 had been extending. Designed via the `artifact-design` skill first (a graphite/ledger "instrument panel" concept, reviewed and approved by the user as an artifact mockup before any real code), then built for real.
+
+### What changed
+
+- **`src/styles.css`** — new `console-*` design tokens (Tailwind v4 `@theme`/`:root` custom properties, same mechanism as the existing `prestige-*` tokens): a dark graphite palette, monospace headings/data vs. the student app's serif, kept as its own deliberately single-dark-theme world (an instrument-panel concept, not a light/dark toggle target).
+- **`src/components/AdminShell.tsx`** (new) — the console's persistent sidebar shell (desktop) / condensed top bar (mobile), with real nav badge counts (modules, feedback) fetched live, not hardcoded.
+- **`src/lib/admin-console-api.ts`** (new) — real query functions: `fetchAdminOverview()` (stat tiles + recent feedback + recent enrollments, six queries run in parallel), `fetchAdminModules()` (every module with real materials/quiz/enrolled counts via the same join-then-count-client-side pattern `modules-api.ts` already uses), `fetchAdminFeedback()` (every submission with the submitter's real name resolved and signed URLs generated for each attached image, since the bucket is private).
+- **New routes**, replacing the old single-page `admin.catalog.tsx` (deleted):
+  - `admin.tsx` — layout: the lecturer gate now lives here once, inherited by every child route, instead of being duplicated per-page.
+  - `admin.index.tsx` (`/admin`) — Overview: real stat tiles, feedback feed, recent-registrations feed.
+  - `admin.modules.index.tsx` (`/admin/modules`) — real modules table with per-row status pills (Draft / No quiz yet / Published, derived from real counts, not stored state).
+  - `admin.modules.new.tsx` (`/admin/modules/new`) — module creation, moved from the old page.
+  - `admin.modules.$moduleId.tsx` (`/admin/modules/:id`) — **a real, new capability**: manage an *existing* module's materials/quiz/roster after leaving the creation flow, which the old `admin.catalog.tsx` genuinely couldn't do (it only ever worked on the module just created in that session).
+  - `admin.feedback.tsx` (`/admin/feedback`) — the full feedback inbox with real submitter names and real images.
+- **`supabase/migrations/0012_admin_console_access.sql`** (new, **not yet applied**) — lecturer read access to `feedback` (table) and `feedback-images` (storage), needed for the Feedback inbox to show everyone's submissions, not just the lecturer's own.
+- **`src/routes/profile.tsx`** — the "Add course content" settings row now points at `/admin` and reads "Admin console".
+
+### Critical bug found while testing: infinite RLS recursion, breaking profile loads app-wide
+
+Testing the console for real (`console-test-*` test user) surfaced a real, severe Postgres error on the very first request: `infinite recursion detected in policy for relation "profiles"` (error `42P17`). Root cause: `0011_module_enrollments.sql`'s own "Lecturers can view all profiles" policy lives **on** `public.profiles` and checks `is_lecturer` via a subquery **back into** `public.profiles` — a genuine self-reference. Postgres has to apply every one of a table's RLS policies to evaluate any access to that table, including a subquery from within one of its own policies, so this recurses. Because `useAuth()` fetches the current user's own profile on effectively every page load, this didn't just break the admin console it was written for — it broke **every profile read for every user, app-wide**, the moment `0011` was applied to the live project.
+
+**Fix (`0013_fix_profiles_recursion.sql`, new)**: a `SECURITY DEFINER` helper function, `public.is_lecturer()`, that checks the flag with RLS bypassed for its own internal lookup — the standard, documented way to check a role from within a policy on the table that role lives on, since a `SECURITY DEFINER` function's internal table access doesn't re-trigger the calling policy. Every "Lecturers can view all ..." policy from this session (`profiles`, `module_enrollments`, `feedback`, `storage.objects`) now goes through this one function instead of a raw subquery, closing off the same class of bug everywhere it could recur, not just the one table where it actually did.
+
+**This migration is urgent** — if `0011` has already been applied to the live project, real users are hitting broken profile loads right now until `0013` is applied.
+
+### How it was validated
+
+`npx tsc --noEmit` and `eslint` clean on every new/changed file. Real Playwright run against a real production build surfaced the recursion bug directly (not guessed at) — a real lecturer test account's profile fetch failed with the real Postgres error above on `/admin`, `/admin/modules`, and `/admin/feedback` alike. Full re-verification (console loads with real stats, modules list shows real counts, feedback inbox shows real submissions with images) is pending `0013` being applied.
+
+---
+
+## Feature 60: `0013`'s recursion fix confirmed live, plus two more real bugs found by finishing the interrupted admin-console verification
+
+Feature 59 left off mid-verification: the RLS recursion bug (`42P17` on `public.profiles`) had been found and `0013_fix_profiles_recursion.sql` written, but not yet confirmed applied. This session picked that up.
+
+**First attempt: the user reported applying `0011`/`0012`/`0013`, but the bug was still live.** Rather than trust the report, re-ran the same direct probe — signed in as a real, freshly-created lecturer test account (via the Admin API) and read `profiles` directly. Still got the exact `42P17` error. Called `public.is_lecturer()` (the function `0013` creates) via `supabase.rpc()` as confirmation: `PGRST202 — Could not find the function`. The function didn't exist at all, meaning `0013` had not actually taken effect, most likely because Supabase's SQL Editor runs a pasted script as one transaction — if the `create or replace function ... as $$ ... $$;` statement failed (a mis-pasted dollar-quote is the classic way this happens through a browser textarea), the whole script, including the four policy rewrites after it, would silently roll back together. Reported this precisely rather than re-guessing, and asked the user to paste the file fresh rather than re-run whatever was already in the editor.
+
+**Second attempt, run fresh: confirmed fixed.** Same direct probe (`rpc('is_lecturer')` returns `false` cleanly; a real authenticated lecturer session reading their own profile row and all profiles succeeds with no error) proved the recursion is actually gone at the Postgres level — not just no error observed, but the mechanism itself (the SECURITY DEFINER function) verified present and callable.
+
+**Two more real, unrelated bugs turned up while finishing the full end-to-end Playwright pass:**
+
+1. **`useAuth()`'s `loading` flag lied about profile readiness** (`src/hooks/use-auth.tsx`). `loading` flipped to `false` as soon as the Supabase session check resolved, but the profile row is fetched in a second, later effect keyed on `user`. Any consumer reading `!profile?.is_lecturer` right as `loading` becomes `false` — exactly what `/admin`'s gate does — could catch that gap and see `profile === null`, misreading a real lecturer as "not a lecturer." Caught directly: a Playwright run hit the "Lecturer access only" gate for an account confirmed (via a separate direct DB check) to already have `is_lecturer = true`. Fixed by splitting `sessionLoading`/`profileLoading` and exposing `loading = sessionLoading || profileLoading`, so the gate can't fire until the profile fetch has actually settled either way.
+2. **The student welcome-tour modal blocks all clicks on the admin console** (`src/components/WelcomeTour.tsx`). It's mounted once at the app root with no route scoping, so any signed-in user who hasn't dismissed it yet sees it on every page — including `/admin/*`, where its content ("Download on Wi-Fi", "Open a module in your Library") is meaningless and its modal backdrop silently intercepts every click underneath, making the entire admin console unusable until the user happens to notice and dismiss it. Caught directly: a Playwright click on "Create module" hung for the full 30s timeout with Playwright's own trace showing `<div ... class="fixed inset-0 z-50 bg-black/80"> intercepts pointer events`. Fixed by reading the route pathname (`useRouterState`, same pattern `AdminShell.tsx` already uses) and suppressing the tour whenever `pathname.startsWith("/admin")`. (On the student side this is correct, intended behavior, not a bug — a modal should block the page behind it; the fix only scopes it away from the console.)
+
+### How it was validated
+
+`npx tsc --noEmit` and `eslint` clean on both changed files. A single real Playwright run, against a real production build, drove the entire admin console end-to-end with real throwaway accounts (created/deleted via the Admin API) and real data: lecturer signs in and sees their real name, not their email; `/admin` overview loads with real counts (modules, feedback); a real module, material, and quiz question were created through the actual forms; the feedback inbox showed a real prior submission with the real submitter's name; a separate student account signed in, was correctly blocked from `/admin`, dismissed the (correctly-shown, on this route) welcome tour, enrolled in the new module, and saw the real quiz question rendered on the module page; the lecturer's roster then showed that same real student's real name. Zero console errors except one unexplained `400` on a single resource load during the lecturer session that didn't block anything — not yet root-caused, noted below.
+
+Two of this session's own test-script bugs are worth naming so they aren't mistaken for app bugs later: an early run's `waitForURL` regex assumed UUID-shaped module IDs (`[0-9a-f-]+`), but this schema's module `id` is a text slug derived from the module code (e.g. `vrf60140`) — the regex just needed widening, the redirect itself always worked. And a run's `moduleId` variable stayed unset after that same regex failure, so cleanup skipped deleting the created test module — one orphaned "Verification Module" row was found and removed manually afterward via a direct query; worth a quick look at the modules table if a stray `Verification Module`/`VRF#####` ever turns up again.
+
+**Not yet investigated**: the single `[lecturer] Failed to load resource: the server responded with a status of 400 ()` console error mentioned above — captured but not traced to a specific request, and didn't affect any functional outcome in this run. Worth a closer look (e.g. a response listener scoped to non-2xx requests) if it recurs.
 
 ---
 

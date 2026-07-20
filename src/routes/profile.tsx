@@ -556,14 +556,14 @@ function Profile() {
               {profile?.is_lecturer && (
                 <li>
                   <Link
-                    to="/admin/catalog"
+                    to="/admin"
                     className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
                   >
                     <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
                       <BookPlus className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-prestige-deep">Add course content</p>
+                      <p className="text-sm font-medium text-prestige-deep">Admin console</p>
                       <p className="text-[11px] text-muted-foreground">Lecturer tools</p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />

@@ -13,6 +13,7 @@
 import type { ChatTurn } from "@/lib/ai-chat";
 import type {
   ChatGenerateRequest,
+  CancelRequest,
   SummarizeRequest,
   WorkerRequest,
   WorkerResponse,
@@ -22,21 +23,43 @@ type PendingRequest = {
   onToken?: (piece: string) => void;
   resolve: (result: string) => void;
   reject: (err: Error) => void;
+  timeoutId: ReturnType<typeof setTimeout>;
 };
+
+// Real generation time on this app's small on-device models is genuinely
+// unmeasured on actual target hardware (see REAL_DEVICE_TESTING.md — still
+// open) and a sandboxed test VM's CPU-bound WASM inference has been found
+// to run far slower than that, so this is deliberately generous rather
+// than tuned to a real number. The point isn't to cut off a legitimately
+// slow-but-working generation — it's that nothing in this pipeline had
+// *any* upper bound before this, so a genuinely stuck (or just very slow)
+// call left the UI showing "Generating…" forever with no feedback and no
+// way out. A caller that can degrade gracefully (quiz generation skips a
+// timed-out question and tries the next one) benefits either way; one
+// that can't (Ask AI) at least surfaces a real error instead of an
+// infinite silent spinner.
+const DEFAULT_TIMEOUT_MS = 180_000;
 
 let workerPromise: Promise<Worker> | null = null;
 const pending = new Map<string, PendingRequest>();
 
+async function cancelRequest(requestId: string): Promise<void> {
+  const worker = await getWorker();
+  const cancel: CancelRequest = { type: "cancel", requestId };
+  worker.postMessage(cancel);
+}
+
 function handleMessage(message: WorkerResponse): void {
   const entry = pending.get(message.requestId);
-  // No entry means the caller already gave up on this request (or it was
-  // cancelled) — nothing left to notify.
+  // No entry means the caller already gave up on this request (timed out
+  // or was otherwise cancelled) — nothing left to notify.
   if (!entry) return;
 
   if (message.type === "token") {
     entry.onToken?.(message.piece);
     return;
   }
+  clearTimeout(entry.timeoutId);
   pending.delete(message.requestId);
   if (message.type === "done") {
     entry.resolve(message.result);
@@ -66,10 +89,23 @@ function makeRequestId(): string {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function send(request: WorkerRequest, onToken?: (piece: string) => void): Promise<string> {
+async function send(
+  request: WorkerRequest,
+  onToken?: (piece: string) => void,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<string> {
   const worker = await getWorker();
   return new Promise<string>((resolve, reject) => {
-    pending.set(request.requestId, { onToken, resolve, reject });
+    const timeoutId = setTimeout(() => {
+      pending.delete(request.requestId);
+      void cancelRequest(request.requestId);
+      reject(
+        new Error(
+          "The AI model is taking too long to respond — this device may be too slow for on-device generation right now.",
+        ),
+      );
+    }, timeoutMs);
+    pending.set(request.requestId, { onToken, resolve, reject, timeoutId });
     worker.postMessage(request);
   });
 }

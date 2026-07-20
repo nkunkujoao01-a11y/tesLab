@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { supabase, type MaterialContent } from "@/lib/supabase";
+import type { QuizQuestion } from "@/lib/quiz-gen";
 
 /** Slugifies a module code into a short, url-safe id matching the seed
  * data's convention ("SEN 301" -> "sen-301") — real modules need a real
@@ -145,4 +146,41 @@ export function useCreateMaterial() {
   }, []);
 
   return { createMaterial, creating };
+}
+
+export type NewModuleQuizQuestionInput = QuizQuestion & { moduleId: string };
+
+/** Adds one question to a module's shared, admin-authored quiz — see
+ * Feature 57. Same lecturer-only RLS gate as materials
+ * (0010_module_quizzes.sql), one row per question rather than one row per
+ * whole quiz, matching how materials are added one at a time too. */
+export function useCreateModuleQuizQuestion() {
+  const [creating, setCreating] = useState(false);
+
+  const createModuleQuizQuestion = useCallback(async (input: NewModuleQuizQuestionInput) => {
+    setCreating(true);
+    try {
+      const { error } = await supabase.from("module_quizzes").insert({
+        id: crypto.randomUUID(),
+        module_id: input.moduleId,
+        question: input.question.trim(),
+        options: input.options.map((o) => o.trim()),
+        correct_index: input.correctIndex,
+      });
+      if (error) {
+        console.error("Failed to add module quiz question", error);
+        toast.error(
+          error.code === "42501"
+            ? "Your account isn't set up as a lecturer yet."
+            : "Couldn't add the question. Try again.",
+        );
+        return false;
+      }
+      return true;
+    } finally {
+      setCreating(false);
+    }
+  }, []);
+
+  return { createModuleQuizQuestion, creating };
 }

@@ -1,6 +1,12 @@
 import { supabase } from "@/lib/supabase";
-import type { MaterialContent, MaterialRow, ModuleRow } from "@/lib/supabase";
+import type {
+  MaterialContent,
+  MaterialRow,
+  ModuleQuizQuestionRow,
+  ModuleRow,
+} from "@/lib/supabase";
 import { deviceDb } from "@/lib/db";
+import type { QuizQuestion } from "@/lib/quiz-gen";
 
 export type { MaterialContent };
 
@@ -78,6 +84,10 @@ export type Module = {
   summary: string;
   totalLessons: number;
   materials: Material[];
+  // Admin-authored, shared quiz for the whole module — see Feature 57.
+  // Empty for the (common, for now) case where a lecturer hasn't added
+  // one yet; distinct from each student's own generated quizzes.
+  quizQuestions: QuizQuestion[];
 };
 
 function mapMaterial(row: MaterialRow): Material {
@@ -91,7 +101,17 @@ function mapMaterial(row: MaterialRow): Material {
   };
 }
 
-function mapModule(row: ModuleRow & { materials: MaterialRow[] }): Module {
+function mapModuleQuizQuestion(row: ModuleQuizQuestionRow): QuizQuestion {
+  return {
+    question: row.question,
+    options: row.options,
+    correctIndex: row.correct_index,
+  };
+}
+
+function mapModule(
+  row: ModuleRow & { materials: MaterialRow[]; module_quizzes: ModuleQuizQuestionRow[] },
+): Module {
   return {
     id: row.id,
     code: row.code,
@@ -103,6 +123,7 @@ function mapModule(row: ModuleRow & { materials: MaterialRow[] }): Module {
     summary: row.summary,
     totalLessons: row.total_lessons,
     materials: row.materials.map(mapMaterial),
+    quizQuestions: row.module_quizzes.map(mapModuleQuizQuestion),
   };
 }
 
@@ -118,7 +139,11 @@ function mapModule(row: ModuleRow & { materials: MaterialRow[] }): Module {
 export async function fetchModules(): Promise<Module[]> {
   try {
     const { data, error } = await withTimeout(
-      supabase.from("modules").select("*, materials(*)").order("code"),
+      supabase
+        .from("modules")
+        .select("*, materials(*), module_quizzes(*)")
+        .order("code")
+        .order("created_at", { foreignTable: "module_quizzes" }),
     );
     if (error) throw error;
     const modules = (data ?? []).map(mapModule);
@@ -141,7 +166,12 @@ export async function fetchModules(): Promise<Module[]> {
 export async function fetchModule(id: string): Promise<Module | null> {
   try {
     const { data, error } = await withTimeout(
-      supabase.from("modules").select("*, materials(*)").eq("id", id).maybeSingle(),
+      supabase
+        .from("modules")
+        .select("*, materials(*), module_quizzes(*)")
+        .eq("id", id)
+        .order("created_at", { foreignTable: "module_quizzes" })
+        .maybeSingle(),
     );
     if (error) throw error;
     const module = data ? mapModule(data) : null;

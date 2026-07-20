@@ -22,6 +22,27 @@
   --color-prestige-gold: var(--prestige-gold);
   --color-prestige-cream: var(--prestige-cream);
 
+  /* Admin console's own palette — deliberately distinct from the
+     student-facing prestige-* tokens above (see DEV_LOG.md, Feature 59).
+     A graphite "instrument panel" world instead of the student app's warm
+     cream/serif look, since the two are genuinely different tools for
+     different audiences (a lecturer administering content vs. a student
+     reading it), not the same product re-skinned. */
+  --font-console-mono: var(--console-mono);
+  --font-console-sans: var(--console-sans);
+  --color-console-bg: var(--console-bg);
+  --color-console-surface: var(--console-surface);
+  --color-console-surface-2: var(--console-surface-2);
+  --color-console-border: var(--console-border);
+  --color-console-text: var(--console-text);
+  --color-console-text-dim: var(--console-text-dim);
+  --color-console-text-faint: var(--console-text-faint);
+  --color-console-accent: var(--console-accent);
+  --color-console-info: var(--console-info);
+  --color-console-good: var(--console-good);
+  --color-console-warn: var(--console-warn);
+  --color-console-critical: var(--console-critical);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -96,6 +117,26 @@
   --sidebar-accent-foreground: var(--prestige-deep);
   --sidebar-border: oklch(0.35 0.06 165 / 10%);
   --sidebar-ring: var(--prestige-gold);
+
+  /* Admin console — a deliberately single-world dark palette (an
+     instrument-panel/ledger concept, not a light/dark toggle target), same
+     reasoning the artifact-design pass used: it's a genuine aesthetic
+     choice for this specific tool, not an omitted light variant. */
+  --console-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas,
+    monospace;
+  --console-sans: -apple-system, "Segoe UI", system-ui, sans-serif;
+  --console-bg: #14181d;
+  --console-surface: #1b2027;
+  --console-surface-2: #232a33;
+  --console-border: #2c333c;
+  --console-text: #e9e6de;
+  --console-text-dim: #8a92a0;
+  --console-text-faint: #5c636e;
+  --console-accent: #d9914a;
+  --console-info: #4fa8a0;
+  --console-good: #6ea968;
+  --console-warn: #d1a13f;
+  --console-critical: #c1594a;
 }
 
 /* Defined but currently unused: nothing in the app ever applies this class

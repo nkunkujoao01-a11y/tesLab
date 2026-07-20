@@ -18,16 +18,21 @@ import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as AssistantRouteImport } from './routes/assistant'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocumentsIndexRouteImport } from './routes/documents.index'
 import { Route as CoursesIndexRouteImport } from './routes/courses.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as DocumentsDocIdRouteImport } from './routes/documents.$docId'
 import { Route as CoursesModuleIdRouteImport } from './routes/courses.$moduleId'
-import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
+import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
 import { Route as DocumentsDocIdIndexRouteImport } from './routes/documents.$docId.index'
 import { Route as CoursesModuleIdIndexRouteImport } from './routes/courses.$moduleId.index'
+import { Route as AdminModulesIndexRouteImport } from './routes/admin.modules.index'
 import { Route as DocumentsCollectionsCollectionIdRouteImport } from './routes/documents.collections.$collectionId'
 import { Route as DocumentsDocIdSummaryRouteImport } from './routes/documents.$docId.summary'
+import { Route as AdminModulesNewRouteImport } from './routes/admin.modules.new'
+import { Route as AdminModulesModuleIdRouteImport } from './routes/admin.modules.$moduleId'
 import { Route as DocumentsCollectionsCollectionIdIndexRouteImport } from './routes/documents.collections.$collectionId.index'
 import { Route as DocumentsCollectionsCollectionIdChatRouteImport } from './routes/documents.collections.$collectionId.chat'
 import { Route as CoursesModuleIdSummaryDocIdRouteImport } from './routes/courses.$moduleId.summary.$docId'
@@ -78,6 +83,11 @@ const AssistantRoute = AssistantRouteImport.update({
   path: '/assistant',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -93,6 +103,11 @@ const CoursesIndexRoute = CoursesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CoursesRoute,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const DocumentsDocIdRoute = DocumentsDocIdRouteImport.update({
   id: '/$docId',
   path: '/$docId',
@@ -103,10 +118,10 @@ const CoursesModuleIdRoute = CoursesModuleIdRouteImport.update({
   path: '/$moduleId',
   getParentRoute: () => CoursesRoute,
 } as any)
-const AdminCatalogRoute = AdminCatalogRouteImport.update({
-  id: '/admin/catalog',
-  path: '/admin/catalog',
-  getParentRoute: () => rootRouteImport,
+const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AdminRoute,
 } as any)
 const DocumentsDocIdIndexRoute = DocumentsDocIdIndexRouteImport.update({
   id: '/',
@@ -118,6 +133,11 @@ const CoursesModuleIdIndexRoute = CoursesModuleIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CoursesModuleIdRoute,
 } as any)
+const AdminModulesIndexRoute = AdminModulesIndexRouteImport.update({
+  id: '/modules/',
+  path: '/modules/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const DocumentsCollectionsCollectionIdRoute =
   DocumentsCollectionsCollectionIdRouteImport.update({
     id: '/collections/$collectionId',
@@ -128,6 +148,16 @@ const DocumentsDocIdSummaryRoute = DocumentsDocIdSummaryRouteImport.update({
   id: '/summary',
   path: '/summary',
   getParentRoute: () => DocumentsDocIdRoute,
+} as any)
+const AdminModulesNewRoute = AdminModulesNewRouteImport.update({
+  id: '/modules/new',
+  path: '/modules/new',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminModulesModuleIdRoute = AdminModulesModuleIdRouteImport.update({
+  id: '/modules/$moduleId',
+  path: '/modules/$moduleId',
+  getParentRoute: () => AdminRoute,
 } as any)
 const DocumentsCollectionsCollectionIdIndexRoute =
   DocumentsCollectionsCollectionIdIndexRouteImport.update({
@@ -156,6 +186,7 @@ const CoursesModuleIdReadDocIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/assistant': typeof AssistantRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
@@ -165,13 +196,17 @@ export interface FileRoutesByFullPath {
   '/progress': typeof ProgressRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
-  '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/courses/$moduleId': typeof CoursesModuleIdRouteWithChildren
   '/documents/$docId': typeof DocumentsDocIdRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
   '/courses/': typeof CoursesIndexRoute
   '/documents/': typeof DocumentsIndexRoute
+  '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
+  '/admin/modules/new': typeof AdminModulesNewRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
+  '/admin/modules/': typeof AdminModulesIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
@@ -188,10 +223,14 @@ export interface FileRoutesByTo {
   '/progress': typeof ProgressRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
-  '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin': typeof AdminIndexRoute
   '/courses': typeof CoursesIndexRoute
   '/documents': typeof DocumentsIndexRoute
+  '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
+  '/admin/modules/new': typeof AdminModulesNewRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
+  '/admin/modules': typeof AdminModulesIndexRoute
   '/courses/$moduleId': typeof CoursesModuleIdIndexRoute
   '/documents/$docId': typeof DocumentsDocIdIndexRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
@@ -202,6 +241,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/assistant': typeof AssistantRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
@@ -211,13 +251,17 @@ export interface FileRoutesById {
   '/progress': typeof ProgressRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
-  '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/courses/$moduleId': typeof CoursesModuleIdRouteWithChildren
   '/documents/$docId': typeof DocumentsDocIdRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
   '/courses/': typeof CoursesIndexRoute
   '/documents/': typeof DocumentsIndexRoute
+  '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
+  '/admin/modules/new': typeof AdminModulesNewRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
+  '/admin/modules/': typeof AdminModulesIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
@@ -229,6 +273,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/assistant'
     | '/courses'
     | '/dashboard'
@@ -238,13 +283,17 @@ export interface FileRouteTypes {
     | '/progress'
     | '/signup'
     | '/summaries'
-    | '/admin/catalog'
+    | '/admin/feedback'
     | '/courses/$moduleId'
     | '/documents/$docId'
+    | '/admin/'
     | '/courses/'
     | '/documents/'
+    | '/admin/modules/$moduleId'
+    | '/admin/modules/new'
     | '/documents/$docId/summary'
     | '/documents/collections/$collectionId'
+    | '/admin/modules/'
     | '/courses/$moduleId/'
     | '/documents/$docId/'
     | '/courses/$moduleId/read/$docId'
@@ -261,10 +310,14 @@ export interface FileRouteTypes {
     | '/progress'
     | '/signup'
     | '/summaries'
-    | '/admin/catalog'
+    | '/admin/feedback'
+    | '/admin'
     | '/courses'
     | '/documents'
+    | '/admin/modules/$moduleId'
+    | '/admin/modules/new'
     | '/documents/$docId/summary'
+    | '/admin/modules'
     | '/courses/$moduleId'
     | '/documents/$docId'
     | '/courses/$moduleId/read/$docId'
@@ -274,6 +327,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/assistant'
     | '/courses'
     | '/dashboard'
@@ -283,13 +337,17 @@ export interface FileRouteTypes {
     | '/progress'
     | '/signup'
     | '/summaries'
-    | '/admin/catalog'
+    | '/admin/feedback'
     | '/courses/$moduleId'
     | '/documents/$docId'
+    | '/admin/'
     | '/courses/'
     | '/documents/'
+    | '/admin/modules/$moduleId'
+    | '/admin/modules/new'
     | '/documents/$docId/summary'
     | '/documents/collections/$collectionId'
+    | '/admin/modules/'
     | '/courses/$moduleId/'
     | '/documents/$docId/'
     | '/courses/$moduleId/read/$docId'
@@ -300,6 +358,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AssistantRoute: typeof AssistantRoute
   CoursesRoute: typeof CoursesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
@@ -309,7 +368,6 @@ export interface RootRouteChildren {
   ProgressRoute: typeof ProgressRoute
   SignupRoute: typeof SignupRoute
   SummariesRoute: typeof SummariesRoute
-  AdminCatalogRoute: typeof AdminCatalogRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -377,6 +435,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssistantRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -398,6 +463,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesIndexRouteImport
       parentRoute: typeof CoursesRoute
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/documents/$docId': {
       id: '/documents/$docId'
       path: '/$docId'
@@ -412,12 +484,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesModuleIdRouteImport
       parentRoute: typeof CoursesRoute
     }
-    '/admin/catalog': {
-      id: '/admin/catalog'
-      path: '/admin/catalog'
-      fullPath: '/admin/catalog'
-      preLoaderRoute: typeof AdminCatalogRouteImport
-      parentRoute: typeof rootRouteImport
+    '/admin/feedback': {
+      id: '/admin/feedback'
+      path: '/feedback'
+      fullPath: '/admin/feedback'
+      preLoaderRoute: typeof AdminFeedbackRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/documents/$docId/': {
       id: '/documents/$docId/'
@@ -433,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesModuleIdIndexRouteImport
       parentRoute: typeof CoursesModuleIdRoute
     }
+    '/admin/modules/': {
+      id: '/admin/modules/'
+      path: '/modules'
+      fullPath: '/admin/modules/'
+      preLoaderRoute: typeof AdminModulesIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/documents/collections/$collectionId': {
       id: '/documents/collections/$collectionId'
       path: '/collections/$collectionId'
@@ -446,6 +525,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/documents/$docId/summary'
       preLoaderRoute: typeof DocumentsDocIdSummaryRouteImport
       parentRoute: typeof DocumentsDocIdRoute
+    }
+    '/admin/modules/new': {
+      id: '/admin/modules/new'
+      path: '/modules/new'
+      fullPath: '/admin/modules/new'
+      preLoaderRoute: typeof AdminModulesNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/modules/$moduleId': {
+      id: '/admin/modules/$moduleId'
+      path: '/modules/$moduleId'
+      fullPath: '/admin/modules/$moduleId'
+      preLoaderRoute: typeof AdminModulesModuleIdRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/documents/collections/$collectionId/': {
       id: '/documents/collections/$collectionId/'
@@ -477,6 +570,24 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminRouteChildren {
+  AdminFeedbackRoute: typeof AdminFeedbackRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminModulesModuleIdRoute: typeof AdminModulesModuleIdRoute
+  AdminModulesNewRoute: typeof AdminModulesNewRoute
+  AdminModulesIndexRoute: typeof AdminModulesIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminFeedbackRoute: AdminFeedbackRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminModulesModuleIdRoute: AdminModulesModuleIdRoute,
+  AdminModulesNewRoute: AdminModulesNewRoute,
+  AdminModulesIndexRoute: AdminModulesIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface CoursesModuleIdRouteChildren {
   CoursesModuleIdIndexRoute: typeof CoursesModuleIdIndexRoute
@@ -558,6 +669,7 @@ const DocumentsRouteWithChildren = DocumentsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AssistantRoute: AssistantRoute,
   CoursesRoute: CoursesRouteWithChildren,
   DashboardRoute: DashboardRoute,
@@ -567,7 +679,6 @@ const rootRouteChildren: RootRouteChildren = {
   ProgressRoute: ProgressRoute,
   SignupRoute: SignupRoute,
   SummariesRoute: SummariesRoute,
-  AdminCatalogRoute: AdminCatalogRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

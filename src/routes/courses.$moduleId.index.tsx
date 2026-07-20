@@ -10,8 +10,11 @@ import {
   ChevronRight,
   Trash2,
   Loader2,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
+import { QuizPanel } from "@/components/QuizFlashcards";
 import { formatMb } from "@/lib/mock-data";
 import { fetchModule, type Material } from "@/lib/modules-api";
 import { cn } from "@/lib/utils";
@@ -34,7 +37,12 @@ import {
   useDeleteModule,
 } from "@/hooks/use-downloads";
 import { useLatestModuleSummary } from "@/hooks/use-summaries";
-import { useReadMaterialIds, useMaterialReadProgress, moduleCompletion } from "@/hooks/use-activity";
+import {
+  useReadMaterialIds,
+  useMaterialReadProgress,
+  moduleCompletion,
+} from "@/hooks/use-activity";
+import { useModuleEnrollment } from "@/hooks/use-enrollment";
 
 export const Route = createFileRoute("/courses/$moduleId/")({
   loader: async ({ params }) => {
@@ -45,15 +53,11 @@ export const Route = createFileRoute("/courses/$moduleId/")({
   head: ({ loaderData }) => ({
     meta: [
       {
-        title: loaderData
-          ? `${loaderData.module.title} — eLearn`
-          : "Module — eLearn",
+        title: loaderData ? `${loaderData.module.title} — eLearn` : "Module — eLearn",
       },
       {
         name: "description",
-        content:
-          loaderData?.module.summary ??
-          "Module details, materials, and AI summary.",
+        content: loaderData?.module.summary ?? "Module details, materials, and AI summary.",
       },
     ],
   }),
@@ -91,10 +95,7 @@ function MaterialRow({
         {isDownloaded && readProgress > 0 && (
           <div className="mt-1.5 flex items-center gap-1.5">
             <div className="h-0.5 w-16 overflow-hidden rounded-full bg-prestige-deep/10">
-              <div
-                className="h-full bg-prestige-gold"
-                style={{ width: `${readProgress}%` }}
-              />
+              <div className="h-full bg-prestige-gold" style={{ width: `${readProgress}%` }} />
             </div>
             <span className="text-[10px] font-medium text-prestige-mid">{readProgress}% read</span>
           </div>
@@ -187,6 +188,13 @@ function ModuleDetail() {
     });
   };
 
+  const {
+    enrolled,
+    loading: enrollmentLoading,
+    toggling,
+    toggle: toggleEnrollment,
+  } = useModuleEnrollment(module.id);
+
   return (
     <MobileShell>
       {/* Top bar with back */}
@@ -215,6 +223,26 @@ function ModuleDetail() {
               <span className="h-1 w-1 rounded-full bg-prestige-gold" />
               <span>{module.lecturer}</span>
             </div>
+            {!enrollmentLoading && (
+              <button
+                type="button"
+                disabled={toggling}
+                onClick={() => void toggleEnrollment()}
+                className={cn(
+                  "mt-4 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all active:scale-[0.97] disabled:opacity-50",
+                  enrolled
+                    ? "bg-prestige-deep/5 text-prestige-mid ring-1 ring-prestige-deep/20"
+                    : "bg-prestige-deep text-prestige-cream",
+                )}
+              >
+                {enrolled ? (
+                  <UserCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
+                ) : (
+                  <UserPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                )}
+                {toggling ? "Updating…" : enrolled ? "Enrolled" : "Enrol in this module"}
+              </button>
+            )}
             <div className="mt-6 h-px w-16 bg-prestige-gold" />
           </header>
 
@@ -244,9 +272,9 @@ function ModuleDetail() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Remove this download?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        {module.title} and all of its downloaded materials will be removed from
-                        this device. You can download it again anytime — nothing is deleted from
-                        your account.
+                        {module.title} and all of its downloaded materials will be removed from this
+                        device. You can download it again anytime — nothing is deleted from your
+                        account.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -335,23 +363,39 @@ function ModuleDetail() {
                 ) : (
                   <>
                     <p className="mt-5 text-sm leading-relaxed text-prestige-cream/70">
-                      No AI summary yet. Open a material and generate one — it'll show up here.
+                      {module.materials.length > 0
+                        ? "No AI summary yet. Open a material and generate one — it'll show up here."
+                        : "No materials yet — a summary will show up here once one's added and opened."}
                     </p>
-                    <div className="mt-6">
-                      <Link
-                        to="/courses/$moduleId/read/$docId"
-                        params={{ moduleId: module.id, docId: module.materials[0].id }}
-                        className="inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-3 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
-                      >
-                        <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        Open a material
-                      </Link>
-                    </div>
+                    {module.materials.length > 0 && (
+                      <div className="mt-6">
+                        <Link
+                          to="/courses/$moduleId/read/$docId"
+                          params={{ moduleId: module.id, docId: module.materials[0].id }}
+                          className="inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-3 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
+                        >
+                          <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          Open a material
+                        </Link>
+                      </div>
+                    )}
                   </>
                 )}
               </article>
             </div>
           </section>
+
+          {/* Module quiz — admin-authored, shared across every student in
+              this module (see Feature 57); distinct from a student's own
+              on-device generated quiz for a single material. Only renders
+              when a lecturer has actually added questions. Same bare
+              QuizPanel usage as documents.$docId.index.tsx — it renders
+              its own "Quiz" label, no extra heading needed here. */}
+          {module.quizQuestions.length > 0 && (
+            <section className="animate-rise">
+              <QuizPanel questions={module.quizQuestions} />
+            </section>
+          )}
 
           {/* Progress footer */}
           <section className="animate-rise">
@@ -360,9 +404,7 @@ function ModuleDetail() {
                 <p className="eyebrow">Materials opened</p>
                 <p className="mt-1 font-display text-2xl text-prestige-deep">
                   {completion.opened}
-                  <span className="text-muted-foreground">
-                    /{completion.total}
-                  </span>
+                  <span className="text-muted-foreground">/{completion.total}</span>
                 </p>
               </div>
               <p className="font-display text-2xl text-prestige-deep">
@@ -380,28 +422,28 @@ function ModuleDetail() {
 
         {/* Side info */}
         <aside className="hidden space-y-4 lg:sticky lg:top-10 lg:block lg:h-fit">
-          <div className="rounded-2xl bg-card p-6 ring-1 ring-border/60">
-            <p className="eyebrow">Next lesson</p>
-            <p className="mt-2 font-display text-lg text-prestige-deep">
-              {module.chapter.split(" — ")[1] ?? "Coming up"}
-            </p>
-            <Link
-              to="/courses/$moduleId/read/$docId"
-              params={{ moduleId: module.id, docId: module.materials[0].id }}
-              className="mt-4 inline-flex w-full items-center justify-between rounded-lg bg-prestige-deep px-4 py-3 text-sm font-medium text-prestige-cream"
-            >
-              <span>Resume reading</span>
-              <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
-            </Link>
-          </div>
+          {module.materials.length > 0 && (
+            <div className="rounded-2xl bg-card p-6 ring-1 ring-border/60">
+              <p className="eyebrow">Next lesson</p>
+              <p className="mt-2 font-display text-lg text-prestige-deep">
+                {module.chapter.split(" — ")[1] ?? "Coming up"}
+              </p>
+              <Link
+                to="/courses/$moduleId/read/$docId"
+                params={{ moduleId: module.id, docId: module.materials[0].id }}
+                className="mt-4 inline-flex w-full items-center justify-between rounded-lg bg-prestige-deep px-4 py-3 text-sm font-medium text-prestige-cream"
+              >
+                <span>Resume reading</span>
+                <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+              </Link>
+            </div>
+          )}
           <div className="rounded-2xl bg-card p-6 ring-1 ring-border/60">
             <p className="eyebrow">Module size</p>
             <p className="mt-2 font-display text-lg text-prestige-deep">
               {formatMb(module.sizeMb)}
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Downloads once. Reads anywhere.
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">Downloads once. Reads anywhere.</p>
           </div>
         </aside>
       </div>
