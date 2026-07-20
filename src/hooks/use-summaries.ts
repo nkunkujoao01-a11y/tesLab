@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { liveQuery } from "dexie";
 import { toast } from "sonner";
-import { getUserDb, materialKey, type MaterialSummary } from "@/lib/db";
+import { getUserDb, materialKey, type MaterialSummary, type AnySummary } from "@/lib/db";
 import { generateStructuredSummary } from "@/lib/summarize-structured";
 import { logActivity } from "@/hooks/use-activity";
 import { useAuth } from "@/hooks/use-auth";
@@ -58,15 +58,18 @@ export function useLatestModuleSummary(moduleId: string): MaterialSummary | unde
   return summary;
 }
 
-/** Every summary the user has generated, across every module, newest
- * first — the real feed behind the Summaries page (see DEV_LOG.md,
- * Feature 25; it previously showed 4 hardcoded canned entries unrelated
- * to anything the user actually did). Sorted client-side rather than via
- * a Dexie index since `generatedAt` isn't indexed and per-user summary
- * counts are small (a few dozen at most). */
-export function useAllSummaries(): MaterialSummary[] {
+/** Every summary the user has generated, across every module *and* every
+ * personal document, newest first — the real feed behind the Summaries
+ * page (see DEV_LOG.md, Feature 25; it previously showed 4 hardcoded
+ * canned entries unrelated to anything the user actually did). Feature 54
+ * extended this to also read `personalDocuments` — a summary generated
+ * for a student's own uploaded/extracted PDF previously never showed up
+ * here at all, only catalog-material summaries did. Sorted client-side
+ * rather than via a Dexie index since `generatedAt` isn't indexed and
+ * per-user summary counts are small (a few dozen at most). */
+export function useAllSummaries(): AnySummary[] {
   const { user } = useAuth();
-  const [summaries, setSummaries] = useState<MaterialSummary[]>([]);
+  const [summaries, setSummaries] = useState<AnySummary[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -74,7 +77,24 @@ export function useAllSummaries(): MaterialSummary[] {
       return;
     }
     const db = getUserDb(user.id);
-    const sub = liveQuery(() => db.materialSummaries.toArray()).subscribe({
+    const sub = liveQuery(async () => {
+      const materials = await db.materialSummaries.toArray();
+      const personalDocs = await db.personalDocuments.toArray();
+      const materialItems: AnySummary[] = materials.map((m) => ({ kind: "material", ...m }));
+      const personalItems: AnySummary[] = personalDocs
+        .filter((d): d is typeof d & { summary: string } => Boolean(d.summary))
+        .map((d) => ({
+          kind: "personal",
+          key: `personal:${d.id}`,
+          docId: d.id,
+          title: d.title,
+          body: d.summary,
+          generatedAt: d.updatedAt,
+          method: d.summaryMethod,
+          sections: d.summarySections,
+        }));
+      return [...materialItems, ...personalItems];
+    }).subscribe({
       next: (rows) => setSummaries([...rows].sort((a, b) => b.generatedAt - a.generatedAt)),
       error: (err) => console.error("Failed to read summaries", err),
     });
@@ -116,7 +136,12 @@ export function useGenerateSummary() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
 
   const generateSummary = useCallback(
-    async (materialId: string, moduleId: string, sourceText: string, fallbackTitle = "Overview") => {
+    async (
+      materialId: string,
+      moduleId: string,
+      sourceText: string,
+      fallbackTitle = "Overview",
+    ) => {
       if (!user) return;
       const db = getUserDb(user.id);
       const key = materialKey(moduleId, materialId);

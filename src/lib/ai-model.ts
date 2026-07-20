@@ -34,6 +34,8 @@
 // and real-world WebGPU support on the budget Android devices this app
 // targets (NFR10) is still inconsistent, so it isn't a safe bet to build
 // around even if it turned out to help.
+import { summarizeViaWorker } from "@/lib/ai-worker-client";
+
 const MODEL_ID = "onnx-community/text_summarization-ONNX";
 const MODEL_DTYPE = "fp32";
 
@@ -103,11 +105,12 @@ export function loadSummarizerModel(onProgress?: (p: ModelProgress) => void): Pr
 // truncated defensively rather than left to error deep inside the runtime.
 const MAX_INPUT_CHARS = 3000;
 
-export async function summarizeWithModel(
-  text: string,
-  onProgress?: (p: ModelProgress) => void,
-): Promise<string> {
-  const summarizer = await loadSummarizerModel(onProgress);
+/** The actual on-device summarization call. Runs inside the AI worker
+ * (ai.worker.ts imports this directly) rather than on the main thread —
+ * see summarizeWithModel below, the main-thread-facing entry point every
+ * application caller actually uses. */
+export async function summarizeLocally(text: string): Promise<string> {
+  const summarizer = await loadSummarizerModel();
   const input = text.length > MAX_INPUT_CHARS ? text.slice(0, MAX_INPUT_CHARS) : text;
   // no_repeat_ngram_size guards against a real degeneration mode found
   // during Feature 20's investigation: on some source material (e.g. the
@@ -120,4 +123,18 @@ export async function summarizeWithModel(
   const summaryText = Array.isArray(result) ? result[0]?.summary_text : undefined;
   if (!summaryText) throw new Error("Model returned no summary text");
   return String(summaryText).trim();
+}
+
+/** Runs neural summarization off the main thread (see DEV_LOG.md, Feature
+ * 51) — same signature as before the worker migration, so existing
+ * callers (summarize-structured.ts) need no changes. `onProgress` is
+ * accepted but unused here: model *download* progress is a main-thread-
+ * only concern, tracked separately via loadSummarizerModel directly (see
+ * use-ai-model.ts) — no real caller of summarizeWithModel has ever passed
+ * one. */
+export async function summarizeWithModel(
+  text: string,
+  _onProgress?: (p: ModelProgress) => void,
+): Promise<string> {
+  return summarizeViaWorker(text);
 }

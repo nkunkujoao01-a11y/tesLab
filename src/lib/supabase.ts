@@ -101,6 +101,17 @@ export type DocumentCollectionRow = {
   updated_at: string;
 };
 
+// In-app feedback/bug reports, optionally with screenshots — see Feature
+// 53. Submit-once: no Update type, matching the migration's lack of an
+// update policy.
+export type FeedbackRow = {
+  id: string;
+  user_id: string;
+  message: string;
+  image_paths: string[];
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -160,6 +171,12 @@ export type Database = {
       document_collections: {
         Row: DocumentCollectionRow;
         Insert: DocumentCollectionRow;
+        Update: never;
+        Relationships: [];
+      };
+      feedback: {
+        Row: FeedbackRow;
+        Insert: FeedbackRow;
         Update: never;
         Relationships: [];
       };

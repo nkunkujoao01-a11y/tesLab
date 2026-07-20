@@ -1586,6 +1586,170 @@ Real Playwright run against a real production build, via a temporary test-harnes
 
 ---
 
+## Feature 48: real two-column PDF page layouts read in scrambled order
+
+**Status: fixed and verified against the real regression; one small, separate residual found and flagged, not fixed.**
+
+User tested three more real documents live and found `TestDoc/"Git Cheat Sheet (2-column test).pdf"` — literally named for this — extracting with content jumping unpredictably between what should be two separate side-by-side columns. Confirmed via `DEV_LOG.md` search this had never actually been addressed before (only multi-page *table* continuation was handled, Feature 44/47) despite the test file's own name anticipating it.
+
+**Root cause**: `pdf-extract.ts` clustered pdf.js's text fragments into lines (grouping by shared y-position) and then sorted purely by y — correct for a single-column document, but a genuine two-column page's raw fragment order interleaves both columns by absolute vertical position, which a plain y-sort just reproduces. Reading a human would do — left column top-to-bottom, then right column top-to-bottom — needs the columns detected and separated first.
+
+**First attempt was wrong, caught by real testing before shipping it**: classifying a line as "left" or "right" by requiring its *entire* `[x, endX]` span to stay clear of a candidate gutter position produced no change at all for the real test file — dumped raw per-line positions and found why: this document's topic boxes have genuinely varying widths, so plenty of legitimate single-column lines are simply long sentences whose `endX` lands well past where the next column visually begins, even though the line unambiguously *starts* in one column. Requiring the whole span to avoid the gutter rejected the real, correct split entirely. Fixed by classifying on each line's *start* x only — simpler, and matches how a person actually perceives which box a line belongs to.
+
+### What changed
+
+- **`src/lib/pdf-extract.ts`** — new `findColumnGutter()`/`orderLinesForReading()`, replacing the previous plain `lines.sort((a, b) => b.y - a.y)`. Looks for the widest gap between consecutive distinct line-start x-positions, roughly centered in the page (25%–75% band, so ordinary margins don't count), requiring both resulting groups to hold a real share of the page's lines (≥25% each) before accepting it as a genuine column break. Falls back to the original plain y-sort whenever no such gutter is found — a single-column document's lines mostly share one left margin and never form two such clusters, so this is a no-op for the overwhelming majority of documents.
+
+### Found, flagged, not fixed — a smaller, separate residual
+
+Two lines in the same test document still show fused content from two different columns (e.g. a real left-column sentence with "Configure Git" — a right-column heading — glued onto its end). Root cause is one level deeper than the reordering fix above: fragment-to-line *clustering* itself (the step before ordering) merges pdf.js fragments sharing a y-position into one line with no awareness of column membership, so two unrelated fragments from different columns that happen to land at the same height get fused into a single line before the new column-splitting logic ever sees them as separate. Fixing this properly means teaching the clustering step itself about column gutters, not just the ordering step — a real, identified next step, but a deeper change to the core fragment-clustering algorithm every other feature in this file depends on (the glued-word fix, table detection, running-header stripping, heading classification), so it wasn't attempted in the same pass as the safer, additive ordering fix. Affects 2 of ~30 lines in the one document that surfaced it.
+
+### How it was validated
+
+Real Playwright runs against a real production build via a temporary test-harness route (removed afterward): dumped raw per-line `(x, endX, y, text)` positions for the real 2-column file to diagnose the first attempt's failure, confirmed the corrected version reorders it into two coherent, correctly-sequenced columns (title → Prepare to Commit → Discard Your Changes → Code Archaeology → ... then Push Your Changes → Pull Changes → ..., matching the real document's actual left-then-right layout). Regression-checked against 7 other real documents (`swecom.pdf`, the NATIS document, `Invoice.pdf`, `Assignment.pdf`, both `ASD810S` slide decks, and the Software Architecture PDF) — all extract without errors, and all of `swecom.pdf`'s and NATIS's previously-verified real-content checks (including Feature 40/43's specific glued-word regression phrases) still pass. `npx tsc --noEmit` and `eslint` clean.
+
+### Also this session: local dev now has real Supabase credentials
+
+User hit "Missing VITE_SUPABASE_URL" running `vite dev` directly in this same directory — no `.env` file exists here (by design, gitignored, matching every earlier session's own constraint). Since `tes-lab` (the sandbox Vercel project this repo deploys to) already has real, working credentials configured, linked this directory to it (`vercel link`) and pulled them down (`vercel env pull`) rather than inventing placeholder ones — local dev now talks to the same real backend the live site uses. `.vercel` (the link metadata) was automatically added to `.gitignore` by the Vercel CLI itself.
+
+---
+
+## Feature 49: flashcard quality — table leaks, non-question fronts, and real heading misclassification
+
+**Status: real, verified improvement; one deeper, harder issue found and explicitly not fully resolved.**
+
+User reported flashcards/quizzes read as "unorganized" — fronts and backs that aren't real questions/answers, just raw bullet points or headings. Also asked (as a live test, pasting raw SWECOM front-matter text into chat) whether structuring could be dramatically better via an external Python/LLM pipeline. **Architecture decision, confirmed with the user**: stay on-device only — no server-side LLM pass. The offline-first, zero-cost premise stays intact; quality improvements come from better heuristics, not a bigger model or a server.
+
+### What changed
+
+- **`src/lib/quiz-gen.ts`** — `parseBlocks()` gained a `"table"` kind for `| `-prefixed blocks (the same table-leak bug already found and fixed in `document-lead.ts`/Feature 46 and `summarize-structured.ts`/Feature 47, here in a third file) — excluded from both flashcard fronts and backs rather than silently falling into "body". `buildSingleQuestionPrompt()`'s source text is now also stripped of table blocks before being sent to the on-device model, so the quiz generator's limited context budget isn't spent on syntax it has no special handling for.
+- **`src/lib/quiz-gen.ts`** — flashcard fronts are no longer a bare heading; `headingToQuestion()` wraps it as `What does "X" cover?` (stripping a numbered/lettered prefix like "11. " first) so a front actually reads as a question. Deliberately a plain template, not model-generated — flashcards are extractive by design specifically so they work instantly offline for every document with no model download required; this keeps that property.
+- **`src/lib/pdf-extract.ts`** — `classifyLine()`'s heading/subheading detection gained two additional safety checks, found necessary by real testing against `swecom.pdf` (a dense, heavily-justified 168-page IEEE document): a line ending in sentence-terminal punctuation (`.`/`!`/`?`) is never a heading regardless of its font-size ratio, and neither is a line longer than 10 words. Without these, ordinary paragraph lines that happened to get a slightly inflated per-line font-size reading (a justification/kerning artifact `pdf.js` reports for specific runs) were misread as headings, producing flashcard fronts like `What does "included in an appendix." cover?` — a sentence tail-end, not a real heading.
+
+### Found, flagged, not fixed — swecom.pdf's heading detection remains genuinely noisy
+
+Even after both fixes above, some flashcard fronts for this specific document are still ordinary paragraph fragments under 10 words that don't end in punctuation (e.g. `"in developing and modifying software-intensive systems. Skill"`). This points to something more systemic than either heuristic can catch: `pdf.js`'s per-line size reporting for this particular document's justified body text appears to vary enough, on enough lines, that font-size ratio alone is an unreliable heading signal here — not just on the specific edge cases already fixed. A more robust fix would likely need a different signal entirely (e.g., unusual vertical whitespace around a real heading, which continuation lines don't have) rather than another narrow font-size-ratio patch. Not attempted this session — real risk of overfitting further narrow heuristics to this one especially difficult document while this project's other, more typical test documents (lecture slides, single-column reference material) are already working well.
+
+### Also investigated: "AI chat/quiz taking too long to respond"
+
+Not a bug found — this looks like an inherent cost of the on-device-only architecture the user just confirmed keeping, not something more code can meaningfully fix. `quiz-gen.ts`'s own existing comment already documents *why* quiz generation asks for one question per model call rather than several at once: "a single call asking for several full questions at once took several minutes on real hardware" (found during Phase J, before this session). Response streaming (`TextStreamer`, token-by-token) and per-model-choice pipeline caching (Feature 47) are both already in place — real optimizations already applied, not gaps. Further speed would require either a smaller/lower-quality model or WebGPU (already investigated with a negative result in Feature 20 — no reliable adapter in this sandbox, and inconsistent support on the actual budget Android devices this app targets per NFR10). Flagged for the user rather than guessed at with unverified code changes.
+
+### How it was validated
+
+Real Playwright runs against a real production build, via a temporary test-harness route (removed afterward): confirmed zero raw table syntax in any generated flashcard across `swecom.pdf`, confirmed fronts are now question-phrased, confirmed the sentence-terminal-punctuation and word-count fixes measurably reduced (though didn't eliminate) heading misclassification for this document. Regression-checked: all of `swecom.pdf`'s and NATIS's previously-verified real-content checks still pass, and all 7 real `TestDoc/` files still extract without errors. `npx tsc --noEmit` and `eslint` clean on all changed files.
+
+---
+
+## Feature 50: wrapped headings breaking apart, bold-lead-in false headings, and citation-list run-ons
+
+**Status: fixed and verified against the real source document; one deeper, pre-existing limitation found and flagged, not fixed.**
+
+User pasted the actual rendered output of a real chapter (`TestDoc/"High Assurance Software Architecture and Design.pdf"`) and pointed out two concrete breakages: the chapter title itself ("High assurance software" / "architecture and design") rendered as two disconnected pieces instead of one heading, and a definition-style sentence ("Client: the requester of the processes either through a web browser interface" / "or chat client, email client, etc.") split the same way, with the first half misread as a heading. Also flagged that dense reference lists (`[24] S. Lujan... [25] A. Anand...`) had no spacing between entries.
+
+### Root causes
+
+1. **No merge step existed for a heading/subheading spanning multiple physical PDF lines.** `formatStructuredText()` buffered consecutive `"body"` lines into one paragraph, but pushed every classified heading/subheading line as its own block immediately — a real title wrapping across two lines in the source PDF became two separate `#`/`##` blocks.
+2. **Bold was OR'd across every fragment merged into one line**, not weighted by how much of the line was actually bold. A sentence with only a 1-2 word bold lead-in (`"Client:"` out of 13 words) got `bold: true` for its *entire* line, which combined with the font-size-ratio subheading check to misclassify the whole sentence as a subheading — while its wrapped continuation line (plain, unindented) fell through as body, one kind apart from the mislabeled first line, and never got reunited with it.
+3. **Bracketed numeric citation markers (`[24]`) matched neither `BULLET_PATTERN` nor `NUMBERED_PATTERN`** (which only recognize bullet glyphs and `\d+[.)]`/paren-wrapped markers, not square brackets), so a run of reference-list entries classified as plain body text and got silently glued into one run-on paragraph by the existing space-joining logic.
+
+### What changed — all in `src/lib/pdf-extract.ts`
+
+- `RawLine.bold: boolean` replaced with `boldChars`/`charCount`, tracked per-fragment during line-merging instead of OR'd. `classifyLine()`'s bold-based subheading check now requires a real majority (`boldRatio >= 0.6`, added as `BOLD_MAJORITY_RATIO`) rather than "any bold fragment present" — a genuinely bold short subheading still clears this trivially (~100% bold), while a bold lead-in term inside a long sentence (~10-15% bold) now correctly fails it and falls through to its actual classification.
+- `formatStructuredText()` gained a `headingBuffer`, mirroring the existing `paragraphBuffer`: consecutive lines of the *same* kind (`heading`-after-`heading`, `subheading`-after-`subheading`) merge into one block, unless the buffered text-so-far already ends in sentence-terminal punctuation (reusing the existing `SENTENCE_TERMINAL` check) — so a table-of-contents run of short, unrelated headings doesn't get wrongly glued into one.
+- New `CITATION_MARKER_PATTERN = /^\[\d+\]\s+/`, added alongside the existing bullet/numbered patterns in `classifyLine()`'s bullet check — each reference-list entry now becomes its own `- [24] ...` block instead of a run-on paragraph. Anchored to line-start, same as every other pattern here, so an inline "as shown in [24]" citation mid-sentence is untouched.
+- **Scope extension found necessary by real testing, beyond the original plan**: a `bulletBuffer`, symmetric to `headingBuffer`, was also needed. Fixing the bold-majority misclassification alone reclassified the "Client:" line correctly — but it turned out to be a genuine indented list item in the source PDF (not just a bold sentence), and bullets had *no* continuation-buffering at all, so the wrapped second line still orphaned into its own paragraph. `bulletBuffer` absorbs consecutive `"body"`-classified lines into the currently-open bullet until its text-so-far looks like a complete sentence, exactly the same discipline as the heading buffer.
+
+### Found, flagged, not fixed — hanging-indent list items still fragment
+
+Some list items in this same document wrap across many lines with a hanging indent large enough that each continuation line independently clears `LIST_INDENT_THRESHOLD` and re-classifies as its own `"bullet"` (via the indentation branch, not a real marker) rather than `"body"` — so `bulletBuffer`'s continuation logic never sees it, and the item still fragments into several one-line bullets (e.g. "The client-server architecture promotes increased scalability. The applica-" / "tion scalability is one..." / "application development trends..." / "ment is rapidly increasing." as four separate blocks instead of one). Confirmed via testing this is pre-existing, not introduced by this fix — every classified-bullet line was already pushed as its own immediate block before any buffering existed. A real fix would need `classifyLine()` (or its caller) to distinguish an indentation-triggered bullet from a marker-triggered one, so only a *marker* starts a genuinely new list item while indentation alone can continue an open one — a larger change to the classification contract itself, not attempted this pass to avoid scope creep beyond what was reported.
+
+### How it was validated
+
+Real Playwright run against a real production build, via a temporary test-harness route (removed afterward, route tree regenerated) driven against the actual source PDF the user's report came from (`TestDoc/"High Assurance Software Architecture and Design.pdf"`). Confirmed: the chapter title merges into one heading block (in fact three wrapped physical lines — "Chapter 15" / "High assurance software" / "architecture and design" — correctly merge into one, better than the two-line case originally reported); the "Client:"/"Server:" definitions each merge into one complete bullet with no orphaned continuation; both `[24]` and `[25]` reference entries become separate bullet blocks (confirmed the earlier false-positive "still run-on" check was actually matching unrelated inline citations in ordinary prose, `"...incorrect place [24]. Software quality...workload [25]."`, not the reference list). A flashcard generated from the merged heading reads as a complete phrase (`What does "Chapter 15 High assurance software architecture and design" cover?`), confirming the fix flows correctly downstream with no truncation. Regression-checked against `TestDoc/"Git Cheat Sheet (2-column test).pdf"` (two-column reading order still correct, no cross-column heading fusion) and `swecom.pdf`/NATIS (all previously-verified real-content and table-detection checks still pass). `npx tsc --noEmit` and `eslint` clean.
+
+---
+
+## Feature 51: moved on-device AI generation (chat, quiz, summarization) off the main thread into a dedicated Worker
+
+**Status: implemented and verified via a real Playwright run against a real production build.**
+
+Every on-device model call — chat replies, quiz-question generation, and neural summarization — ran on the main thread via `@huggingface/transformers`' WASM/ONNX backend. A real generation call can take anywhere from several seconds to multiple minutes (confirmed again by this feature's own verification run, below), during which the whole UI — scrolling, clicking, any other in-flight work — freezes. This is the same class of problem Feature 31 already fixed for model *downloads* (silent long wait reading as "broken"); this feature applies the same fix to *inference* by moving the actual generation call off the main thread entirely.
+
+### What changed
+
+- **`src/lib/ai-worker-protocol.ts`** (new) — the request/response message shapes (`chat-generate`, `summarize`, `cancel` → `token`/`done`/`error`/`busy`), imported by both sides so they can't drift apart.
+- **`src/lib/ai.worker.ts`** (new) — the actual Worker entry point. Imports `generateChatLocally`/`summarizeLocally` (the raw generation logic, unmodified) directly rather than reimplementing anything — a Worker executes its own isolated copy of every imported module, so this gives it its own independently-lazy pipeline cache for free, with zero duplicated retry/dtype/streaming logic to drift out of sync with any main-thread copy. Single in-flight generation per worker (reject-if-busy via a `busy` response, not queued) — this app never fires two concurrent generations from one tab today, and queuing would need cancellation-safe bookkeeping this doesn't need yet.
+- **`src/lib/ai-worker-client.ts`** (new) — main-thread entry point, mirrors `pdf-ocr.ts`'s lazily-created cached-worker pattern. Correlates requests/responses by a `requestId` (via `pending: Map`), so `handleMessage` can route a stray response to nothing (already-abandoned request) safely. Exposes `generateChatViaWorker`/`summarizeViaWorker` with the exact same signature and streaming semantics (`onToken` callback, promise resolving to full text) as the functions they replace, so no caller needs to change.
+- **`src/lib/ai-chat.ts`** — `generateChatLocally` (the raw call, now also imported by the worker) kept as-is; `askChatModel` (what every real caller — `use-ai-chat.ts`, `use-collection-chat.ts`, `use-quiz.ts` — actually calls) now just delegates to `generateChatViaWorker`. Model *download* (progress-tracked, used by Profile > AI Settings) deliberately stays on the main thread — only generation moved.
+- **`src/lib/ai-model.ts`** — same split: `summarizeLocally` (raw call) vs. `summarizeWithModel` (now delegates to `summarizeViaWorker`).
+
+### Why single-worker reject-if-busy, not a queue
+
+Considered queuing concurrent requests instead of rejecting, but this app never actually issues two concurrent generations from one tab in current usage (chat is turn-by-turn, quiz generation is awaited one question at a time) — a queue would add real complexity (ordering, cancellation-while-queued) for a case that doesn't happen yet. `busy` is a real signal a future caller can act on if that changes.
+
+### How it was validated
+
+Built a temporary `/worker-smoke-test` route (removed afterward, route tree regenerated back to its pre-feature state — confirmed no trace of it remains) and ran it against a real `NITRO_PRESET=node-server` production build via real Playwright, not `vite dev` (per this project's standing convention for anything worker/SW-related). The test clicked a "ping" counter on a fixed 10s cadence throughout a real `askChatModel` call — a real SmolLM2-360M download (confirmed via captured network requests to `huggingface.co`, including the same non-fatal Cache-API "Unexpected internal error" already documented in `ai-model.ts`) followed by real generation. Total real wall-clock time in this sandboxed environment: ~241s. The ping counter incremented on every single poll across the entire run (26 clicks, never stalled) — direct proof the main thread stayed responsive for the full duration, not just fast enough to appear so. The response streamed in incrementally (25 tokens counted individually via `onToken`) and resolved to a coherent, on-topic final string with no errors. `npx tsc --noEmit` clean; `eslint` clean.
+
+### Not yet done
+
+Quiz generation (`quiz-gen.ts`, which also calls `askChatModel`) inherits this change automatically since it goes through the same `askChatModel` entry point, but wasn't separately re-verified end-to-end this session — worth a real check next time quiz generation is touched. Cancellation (`CancelRequest` in the protocol) is wired on the worker side but nothing in the app calls it yet — no caller currently has a "stop generating" UI action.
+
+---
+
+## Feature 52: author-year citation blocks were still leaking into AI summaries, plus a real investigation into a larger summarization model
+
+**Status: citation fix implemented and verified. Model swap investigated with real data — not adopted, findings logged.**
+
+### Bug found while verifying Feature 51 end-to-end: AI summaries still garbled on `swecom.pdf`
+
+Real Playwright verification of the Feature 51 Worker migration (real test user, real ~155MB model download via Profile > AI Settings, real upload of `TestDoc/swecom.pdf`, real "Summarise") surfaced a still-open quality bug: the AI summary's OVERVIEW and section bodies were riddled with repetition/degeneration artifacts ("compe-e-book compes-ess-se-sss.come--st-s-t--tt-t.", "Guide to the Guide to The Guide of the eponymous emojis"). Root-caused to `CITATION_MARKER_PATTERN` in `pdf-extract.ts` (added Feature 50 for numeric `[24]`-style citations) only matching `/^\[\d+\]\s+/` — SWECOM's reference list uses IEEE's author-year key style exclusively (`[Abran 2010]`, `[ACM 2004]`, `[IEEE 730-2002]`), which that pattern never matches. Those lines fell through as ordinary body text, survived `summarize-structured.ts`'s `isPlainParagraph` filter (which already excludes classified bullets from being fed to the model), and got summarized as if they were prose — a T5 model has no way to meaningfully compress a wall of bibliography entries, and degenerates.
+
+**Fix**: broadened `CITATION_MARKER_PATTERN` to `/^\[[^\]\n]{1,60}\]\s+/` — any short bracketed line-start marker, not just numeric. Heading/subheading classification still runs first in `classifyLine()`, so this doesn't risk misclassifying a real heading that happens to start with a bracket. Re-verified against the same real document: reference entries now render as clean, separate lines instead of interleaved chaos. The deeper repetition/gibberish artifacts elsewhere in the document persisted, though — this fix narrowed the problem, it didn't fully solve document-wide summary quality, which motivated the model investigation below.
+
+### Investigated: would a larger summarization model fix the remaining quality gap?
+
+User asked to look into whether a bigger (up to ~2GB) model would summarize real course material meaningfully better. Ran the same two-phase validation discipline as the original Feature 14 model choice:
+
+**Phase 1 — isolated Node spike**, comparing the current model against `Xenova/distilbart-cnn-12-6` (a different distillation than `distilbart-cnn-6-6`, which Feature 14 already rejected for degenerate int8 output — this one keeps the full 12-layer encoder and only distills the decoder to 6 layers) on the same real, previously-degenerate text chunk from `swecom.pdf`:
+
+| Model | Load | Generate | Quality |
+|---|---|---|---|
+| Current (T5-small, fp32, ~300MB) | 110s | 2s | Mostly verbatim on this chunk |
+| distilbart-cnn-12-6 (int8, ~360MB) | 143s | 5s | Genuinely abstractive, some repetition |
+| distilbart-cnn-12-6 (fp32, ~1.4GB) | 564s | 5s | Best of the three — coherent, correctly synthesizes content, no repetition |
+
+Both distilbart-cnn-12-6 variants loaded and ran cleanly under `onnxruntime-node` — no repeat of the graph-optimizer crashes that killed every quantized T5 export.
+
+**Phase 2 — real browser verification** (the step Feature 14 found necessary, since Node success doesn't predict `onnxruntime-web`/WASM behavior): temporarily pointed `ai-model.ts` at `Xenova/distilbart-cnn-12-6` (fp32), rebuilt, and drove the real app end-to-end against a real test user. Download completed in ~523s (consistent with the ~1.4GB size). But **generation alone took ~586s (nearly 10 minutes) to summarize a 2-page real document** (`TestDoc/Assignment.pdf`) — the current model does comparable content in 1-2 seconds. Output quality was genuinely good and coherent, but a ~10-minute wait for a two-page summary is disqualifying for an app whose core constraint (NFR10) is usability on budget/low-power Android devices — this isn't a marginal regression, it's roughly two orders of magnitude slower for real content.
+
+**Decision: not adopted.** Reverted `ai-model.ts` back to `onnx-community/text_summarization-ONNX`/fp32. The citation-pattern fix above ships as a real, standalone improvement. The int8 variant of distilbart-cnn-12-6 (faster to load than fp32 in the Node spike, untested in the real browser for generation speed) is a possible middle-ground worth a real test in a future session if summary quality is revisited — flagged, not pursued further this session given the fp32 result's severity already answered the practical question.
+
+### How it was validated
+
+Every step above used real data: real Playwright runs against a real `NITRO_PRESET=node-server` production build, a real Supabase test user created/deleted via the Admin API (same pattern as Features 12/14), real documents from `TestDoc/`, and a real model download/generation cycle for each variant — no synthetic timing estimates. `npx tsc --noEmit` and `eslint` clean on `pdf-extract.ts` after the citation fix, and clean again after `ai-model.ts`'s revert.
+
+---
+
+## Feature 53: in-app feedback/bug reports, with optional screenshots, from Profile
+
+**Status: implemented, UI verified with real Playwright. Migration written but not yet applied to the live project — needs the user to run it (same as every prior migration; this environment only has REST API keys, not DB/CLI credentials — see Feature 10's own note on this).**
+
+User asked for a way for students to report a problem or suggest an improvement, optionally attaching screenshots, from somewhere in the Profile section, landing somewhere the project maintainers can review later.
+
+### What changed
+
+- **`supabase/migrations/0009_feedback.sql`** (new, **not yet applied**) — a `feedback` table (`user_id`, `message`, `image_paths text[]`, `created_at`), owner-only RLS (insert + select own rows only — deliberately no update/delete policy, since a submitted report shouldn't be editable after the fact, same as a real bug report once filed). Also creates a new **`feedback-images` Storage bucket** — the first use of Supabase Storage anywhere in this app (`0005_personal_documents.sql` explicitly scoped Storage out for course PDFs; confirmed via research that no bucket exists yet). Deliberately **private**, not public like a course material would be — a bug-report screenshot can easily contain personal info elsewhere in frame. RLS on `storage.objects` enforces the upload path's first folder segment equals `auth.uid()`, so a user can only write into their own folder; review happens via the service role or a signed URL generated at review time, not a public bucket URL. There's no in-app review UI in this pass — same deliberate scope line 0005 drew for course-PDF Storage — review happens by whoever administers the Supabase project directly.
+- **`src/lib/supabase.ts`** — new `FeedbackRow` type and `feedback` table entry in the `Database` type, following the existing `Insert`/`Update: never` pattern for submit-once tables like `activity_events`.
+- **`src/hooks/use-feedback.ts`** (new) — `useSubmitFeedback()`: uploads each image to `feedback-images/{user_id}/{feedback_id}/{index}-{filename}`, then inserts the `feedback` row referencing the resulting paths. **Online-only, no offline queue** — unlike every other write in this app, a submitted report has no local read path the student ever needs back (it's sent once and done), so this just gates on `useOnlineStatus()` like the AI model download buttons already do, rather than extending `sync.ts`'s local-first/reconcile-later pattern to a case that doesn't need it. Caps at 4 images, 8MB each — client-side, same "no surprise large upload" discipline as `use-documents.ts`'s own 25MB PDF cap.
+- **`src/routes/profile.tsx`** — new "Send feedback" card, placed after Device permissions and before the Settings list, matching the existing card layout (icon chip + title/subtitle header) used by AI Settings/Sync. Textarea for the message, a hidden multi-file `accept="image/*"` input behind an "Add screenshot" button (same ref-triggered pattern `documents.index.tsx` already uses for PDF upload) with removable thumbnail previews, and a Send button disabled while offline/empty/submitting — same disabled+`title`-tooltip pattern as every other network-gated button on this page.
+
+### How it was validated
+
+`npx tsc --noEmit` and `eslint` clean on every new/changed file. Real Playwright run against a real production build: created a real test user via the Admin API, logged in, navigated to Profile, confirmed the new card renders correctly in place among the existing sections (screenshotted), confirmed the Send button is correctly disabled until real text is typed into the textarea. **Not yet tested**: an actual submission end-to-end (image upload + row insert), since that requires the migration above to be live first — the `feedback` table and `feedback-images` bucket don't exist in the database yet. Once applied, a real submission (with and without an attached image) should be verified before considering this fully done.
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.

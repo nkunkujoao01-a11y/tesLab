@@ -47,6 +47,26 @@ export type SummarySection = {
   body: string;
 };
 
+/** A unified feed item for the Summaries page — see Feature 54. Before
+ * this, `useAllSummaries()` only read `materialSummaries` (catalog
+ * content), so a summary generated for a student's own uploaded/extracted
+ * PDF (`PersonalDocument.summary`) never appeared there even though it's
+ * exactly the same kind of AI output. `kind` distinguishes the two
+ * because they route to different reader pages and have no shared
+ * `moduleId`/`materialId` to key on. */
+export type AnySummary =
+  | ({ kind: "material" } & MaterialSummary)
+  | {
+      kind: "personal";
+      key: string;
+      docId: string;
+      title: string;
+      body: string;
+      generatedAt: number;
+      method?: "neural" | "extractive";
+      sections?: SummarySection[];
+    };
+
 export type MaterialSummary = {
   key: string;
   materialId: string;

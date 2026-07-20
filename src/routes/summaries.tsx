@@ -14,8 +14,7 @@ export const Route = createFileRoute("/summaries")({
       { title: "Summaries — eLearn" },
       {
         name: "description",
-        content:
-          "Every AI summary you have generated, kept alongside its source module.",
+        content: "Every AI summary you have generated, kept alongside its source module.",
       },
     ],
   }),
@@ -71,22 +70,37 @@ function Summaries() {
         ) : (
           <ul className="space-y-4">
             {summaries.map((s, i) => {
-              const module = modules.find((m) => m.id === s.moduleId);
-              const material = module?.materials.find((mat) => mat.id === s.materialId);
+              const module =
+                s.kind === "material" ? modules.find((m) => m.id === s.moduleId) : undefined;
+              const material =
+                s.kind === "material"
+                  ? module?.materials.find((mat) => mat.id === s.materialId)
+                  : undefined;
+              const linkProps =
+                s.kind === "personal"
+                  ? { to: "/documents/$docId/summary" as const, params: { docId: s.docId } }
+                  : s.sections && s.sections.length > 0
+                    ? {
+                        to: "/courses/$moduleId/summary/$docId" as const,
+                        params: { moduleId: s.moduleId, docId: s.materialId },
+                      }
+                    : {
+                        to: "/courses/$moduleId/read/$docId" as const,
+                        params: { moduleId: s.moduleId, docId: s.materialId },
+                      };
               return (
                 <li key={s.key} className="animate-rise" style={{ animationDelay: `${i * 60}ms` }}>
                   <Link
-                    to={
-                      s.sections && s.sections.length > 0
-                        ? "/courses/$moduleId/summary/$docId"
-                        : "/courses/$moduleId/read/$docId"
-                    }
-                    params={{ moduleId: s.moduleId, docId: s.materialId }}
+                    {...linkProps}
                     className="block rounded-2xl bg-card p-5 ring-1 ring-border/60 transition-colors hover:ring-prestige-gold/40 lg:p-6"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prestige-mid">
-                        {module ? `${module.faculty} · ${module.title}` : s.moduleId}
+                        {s.kind === "personal"
+                          ? "My documents"
+                          : module
+                            ? `${module.faculty} · ${module.title}`
+                            : s.moduleId}
                       </p>
                       <p className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">
                         {formatRelative(new Date(s.generatedAt).toISOString())}
@@ -97,7 +111,11 @@ function Summaries() {
                     </p>
                     <div className="mt-5 flex items-center justify-between gap-4">
                       <span className="min-w-0 truncate text-[11px] uppercase tracking-widest text-muted-foreground">
-                        {material ? `From ${material.title}` : "Open in reader"}
+                        {s.kind === "personal"
+                          ? `From ${s.title}`
+                          : material
+                            ? `From ${material.title}`
+                            : "Open in reader"}
                         {s.method && ` · ${s.method === "neural" ? "Neural model" : "Extractive"}`}
                       </span>
                       <button

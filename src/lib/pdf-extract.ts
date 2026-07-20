@@ -46,11 +46,16 @@ type RawLine = {
   // since pdf.js doesn't expose one directly. Used to tell a heading from
   // body text.
   size: number;
-  // Best-effort: true if any fragment's font name looks bold (e.g.
-  // "Helvetica-Bold"). PDFs don't reliably expose a numeric font weight
-  // through pdf.js, so this is a heuristic on the font's name, same
-  // honesty-about-limits precedent as the rest of this file.
-  bold: boolean;
+  // Character counts backing a bold *proportion* for the line, not a
+  // simple OR across fragments — a line whose first word or two is bold
+  // (e.g. a lead-in term like "Client:") but whose remaining dozen words
+  // are plain body text should not read as "this whole line is bold."
+  // Bold itself is a best-effort heuristic on whether a fragment's font
+  // name looks bold (e.g. "Helvetica-Bold") — PDFs don't reliably expose
+  // a numeric font weight through pdf.js, same honesty-about-limits
+  // precedent as the rest of this file.
+  boldChars: number;
+  charCount: number;
   // Per-cell text and each cell's left edge, split wherever a fragment gap
   // is wide enough to look like column padding rather than an ordinary
   // word space (see CELL_GAP_RATIO). An ordinary prose line just ends up
@@ -63,8 +68,105 @@ type RawLine = {
 
 type LineKind = "heading" | "subheading" | "bullet" | "body" | "table-row";
 
+// A real two-column page (found via real testing on TestDoc/"Git Cheat
+// Sheet (2-column test).pdf", named for exactly this) extracts, before
+// this, in whatever raw content-stream/y-position order the PDF encodes —
+// not necessarily "read the left column top-to-bottom, then the right
+// column," which is what a human actually does. A plain y-sort interleaves
+// both columns' lines by absolute vertical position, reading as scrambled
+// nonsense.
+//
+// Classification is by each line's *start* x only, not its full [x, endX]
+// range — found the hard way via real testing: this document's topic boxes
+// have genuinely varying widths, so plenty of legitimate single-column
+// lines are simply long enough that their endX lands well past where the
+// next column visually begins, even though the line unambiguously belongs
+// to (starts in) one column. Requiring the whole line to stay clear of the
+// gutter rejected the correct split entirely; requiring only where it
+// *starts* to be clearly on one side is both simpler and matches how a
+// human actually perceives which box a line belongs to. Still
+// conservative in the ways that matter: only reorders when start-x values
+// clearly cluster into two well-separated, well-populated groups roughly
+// in the middle of the page — a single-column document's lines mostly
+// share one left margin and never form two such clusters.
+const COLUMN_MIN_GAP_RATIO = 0.06;
+const COLUMN_MIN_SIDE_FRACTION = 0.25;
+const COLUMN_MIN_LINE_COUNT = 8;
+
+function findColumnGutter(lines: RawLine[]): number | null {
+  if (lines.length < COLUMN_MIN_LINE_COUNT) return null;
+
+  const minX = Math.min(...lines.map((l) => l.x));
+  const maxX = Math.max(...lines.map((l) => l.x));
+  const spanWidth = maxX - minX;
+  if (spanWidth <= 0) return null;
+
+  // Only consider a gutter roughly in the middle of the page — a gap near
+  // either edge is just how many lines happen to start, not a column break.
+  const bandStart = minX + spanWidth * 0.25;
+  const bandEnd = minX + spanWidth * 0.75;
+
+  const starts = [...new Set(lines.map((l) => l.x))].sort((a, b) => a - b);
+  let bestGapWidth = 0;
+  let bestSplit: number | null = null;
+
+  for (let i = 0; i < starts.length - 1; i++) {
+    const gapStart = starts[i];
+    const gapEnd = starts[i + 1];
+    const mid = (gapStart + gapEnd) / 2;
+    if (mid < bandStart || mid > bandEnd) continue;
+
+    const left = lines.filter((l) => l.x < mid).length;
+    const right = lines.length - left;
+    if (left / lines.length < COLUMN_MIN_SIDE_FRACTION) continue;
+    if (right / lines.length < COLUMN_MIN_SIDE_FRACTION) continue;
+
+    const gapWidth = gapEnd - gapStart;
+    if (gapWidth > bestGapWidth) {
+      bestGapWidth = gapWidth;
+      bestSplit = mid;
+    }
+  }
+
+  if (bestSplit === null || bestGapWidth < spanWidth * COLUMN_MIN_GAP_RATIO) return null;
+  return bestSplit;
+}
+
+/** Reorders a page's lines to read the left column fully (top to bottom),
+ * then the right column fully — see findColumnGutter for the detection
+ * heuristic and its safety margins. */
+function orderLinesForReading(lines: RawLine[]): RawLine[] {
+  const gutter = findColumnGutter(lines);
+  if (gutter === null) {
+    return [...lines].sort((a, b) => b.y - a.y);
+  }
+
+  const left = lines.filter((l) => l.x < gutter).sort((a, b) => b.y - a.y);
+  const right = lines.filter((l) => l.x >= gutter).sort((a, b) => b.y - a.y);
+  return [...left, ...right];
+}
+
 const BULLET_PATTERN = /^[•●▪◦‣∙·-]\s+|^\*\s+/;
 const NUMBERED_PATTERN = /^(\d+[.)]|[a-zA-Z][.)]|\([a-zA-Z0-9]+\))\s+/;
+// A reference-list entry ("[24] S. Lujan..." or IEEE-style "[Abran 2010]
+// Alain Abran...") starts with a bracketed marker — square brackets
+// aren't matched by BULLET_PATTERN (bullet glyphs) or NUMBERED_PATTERN
+// (`\d+[.)]`/parens only), so a dense reference list previously read as
+// plain body text and got silently run-on joined by joinParagraphLines
+// with no per-entry break. Matches any short bracketed marker, not just
+// numeric — found via real testing on swecom.pdf, whose references use
+// IEEE's author-year key style (`[Abran 2010]`, `[ACM 2004]`) exclusively,
+// not bare numbers; the numeric-only version of this pattern never
+// matched a single one of them, so the whole reference list (and its
+// citation-dense prose) still fed straight into the neural summarizer as
+// ordinary body text, producing degenerate/hallucinated output on real
+// documents (see summarize-structured.ts's isPlainParagraph, which
+// already excludes bullets from summarization once classified as such).
+// The bracket-content length cap keeps this from matching a long
+// bracketed aside that happens to open a line. Anchored to line start
+// like every other pattern here, so an inline "as shown in [24]" citation
+// mid-sentence is untouched.
+const CITATION_MARKER_PATTERN = /^\[[^\]\n]{1,60}\]\s+/;
 // A list item is indented at least this many PDF units further right than
 // the document's body-text left margin. Found empirically to matter: many
 // real PDFs (anything from a browser's print-to-PDF, in particular) render
@@ -141,6 +243,42 @@ function escapeTableCell(text: string): string {
   return text.trim().replace(/\|/g, "\\|");
 }
 
+// A real heading essentially never ends in sentence-terminal punctuation
+// — found via real testing on swecom.pdf, where several ordinary
+// sentence tail-ends ("included in an appendix.", "...analogous elements
+// of SWECOM.") were misclassified as headings/subheadings purely because
+// a page-edge justification quirk made pdf.js report a slightly larger
+// font size for that one line, and font-size ratio was previously the
+// *only* signal used. Those went on to produce nonsense flashcard fronts
+// downstream ("What does 'included in an appendix.' cover?"). A line
+// ending in ":" is deliberately still allowed through (e.g. "References:"
+// is a real heading-like label), only real sentence-final punctuation
+// disqualifies it.
+const SENTENCE_TERMINAL = /[.!?]['")\]]*$/;
+
+// A real heading is short — every genuine heading in real test documents
+// (this project's own TestDoc/ corpus included) runs a handful of words
+// ("Software Systems Engineering Skill Area", "References"). Found via
+// the same real testing as SENTENCE_TERMINAL above: even after excluding
+// lines ending in sentence-terminal punctuation, plenty of ordinary
+// paragraph continuation lines ("designer are provided. The SWECOM
+// Staffing Gap Analysis and", 10 words) were still being read as
+// headings — a justified paragraph's own line-wrap can coincidentally
+// avoid ending in punctuation while clearly still being a sentence
+// fragment, not a label. Word count catches what punctuation alone
+// can't.
+const MAX_HEADING_WORDS = 10;
+
+// A line's bold *proportion* has to clear a real majority, not merely
+// contain any bold fragment, before its size (just under the outright
+// ratio>=1.15 subheading cutoff) is trusted as a bold-styled label —
+// found via real testing on swecom.pdf's "Client: the requester of the
+// process..." bold-lead-in sentences, where only the first word or two
+// was actually bold. A genuinely bold short subheading reads as ~100%
+// bold and clears this trivially; a sentence with a 1-2 word bold
+// lead-in term fails it decisively.
+const BOLD_MAJORITY_RATIO = 0.6;
+
 /** Classifies one line relative to the document's own body-text size and
  * left margin — "heading" or "indented" is meaningless in isolation (a
  * size or offset that's huge in one PDF is ordinary in another with a
@@ -148,9 +286,22 @@ function escapeTableCell(text: string): string {
  * against the document's own `bodySize`/`bodyX`, not an absolute value. */
 function classifyLine(line: RawLine, bodySize: number, bodyX: number): LineKind {
   const ratio = bodySize > 0 ? line.size / bodySize : 1;
-  if (ratio >= 1.4) return "heading";
-  if (ratio >= 1.15 || (line.bold && ratio >= 0.95)) return "subheading";
-  if (BULLET_PATTERN.test(line.text) || NUMBERED_PATTERN.test(line.text)) return "bullet";
+  const boldRatio = line.charCount > 0 ? line.boldChars / line.charCount : 0;
+  const trimmed = line.text.trim();
+  const looksLikeHeadingText =
+    !SENTENCE_TERMINAL.test(trimmed) && trimmed.split(/\s+/).length <= MAX_HEADING_WORDS;
+  if (ratio >= 1.4 && looksLikeHeadingText) return "heading";
+  if (
+    (ratio >= 1.15 || (boldRatio >= BOLD_MAJORITY_RATIO && ratio >= 0.95)) &&
+    looksLikeHeadingText
+  )
+    return "subheading";
+  if (
+    BULLET_PATTERN.test(line.text) ||
+    NUMBERED_PATTERN.test(line.text) ||
+    CITATION_MARKER_PATTERN.test(line.text)
+  )
+    return "bullet";
   if (ratio >= 0.85 && ratio <= 1.15 && line.x - bodyX >= LIST_INDENT_THRESHOLD) return "bullet";
   return "body";
 }
@@ -196,11 +347,46 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
   const blocks: string[] = [];
   let paragraphBuffer: string[] = [];
   let tableBuffer: string[][] = [];
+  // A heading/subheading that visually wraps across two physical PDF
+  // lines (e.g. "High assurance software" / "architecture and design")
+  // would otherwise become two separate blocks, one per raw line — this
+  // buffers consecutive same-kind heading lines the same way
+  // paragraphBuffer buffers body lines, only closing the buffer once the
+  // accumulated text already looks like a complete line (ends in
+  // sentence-terminal punctuation) or the next line is a different kind,
+  // so an unrelated table-of-contents run of short headings doesn't get
+  // wrongly glued into one.
+  let headingBuffer: { kind: "heading" | "subheading"; lines: string[] } | null = null;
+  // A list item's own text can wrap across multiple physical PDF lines too
+  // (e.g. "Client: the requester of the processes either through a web
+  // browser interface" / "or chat client, email client, etc.") — the
+  // wrapped continuation classifies as plain "body" (it isn't itself
+  // indented or bullet-marked), so without this buffer it would flush as
+  // its own orphaned paragraph right after the bullet instead of
+  // completing it. Same discipline as headingBuffer: keep absorbing
+  // "body"-classified lines into the open bullet until its text-so-far
+  // already looks like a complete sentence, or a non-"body" line arrives.
+  let bulletBuffer: string[] | null = null;
 
   const flushParagraph = () => {
     if (paragraphBuffer.length > 0) {
       blocks.push(joinParagraphLines(paragraphBuffer));
       paragraphBuffer = [];
+    }
+  };
+
+  const flushHeading = () => {
+    if (headingBuffer) {
+      const prefix = headingBuffer.kind === "heading" ? "# " : "## ";
+      blocks.push(`${prefix}${joinParagraphLines(headingBuffer.lines)}`);
+      headingBuffer = null;
+    }
+  };
+
+  const flushBullet = () => {
+    if (bulletBuffer) {
+      blocks.push(`- ${joinParagraphLines(bulletBuffer)}`);
+      bulletBuffer = null;
     }
   };
 
@@ -221,29 +407,53 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
     if (!line.text.trim()) continue;
     if (line.kind === "table-row" && line.cells) {
       flushParagraph();
+      flushHeading();
+      flushBullet();
       tableBuffer.push(line.cells.map(escapeTableCell));
       continue;
     }
     flushTable();
     switch (line.kind) {
       case "heading":
+      case "subheading": {
         flushParagraph();
-        blocks.push(`# ${line.text.trim()}`);
+        const trimmed = line.text.trim();
+        if (headingBuffer && headingBuffer.kind === line.kind) {
+          const bufferedSoFar = joinParagraphLines(headingBuffer.lines);
+          if (!SENTENCE_TERMINAL.test(bufferedSoFar)) {
+            headingBuffer.lines.push(trimmed);
+            break;
+          }
+        }
+        flushHeading();
+        headingBuffer = { kind: line.kind, lines: [trimmed] };
         break;
-      case "subheading":
-        flushParagraph();
-        blocks.push(`## ${line.text.trim()}`);
-        break;
+      }
       case "bullet":
         flushParagraph();
-        blocks.push(`- ${stripBulletPrefix(line.text)}`);
+        flushHeading();
+        flushBullet();
+        bulletBuffer = [stripBulletPrefix(line.text)];
         break;
-      case "body":
-        paragraphBuffer.push(line.text.trim());
+      case "body": {
+        flushHeading();
+        const trimmed = line.text.trim();
+        if (bulletBuffer) {
+          const bufferedSoFar = joinParagraphLines(bulletBuffer);
+          if (!SENTENCE_TERMINAL.test(bufferedSoFar)) {
+            bulletBuffer.push(trimmed);
+            break;
+          }
+          flushBullet();
+        }
+        paragraphBuffer.push(trimmed);
         break;
+      }
     }
   }
   flushParagraph();
+  flushHeading();
+  flushBullet();
   flushTable();
   return blocks.join("\n\n");
 }
@@ -344,7 +554,8 @@ export async function extractPdfText(
           existing.cells[existing.cells.length - 1] += item.str;
         }
         existing.size = Math.max(existing.size, size);
-        existing.bold = existing.bold || bold;
+        existing.boldChars += bold ? item.str.length : 0;
+        existing.charCount += item.str.length;
         existing.x = Math.min(existing.x, x);
         existing.endX = Math.max(existing.endX, x + width);
       } else {
@@ -354,16 +565,18 @@ export async function extractPdfText(
           endX: x + width,
           text: item.str,
           size,
-          bold,
+          boldChars: bold ? item.str.length : 0,
+          charCount: item.str.length,
           cells: [item.str],
           cellX: [x],
         });
       }
     }
     // pdf.js's y-axis grows upward (origin bottom-left), so the first
-    // line on the page has the largest y.
-    lines.sort((a, b) => b.y - a.y);
-    pageLines.push(lines);
+    // line on the page has the largest y — orderLinesForReading falls
+    // back to exactly this plain sort unless it detects a real two-column
+    // layout (see its own comment).
+    pageLines.push(orderLinesForReading(lines));
     onProgress?.({ page: i, totalPages: doc.numPages, stage: "reading" });
   }
 

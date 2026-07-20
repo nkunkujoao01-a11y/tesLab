@@ -16,7 +16,7 @@
 
 export type Flashcard = { front: string; back: string };
 
-type Block = { kind: "heading" | "subheading" | "bullet" | "body"; content: string };
+type Block = { kind: "heading" | "subheading" | "bullet" | "body" | "table"; content: string };
 
 function parseBlocks(text: string): Block[] {
   return text
@@ -27,11 +27,40 @@ function parseBlocks(text: string): Block[] {
       if (block.startsWith("## ")) return { kind: "subheading" as const, content: block.slice(3) };
       if (block.startsWith("# ")) return { kind: "heading" as const, content: block.slice(2) };
       if (block.startsWith("- ")) return { kind: "bullet" as const, content: block.slice(2) };
+      // A table block (see pdf-extract.ts's `| `-prefixed GFM markup) isn't
+      // real explanatory prose — gluing its raw pipe syntax onto a
+      // flashcard's back reproduces the exact table-leak bug already found
+      // and fixed in document-lead.ts and summarize-structured.ts. Kept as
+      // its own kind (not silently dropped) so a heading immediately
+      // followed by only a table still correctly produces no card, rather
+      // than accidentally treating the table as the heading's "back" once
+      // filtered out downstream.
+      if (block.startsWith("| ")) return { kind: "table" as const, content: block };
       return { kind: "body" as const, content: block };
     });
 }
 
 const MAX_CARDS = 12;
+
+// A numbered/lettered heading prefix ("11. Software Requirements Skill
+// Area", "A. Contributors") reads awkwardly once wrapped in a question —
+// stripped before building the front, real heading text kept as-is.
+const HEADING_ENUMERATION_PREFIX = /^(?:\d+|[A-Z])[.)]\s+/;
+
+/** Turns a heading into something that actually reads as a question, not
+ * just the heading text relabeled — found via real user feedback that a
+ * flashcard front which is just a document heading ("References",
+ * "Prepare to Commit") doesn't read as a question at all. Deliberately a
+ * plain template, not model-generated: flashcards are extractive by
+ * design (see this file's own top comment) specifically so they work
+ * instantly, offline, for every document with no AI download required;
+ * templating the heading keeps that property while still framing genuine
+ * recall practice rather than a bare label. */
+function headingToQuestion(heading: string): string {
+  const trimmed = heading.replace(HEADING_ENUMERATION_PREFIX, "").trim();
+  if (trimmed.endsWith("?")) return trimmed;
+  return `What does "${trimmed}" cover?`;
+}
 
 /** Pairs each heading/subheading with the text that follows it (up to the
  * next heading) as front/back — a direct, honest mapping onto how the
@@ -62,10 +91,13 @@ export function generateFlashcards(text: string): Flashcard[] {
   for (const block of blocks) {
     if (block.kind === "heading" || block.kind === "subheading") {
       flush();
-      front = block.content;
-    } else {
+      front = headingToQuestion(block.content);
+    } else if (block.kind === "bullet" || block.kind === "body") {
       backParts.push(block.content);
     }
+    // "table" blocks contribute to neither front nor back — see
+    // parseBlocks' own comment on why they're excluded rather than
+    // silently falling into "body".
   }
   flush();
 
@@ -97,12 +129,25 @@ const MAX_SOURCE_CHARS = 3000;
  * progress instead of one long unmeasured wait. `alreadyAsked` is passed
  * back in so the model doesn't repeat the same question across calls,
  * since each call otherwise has no memory of the others. */
+// Raw `| `-prefixed table markup (see pdf-extract.ts) wastes a real chunk
+// of the model's small char budget on syntax it has no special handling
+// for, and risks the same garbled-output-from-raw-markup failure mode
+// already found and fixed for flashcards/summaries/pull-quotes elsewhere
+// in this app — stripped before the budget is spent, not left for the
+// model to make sense of.
+function stripTableBlocks(text: string): string {
+  return text
+    .split(/\n\n+/)
+    .filter((block) => !block.trim().startsWith("| "))
+    .join("\n\n");
+}
+
 export function buildSingleQuestionPrompt(
   text: string,
   questionNumber: number,
   alreadyAsked: string[],
 ): string {
-  const source = text.slice(0, MAX_SOURCE_CHARS);
+  const source = stripTableBlocks(text).slice(0, MAX_SOURCE_CHARS);
   const avoid =
     alreadyAsked.length > 0
       ? `Do not repeat these already-asked questions: ${alreadyAsked.join(" | ")}\n`

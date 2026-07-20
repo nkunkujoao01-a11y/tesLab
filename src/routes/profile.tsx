@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ChevronRight,
   Download,
@@ -12,6 +12,9 @@ import {
   HardDrive,
   Bell,
   BookPlus,
+  MessageSquareText,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -36,6 +39,13 @@ import { useSummariesStorageMb } from "@/hooks/use-summaries";
 import { useLastSyncedAt, useManualSync } from "@/hooks/use-sync";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { usePersistentStorage, useNotificationPermission } from "@/hooks/use-permissions";
+import {
+  useSubmitFeedback,
+  makeFeedbackImage,
+  MAX_FEEDBACK_IMAGES,
+  MAX_IMAGE_MB,
+  type FeedbackImage,
+} from "@/hooks/use-feedback";
 
 // Known material kinds (see supabase/migrations/0001_init.sql), in the
 // order they're displayed. Any downloaded material whose kind doesn't
@@ -101,6 +111,43 @@ function Profile() {
   const isOnline = useOnlineStatus();
   const persistentStorage = usePersistentStorage();
   const notificationPermission = useNotificationPermission();
+  const { submitFeedback, submitting: submittingFeedback } = useSubmitFeedback();
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackImages, setFeedbackImages] = useState<FeedbackImage[]>([]);
+  const feedbackImageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAddFeedbackImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    const room = MAX_FEEDBACK_IMAGES - feedbackImages.length;
+    if (room <= 0) {
+      toast.error(`You can attach up to ${MAX_FEEDBACK_IMAGES} images.`);
+      return;
+    }
+    const oversized = files.find((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+    if (oversized) {
+      toast.error(`${oversized.name} is too large — the limit is ${MAX_IMAGE_MB} MB per image.`);
+      return;
+    }
+    setFeedbackImages((prev) => [...prev, ...files.slice(0, room).map(makeFeedbackImage)]);
+  };
+
+  const removeFeedbackImage = (id: string) => {
+    setFeedbackImages((prev) => {
+      const target = prev.find((img) => img.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((img) => img.id !== id);
+    });
+  };
+
+  const handleSubmitFeedback = async () => {
+    const ok = await submitFeedback(feedbackMessage, feedbackImages);
+    if (ok) {
+      feedbackImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+      setFeedbackMessage("");
+      setFeedbackImages([]);
+    }
+  };
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -413,6 +460,93 @@ function Profile() {
                   <CircleCheck className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={1.75} />
                 )}
               </div>
+            </div>
+          </section>
+
+          {/* Send feedback */}
+          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                <MessageSquareText className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-prestige-deep">Send feedback</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Report a problem or suggest an improvement — screenshots help
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <textarea
+                value={feedbackMessage}
+                onChange={(e) => setFeedbackMessage(e.target.value)}
+                placeholder="What happened, or what would you like to see?"
+                rows={4}
+                className="w-full resize-none rounded-lg border border-border/70 bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+              />
+
+              {feedbackImages.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {feedbackImages.map((img) => (
+                    <div key={img.id} className="relative h-16 w-16 shrink-0">
+                      <img
+                        src={img.previewUrl}
+                        alt=""
+                        className="h-full w-full rounded-lg object-cover ring-1 ring-border/70"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeFeedbackImage(img.id)}
+                        aria-label="Remove image"
+                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-prestige-deep text-prestige-cream shadow"
+                      >
+                        <X className="h-3 w-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <input
+                    ref={feedbackImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleAddFeedbackImages}
+                  />
+                  <button
+                    type="button"
+                    disabled={feedbackImages.length >= MAX_FEEDBACK_IMAGES}
+                    onClick={() => feedbackImageInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Add screenshot
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  disabled={!isOnline || !feedbackMessage.trim() || submittingFeedback}
+                  aria-disabled={!isOnline}
+                  title={!isOnline ? "Sending feedback needs a network connection" : undefined}
+                  onClick={() => void handleSubmitFeedback()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+                >
+                  {submittingFeedback ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                  ) : null}
+                  {submittingFeedback ? "Sending…" : "Send"}
+                </button>
+              </div>
+              {!isOnline && (
+                <p className="text-[11px] text-muted-foreground">
+                  You're offline — reconnect to send feedback.
+                </p>
+              )}
             </div>
           </section>
 

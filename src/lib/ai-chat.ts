@@ -21,6 +21,7 @@
 // (q4) is ~859MB, more than double SmolLM2's ~387MB q4 file, so it's an
 // explicit opt-in (Profile > AI Settings), never the default.
 import { deviceDb } from "@/lib/db";
+import { generateChatViaWorker } from "@/lib/ai-worker-client";
 
 export type ChatModelChoice = "smollm2" | "gemma3-1b";
 
@@ -200,16 +201,19 @@ export async function isModelCachedForOffline(modelChoice?: ChatModelChoice): Pr
 
 const MAX_NEW_TOKENS = 300;
 
-/** Runs one turn of conversation through the on-device model. `onToken` is
- * called incrementally as text streams out (transformers.js's own
- * TextStreamer) — without this, a real response can take long enough on a
- * real device that a silent wait reads as frozen, the exact "AI can't be
- * downloaded" mistake Feature 31 found and fixed for the download itself;
- * this is the same lesson applied to inference. `maxNewTokens` defaults to
- * the chat-turn budget above; quiz generation (src/lib/quiz-gen.ts) needs
- * more room for several full multiple-choice questions in one response, so
- * it passes a larger explicit budget rather than sharing the chat default. */
-export async function askChatModel(
+/** The actual on-device generation call. Runs inside the AI worker
+ * (ai.worker.ts imports this directly) rather than on the main thread —
+ * see askChatModel below, the main-thread-facing entry point every
+ * application caller actually uses. `onToken` is called incrementally as
+ * text streams out (transformers.js's own TextStreamer) — without this, a
+ * real response can take long enough on a real device that a silent wait
+ * reads as frozen, the exact "AI can't be downloaded" mistake Feature 31
+ * found and fixed for the download itself; this is the same lesson
+ * applied to inference. `maxNewTokens` defaults to the chat-turn budget
+ * above; quiz generation (src/lib/quiz-gen.ts) needs more room for
+ * several full multiple-choice questions in one response, so it passes a
+ * larger explicit budget rather than sharing the chat default. */
+export async function generateChatLocally(
   history: ChatTurn[],
   onToken?: (piece: string) => void,
   maxNewTokens: number = MAX_NEW_TOKENS,
@@ -233,4 +237,16 @@ export async function askChatModel(
   const content = lastTurn && typeof lastTurn === "object" ? lastTurn.content : undefined;
   if (!content) throw new Error("Model returned no response");
   return String(content).trim();
+}
+
+/** Runs one turn of conversation through the on-device model, off the main
+ * thread (see DEV_LOG.md, Feature 51) — same signature and streaming
+ * semantics as before the worker migration, so existing callers
+ * (use-ai-chat.ts, use-collection-chat.ts, use-quiz.ts) need no changes. */
+export async function askChatModel(
+  history: ChatTurn[],
+  onToken?: (piece: string) => void,
+  maxNewTokens: number = MAX_NEW_TOKENS,
+): Promise<string> {
+  return generateChatViaWorker(history, onToken, maxNewTokens);
 }
