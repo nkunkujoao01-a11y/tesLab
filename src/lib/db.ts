@@ -45,6 +45,14 @@ export type DownloadedMaterial = {
 export type SummarySection = {
   heading: string;
   body: string;
+  // Real bullets lifted straight from this section of the source document
+  // (see summarize-structured.ts's splitIntoSections) — not AI-paraphrased,
+  // since a small summarizer model reliably produces only plain prose, not
+  // markup, and asking it to invent a bullet list risks the same corrupted-
+  // output failure mode already found for raw tables/bullets elsewhere in
+  // this app. Optional: sections generated before this existed, or with no
+  // real bullets in their source, still render correctly without it.
+  keyPoints?: string[];
 };
 
 /** A unified feed item for the Summaries page — see Feature 54. Before

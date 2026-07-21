@@ -310,6 +310,42 @@ function stripBulletPrefix(text: string): string {
   return text.replace(BULLET_PATTERN, "").replace(NUMBERED_PATTERN, "").trim();
 }
 
+// Real, observed bug (TestDoc/"1-Week5A PRS821 Domains of Security-S1.pdf"):
+// a hanging-indent bullet list's own *wrapped continuation* line — e.g.
+// "Firewalls – Hardware or software that monitors incoming and outgoing
+// network" wrapping onto a second physical PDF line, "traffic and blocks
+// threats" — is indented to line up with the bullet's *text*, not the
+// bullet glyph, so it satisfies classifyLine's indentation-only bullet
+// fallback (line.x - bodyX >= LIST_INDENT_THRESHOLD) exactly the same way a
+// genuine new list item does. Every wrapped continuation line of a bullet
+// like this was read as a brand new bullet instead, splitting one real
+// bullet into two or more fragments. A line with an actual marker character
+// (a real bullet glyph, a number, a citation bracket) is never ambiguous —
+// only the indentation-alone fallback is — so only that case needs to
+// check for an already-open, not-yet-complete bullet to continue instead
+// of starting fresh.
+function hasExplicitBulletMarker(text: string): boolean {
+  return (
+    BULLET_PATTERN.test(text) || NUMBERED_PATTERN.test(text) || CITATION_MARKER_PATTERN.test(text)
+  );
+}
+
+// Found necessary via the same real testing as hasExplicitBulletMarker,
+// against a different real document (swecom.pdf): a genuine sequence of
+// short, independent, Title Case list items with no marker of their own
+// ("Inductive Reasoning" / "Deductive Reasoning" / "Heuristic Reasoning",
+// each its own real skill/competency, not a continued sentence) triggered
+// the exact same indentation-only bullet fallback as a real wrapped
+// continuation would — hasExplicitBulletMarker alone can't tell these two
+// cases apart, since neither has a marker. The real, reliable difference:
+// an actual sentence wrapping onto a new line continues mid-sentence, so
+// its first word is never capitalized ("traffic and blocks threats" — the
+// real bug this file's own history documents); a new, independent item
+// starts its own sentence/phrase, capitalized, even with no marker glyph.
+function looksLikeContinuationLine(text: string): boolean {
+  return /^\p{Ll}/u.test(text.trim());
+}
+
 // A line ending in a hyphen right after a lowercase letter is almost
 // always a word-wrap break the PDF's own justification inserted (e.g.
 // "under-" / "standing" across two lines), not a real hyphenated compound
@@ -429,12 +465,35 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
         headingBuffer = { kind: line.kind, lines: [trimmed] };
         break;
       }
-      case "bullet":
+      case "bullet": {
+        // A line classified "bullet" purely by indentation (no real marker
+        // character) *and* starting lowercase — genuinely mid-sentence —
+        // might be a wrapped continuation of the bullet already open, not
+        // a new item. Both conditions matter: hasExplicitBulletMarker alone
+        // isn't enough, since a real sequence of short, independent,
+        // Title Case items with no marker of their own (found via swecom.pdf
+        // real testing) would otherwise all get merged into one run-on
+        // "bullet" — looksLikeContinuationLine's own comment has the full
+        // reasoning for why capitalization is the reliable tell here. A
+        // line with an explicit marker is never ambiguous either way; it
+        // always starts a new item.
+        if (
+          !hasExplicitBulletMarker(line.text) &&
+          looksLikeContinuationLine(line.text) &&
+          bulletBuffer
+        ) {
+          const bufferedSoFar = joinParagraphLines(bulletBuffer);
+          if (!SENTENCE_TERMINAL.test(bufferedSoFar)) {
+            bulletBuffer.push(line.text.trim());
+            break;
+          }
+        }
         flushParagraph();
         flushHeading();
         flushBullet();
         bulletBuffer = [stripBulletPrefix(line.text)];
         break;
+      }
       case "body": {
         flushHeading();
         const trimmed = line.text.trim();

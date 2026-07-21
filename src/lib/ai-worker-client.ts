@@ -18,6 +18,35 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from "@/lib/ai-worker-protocol";
+import type { ModelErrorCategory } from "@/lib/ai-error-classifier";
+
+/** An error from the worker, carrying the same classification computed
+ * worker-side (see ai.worker.ts) — lets a caller do
+ * `err instanceof ModelError && err.category === "fatal-unsupported"`
+ * instead of re-parsing message text on this side of the boundary. */
+export class ModelError extends Error {
+  category: ModelErrorCategory;
+  constructor(message: string, category: ModelErrorCategory) {
+    super(message);
+    this.name = "ModelError";
+    this.category = category;
+  }
+}
+
+/** Distinct from ModelError — this isn't a model failure at all, just this
+ * worker's own "single in-flight generation, reject if busy, not queued"
+ * scheduling (see ai.worker.ts's own comment on that design). Found via
+ * real-device testing to matter: a caller retrying a genuinely transient
+ * "busy" the same way it would retry a real model error wastes a retry
+ * attempt on something that just needs a short wait, not a different
+ * approach — see use-quiz.ts's own handling. A distinct class lets callers
+ * tell the two apart with `instanceof` instead of matching on message text. */
+export class WorkerBusyError extends Error {
+  constructor() {
+    super("AI worker is busy with another request");
+    this.name = "WorkerBusyError";
+  }
+}
 
 type PendingRequest = {
   onToken?: (piece: string) => void;
@@ -64,9 +93,9 @@ function handleMessage(message: WorkerResponse): void {
   if (message.type === "done") {
     entry.resolve(message.result);
   } else if (message.type === "error") {
-    entry.reject(new Error(message.message));
+    entry.reject(new ModelError(message.message, message.category));
   } else {
-    entry.reject(new Error("AI worker is busy with another request"));
+    entry.reject(new WorkerBusyError());
   }
 }
 
@@ -118,12 +147,14 @@ export function generateChatViaWorker(
   turns: ChatTurn[],
   onToken?: (piece: string) => void,
   maxNewTokens?: number,
+  sample?: boolean,
 ): Promise<string> {
   const request: ChatGenerateRequest = {
     type: "chat-generate",
     requestId: makeRequestId(),
     turns,
     maxNewTokens,
+    sample,
     stream: Boolean(onToken),
   };
   return send(request, onToken);

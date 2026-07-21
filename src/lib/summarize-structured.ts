@@ -25,7 +25,18 @@ const MODEL_DOWNLOADED_KEY = "ai_model_downloaded";
 // exists specifically to avoid ever triggering.
 const MODEL_INPUT_BUDGET = 3000;
 
-type RawSection = { heading: string; body: string };
+type RawSection = { heading: string; body: string; keyPoints: string[] };
+
+// A section's summary reads as one dense block with no internal structure,
+// because the on-device summarizer only ever outputs plain prose — it
+// can't reliably produce a bullet list on its own (see this file's own
+// header comment on why raw markup fed to the model corrupts its output).
+// Real bullets straight from the source document are the one piece of
+// structure that's genuine and safe to show without asking the model to
+// invent anything — capped the same way flashcard generation caps its own
+// per-document list (quiz-gen.ts's MAX_CARDS) so one bullet-heavy section
+// doesn't dwarf its own prose summary.
+const MAX_KEY_POINTS_PER_SECTION = 5;
 
 // A bullet or table block isn't sentence prose — summarizeText's
 // splitSentences has no markup awareness at all, so handing it a raw
@@ -57,24 +68,39 @@ function splitIntoSections(text: string, fallbackTitle: string): RawSection[] {
   const sections: RawSection[] = [];
   let currentHeading: string | null = null;
   let currentBody: string[] = [];
+  let currentBullets: string[] = [];
 
   const flush = () => {
     const body = currentBody.join("\n\n").trim();
-    if (body) sections.push({ heading: currentHeading ?? fallbackTitle, body });
+    if (body || currentBullets.length > 0) {
+      sections.push({
+        heading: currentHeading ?? fallbackTitle,
+        body,
+        keyPoints: currentBullets.slice(0, MAX_KEY_POINTS_PER_SECTION),
+      });
+    }
     currentBody = [];
+    currentBullets = [];
   };
 
   for (const block of blocks) {
     if (block.startsWith("# ") || block.startsWith("## ")) {
       flush();
       currentHeading = block.replace(/^#+\s*/, "").trim();
+    } else if (block.startsWith("- ")) {
+      // Kept out of `body` — never fed to the model (see this file's own
+      // header comment) — but real, so worth surfacing directly. See
+      // MAX_KEY_POINTS_PER_SECTION's comment above.
+      currentBullets.push(block.slice(2).trim());
     } else if (isPlainParagraph(block)) {
       currentBody.push(block);
     }
   }
   flush();
 
-  return sections.length > 0 ? sections : [{ heading: fallbackTitle, body: text.trim() }];
+  return sections.length > 0
+    ? sections
+    : [{ heading: fallbackTitle, body: text.trim(), keyPoints: [] }];
 }
 
 /** Greedily groups a section's paragraphs into chunks that each fit the
@@ -127,7 +153,14 @@ export async function generateStructuredSummary(
     const chunks = chunkForModel(section.body, MODEL_INPUT_BUDGET);
     const chunkSummaries: string[] = [];
     for (const chunk of chunks) {
-      if (modelDownloaded) {
+      // method !== "extractive": once one chunk's neural attempt has
+      // already failed, every later chunk skipped straight to the
+      // extractive fallback here too — before this, `modelDownloaded`
+      // alone gated this branch, so a fatal, deterministic failure (one
+      // that will reproduce identically for every remaining chunk) got
+      // re-attempted from scratch for each one anyway. One real attempt
+      // per document, then a clean, fast fallback for the rest.
+      if (modelDownloaded && method !== "extractive") {
         try {
           chunkSummaries.push(await summarizeWithModel(chunk));
           continue;
@@ -138,7 +171,11 @@ export async function generateStructuredSummary(
       }
       chunkSummaries.push(summarizeText(chunk, 2));
     }
-    sections.push({ heading: section.heading, body: chunkSummaries.join(" ") });
+    sections.push({
+      heading: section.heading,
+      body: chunkSummaries.join(" "),
+      keyPoints: section.keyPoints.length > 0 ? section.keyPoints : undefined,
+    });
   }
 
   const combined = sections.map((s) => s.body).join(" ");

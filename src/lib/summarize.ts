@@ -28,6 +28,20 @@ function wordsOf(sentence: string): string[] {
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
 }
 
+/** Groups a block of AI-generated prose into a handful of short paragraphs
+ * instead of one dense block — a real readability improvement (found via
+ * real-device testing feedback) that needs no model change at all, since
+ * the summarizer only ever outputs plain prose with no paragraph breaks of
+ * its own. Reuses splitSentences rather than a separate implementation. */
+export function groupIntoParagraphs(text: string, sentencesPerParagraph = 2): string[] {
+  const sentences = splitSentences(text);
+  const paragraphs: string[] = [];
+  for (let i = 0; i < sentences.length; i += sentencesPerParagraph) {
+    paragraphs.push(sentences.slice(i, i + sentencesPerParagraph).join(" "));
+  }
+  return paragraphs;
+}
+
 export function summarizeText(text: string, sentenceCount = 3): string {
   const sentences = splitSentences(text);
   if (sentences.length <= sentenceCount) return sentences.join(" ");

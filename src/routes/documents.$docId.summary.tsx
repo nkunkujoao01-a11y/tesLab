@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, Copy, Sparkles, ArrowUpRight } from "lucide-react";
 import { usePersonalDocument } from "@/hooks/use-documents";
+import { groupIntoParagraphs } from "@/lib/summarize";
 
 export const Route = createFileRoute("/documents/$docId/summary")({
   head: () => ({
@@ -101,9 +102,29 @@ function DocumentSummaryPage() {
                       {section.heading}
                     </h2>
                     <div className="mt-2 h-px w-12 bg-prestige-gold" />
-                    <p className="mt-4 text-[15px] leading-[1.75] text-foreground/85">
-                      {section.body}
-                    </p>
+                    {/* Grouped into short paragraphs instead of one dense
+                     * block — the summarizer only ever outputs plain prose
+                     * with no paragraph breaks of its own; see
+                     * groupIntoParagraphs's own comment. */}
+                    <div className="mt-4 space-y-3">
+                      {groupIntoParagraphs(section.body).map((paragraph, pi) => (
+                        <p key={pi} className="text-[15px] leading-[1.75] text-foreground/85">
+                          {paragraph}
+                        </p>
+                      ))}
+                    </div>
+                    {section.keyPoints && section.keyPoints.length > 0 && (
+                      <div className="mt-4 rounded-xl bg-secondary/60 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-prestige-mid">
+                          Key points
+                        </p>
+                        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[14px] leading-relaxed text-foreground/85">
+                          {section.keyPoints.map((point, ki) => (
+                            <li key={ki}>{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </section>
                 ))}
               </div>

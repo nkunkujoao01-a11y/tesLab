@@ -15,6 +15,10 @@ import {
   type ChatModelChoice,
 } from "@/lib/ai-chat";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  checkAndConsumeStaleAiBreadcrumb,
+  type StaleAiBreadcrumb,
+} from "@/lib/ai-crash-breadcrumb";
 
 const SETTING_KEY = "ai_chat_model_downloaded";
 // Separate from SETTING_KEY: whether the download actually persisted for
@@ -263,6 +267,27 @@ export function useSendAssistantMessage() {
   );
 
   return { sendMessage, sending, streamingText };
+}
+
+/** Checks, once, for a stale AI-operation breadcrumb left over from a
+ * previous session (see ai-crash-breadcrumb.ts) — consistent with, but not
+ * proof of, the process having crashed mid-download/generation last time.
+ * Consumed (deleted) the moment it's read, so this only ever surfaces
+ * once, whether or not the caller ends up showing anything for it. */
+export function useStaleAiOperationWarning(): StaleAiBreadcrumb | null {
+  const [breadcrumb, setBreadcrumb] = useState<StaleAiBreadcrumb | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void checkAndConsumeStaleAiBreadcrumb().then((b) => {
+      if (!cancelled) setBreadcrumb(b);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return breadcrumb;
 }
 
 export function useClearAssistantConversation() {

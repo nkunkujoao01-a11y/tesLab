@@ -21,6 +21,7 @@
 // a worker from inside a worker on every request.
 import { generateChatLocally } from "@/lib/ai-chat";
 import { summarizeLocally } from "@/lib/ai-model";
+import { classifyModelError } from "@/lib/ai-error-classifier";
 import type { WorkerRequest, WorkerResponse } from "@/lib/ai-worker-protocol";
 
 function post(message: WorkerResponse): void {
@@ -63,6 +64,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
                 }
               : undefined,
             msg.maxNewTokens,
+            msg.sample,
           )
         : await summarizeLocally(msg.text);
 
@@ -71,10 +73,13 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     }
   } catch (err) {
     if (suppressedRequestId !== msg.requestId) {
+      // Classified here, not on the receiving end — the real err object
+      // (not yet reduced to a string) is only available at this point.
       post({
         type: "error",
         requestId: msg.requestId,
         message: err instanceof Error ? err.message : String(err),
+        category: classifyModelError(err),
       });
     }
   } finally {

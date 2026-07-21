@@ -1,10 +1,38 @@
 import { useCallback, useEffect, useState } from "react";
 import { liveQuery } from "dexie";
 import { deviceDb } from "@/lib/db";
-import { loadSummarizerModel, type ModelProgress } from "@/lib/ai-model";
+import {
+  loadSummarizerModel,
+  isSummarizerCachedForOffline,
+  type ModelProgress,
+} from "@/lib/ai-model";
 import { notifyIfPermitted } from "@/hooks/use-permissions";
 
 const SETTING_KEY = "ai_model_downloaded";
+// Separate from SETTING_KEY: whether the download actually persisted for
+// reuse, not just whether it completed this session — mirrors
+// use-ai-chat.ts's identical pair for the chat model; see
+// isSummarizerCachedForOffline's own comment for why these can genuinely
+// differ (a caught, non-fatal Cache API failure).
+const OFFLINE_CACHED_KEY = "ai_model_offline_cached";
+
+/** Whether the summarizer is actually cached for reuse without a network
+ * connection — distinct from useAIModelStatus, which only means "the
+ * download completed this session." Mirrors
+ * use-ai-chat.ts's useChatModelOfflineCapable. */
+export function useAIModelOfflineCapable(): boolean {
+  const [cached, setCached] = useState(false);
+
+  useEffect(() => {
+    const sub = liveQuery(() => deviceDb.appSettings.get(OFFLINE_CACHED_KEY)).subscribe({
+      next: (row) => setCached(row?.value === "true"),
+      error: (err) => console.error("Failed to read AI model offline-cache status", err),
+    });
+    return () => sub.unsubscribe();
+  }, []);
+
+  return cached;
+}
 
 export type ModelStatus = "not-downloaded" | "downloading" | "ready" | "error";
 
@@ -74,7 +102,12 @@ export function useDownloadAIModel() {
           armStallTimer(pct);
         }
       });
+      const offlineCached = await isSummarizerCachedForOffline();
       await deviceDb.appSettings.put({ key: SETTING_KEY, value: "true" });
+      await deviceDb.appSettings.put({
+        key: OFFLINE_CACHED_KEY,
+        value: offlineCached ? "true" : "false",
+      });
       setProgress(100);
       setStatus("idle");
       notifyIfPermitted(

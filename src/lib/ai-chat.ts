@@ -22,6 +22,8 @@
 // explicit opt-in (Profile > AI Settings), never the default.
 import { deviceDb } from "@/lib/db";
 import { generateChatViaWorker } from "@/lib/ai-worker-client";
+import { classifyModelError, isFatalCategory } from "@/lib/ai-error-classifier";
+import { markAiOperationStarted, markAiOperationFinished } from "@/lib/ai-crash-breadcrumb";
 
 export type ChatModelChoice = "smollm2" | "gemma3-1b";
 
@@ -53,26 +55,33 @@ export type ChatModelInfo = {
 };
 
 export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
-  // dtype was "q4" (block-quantized) until real-device testing surfaced a
-  // hard failure generating every quiz question: "Can't create a session
-  // ... Could not find an implementation for GatherBlockQuantized(1) node
-  // with name '/model/embed_tokens/Gather_Quant'" — a real ONNX Runtime Web
-  // kernel gap for this model's block-quantized embedding lookup, not a
-  // timeout or a device-capability issue (this project's own sandboxed
-  // testing hits the model's genuine slowness, a different failure mode,
-  // never this exact error — this fix is grounded in the real error text
-  // and the model's actual published files, not verified end-to-end here).
-  // "int8" is a plain per-tensor quantization (DequantizeLinear/
-  // MatMulInteger, not GatherBlockQuantized/MatMulNBits) that's had broad
-  // WASM kernel support for a long time, and onnx-community's own published
-  // int8 file for this model is 363MB — smaller than q4's 386MB, not a
-  // tradeoff. Needs a real device to confirm this actually resolves it.
+  // dtype history, real and humbling: started "q4" (block-quantized),
+  // which real-device testing found crashed every quiz question with
+  // "Can't create a session ... Could not find an implementation for
+  // GatherBlockQuantized(1) node with name '/model/embed_tokens/Gather_Quant'"
+  // — a real ONNX Runtime Web kernel gap for this op. Switched to "int8" on
+  // the reasoning that it's a plain per-tensor quantization scheme
+  // (DequantizeLinear/MatMulInteger) with long-standing WASM support — that
+  // reasoning was wrong: the *exact same* GatherBlockQuantized error
+  // reproduced on the same real device after that fix shipped. The most
+  // likely explanation is that onnx-community's export tooling applies
+  // block quantization to the token-embedding table specifically, as a
+  // size-optimization, independent of the overall dtype label — so
+  // "int8" still hit the same unsupported op for embed_tokens even though
+  // the rest of the model's weights genuinely were plain int8. "fp32" (no
+  // quantization anywhere in the graph, on any tensor, embeddings
+  // included) is the only choice left that's *certain* to avoid this
+  // specific op, at a real cost: ~1.45GB, larger than "q4" ever was.
+  // Reliability over size given this model is the app's default and this
+  // exact failure has now been hit twice on a real device — not verified
+  // end-to-end here either, but this is the last lever available short of
+  // dropping GatherBlockQuantized-affected exports as an option entirely.
   smollm2: {
     id: "onnx-community/SmolLM2-360M-Instruct-ONNX",
-    dtype: "int8",
+    dtype: "fp32",
     label: "SmolLM2 (360M)",
     description: "Small and fast — the default. Good for quick answers and quiz generation.",
-    approxSizeMb: 363,
+    approxSizeMb: 1450,
   },
   // Real-device testing also reported the device crashing during this
   // model's download/install (SmolLM2 self-recovered via a page refresh;
@@ -133,10 +142,6 @@ type Generator = any;
 const TRANSIENT_RETRY_ATTEMPTS = 2;
 const TRANSIENT_RETRY_DELAY_MS = 1500;
 
-function isTransientFetchError(err: unknown): boolean {
-  return err instanceof TypeError;
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -145,6 +150,25 @@ function delay(ms: number): Promise<void> {
 // setting doesn't discard an already-loaded model still usable this
 // session, and loading one model never blocks or clobbers the other.
 const pipelinePromises = new Map<ChatModelChoice, Promise<Generator>>();
+
+// Real bug found via real-device testing: a fatal, deterministic session-
+// creation failure (e.g. the real GatherBlockQuantized kernel gap) got
+// retried anyway — every quiz question re-attempted full pipeline creation
+// from scratch, even though a fatal failure reproduces identically every
+// time. Remembered for the rest of this worker's lifetime once seen, so
+// every subsequent call rejects immediately instead of repeating a doomed
+// attempt. Intentionally in-memory only (not persisted) — a fresh page
+// load/worker restart gets a clean attempt, in case the failure was
+// somehow transient to that one runtime instance.
+const fatalModelErrors = new Map<ChatModelChoice, Error>();
+
+/** Whether loading this specific model has already failed fatally this
+ * session, without triggering a load attempt — for UI purposes, e.g.
+ * disabling "regenerate quiz" instead of letting the user click into the
+ * same wall again. */
+export function isModelFatallyBroken(modelChoice: ChatModelChoice): boolean {
+  return fatalModelErrors.has(modelChoice);
+}
 
 // Real bug found via real-device testing: leaving the /assistant page (or
 // any component calling loadChatModel) while a download was in flight, then
@@ -169,6 +193,9 @@ export async function loadChatModel(
   modelChoice?: ChatModelChoice,
 ): Promise<Generator> {
   const choice = modelChoice ?? (await getSelectedChatModel());
+  const fatalError = fatalModelErrors.get(choice);
+  if (fatalError) return Promise.reject(fatalError);
+
   const existing = pipelinePromises.get(choice);
   if (existing) {
     if (onProgress) progressSubscribers.get(choice)?.add(onProgress);
@@ -184,26 +211,46 @@ export async function loadChatModel(
   };
 
   const promise = (async () => {
-    const { pipeline } = await import("@huggingface/transformers");
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await pipeline("text-generation", id, {
-          dtype,
-          progress_callback: broadcastProgress,
-        });
-      } catch (err) {
-        if (attempt >= TRANSIENT_RETRY_ATTEMPTS || !isTransientFetchError(err)) throw err;
-        console.error(
-          `Transient failure loading chat model (attempt ${attempt + 1}), retrying`,
-          err,
-        );
-        await delay(TRANSIENT_RETRY_DELAY_MS);
+    await markAiOperationStarted("load", CHAT_MODELS[choice].label);
+    try {
+      const { pipeline } = await import("@huggingface/transformers");
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await pipeline("text-generation", id, {
+            dtype,
+            progress_callback: broadcastProgress,
+          });
+        } catch (err) {
+          const category = classifyModelError(err);
+          // A fatal failure reproduces identically every time — no point
+          // spending the remaining transient-retry attempts on it. Remember
+          // it so every future call for this model rejects immediately
+          // instead of repeating the same doomed pipeline() attempt.
+          if (isFatalCategory(category)) {
+            const fatal = err instanceof Error ? err : new Error(String(err));
+            fatalModelErrors.set(choice, fatal);
+            throw fatal;
+          }
+          if (attempt >= TRANSIENT_RETRY_ATTEMPTS || category !== "transient") throw err;
+          console.error(
+            `Transient failure loading chat model (attempt ${attempt + 1}), retrying`,
+            err,
+          );
+          await delay(TRANSIENT_RETRY_DELAY_MS);
+        }
       }
+    } finally {
+      // Reached only if the process is still alive to run it — a real
+      // crash mid-load never gets here, which is exactly the signal
+      // checkAndConsumeStaleAiBreadcrumb looks for on a later load.
+      await markAiOperationFinished();
     }
   })();
   pipelinePromises.set(choice, promise);
   // Same reasoning as ai-model.ts: don't cache a rejected promise, so the
-  // next attempt retries clean instead of failing forever.
+  // next attempt retries clean instead of failing forever — except for a
+  // fatal error, which is deliberately kept in fatalModelErrors above
+  // instead so it stops future attempts rather than allowing a clean retry.
   promise.catch(() => {
     pipelinePromises.delete(choice);
   });
@@ -273,6 +320,7 @@ export async function generateChatLocally(
   history: ChatTurn[],
   onToken?: (piece: string) => void,
   maxNewTokens: number = MAX_NEW_TOKENS,
+  sample = false,
 ): Promise<string> {
   const { TextStreamer } = await import("@huggingface/transformers");
   const generator = await loadChatModel();
@@ -283,12 +331,27 @@ export async function generateChatLocally(
         callback_function: onToken,
       })
     : undefined;
-  const output = await generator(history, {
-    max_new_tokens: maxNewTokens,
-    do_sample: false,
-    no_repeat_ngram_size: 3,
-    streamer,
-  });
+  await markAiOperationStarted("generate", "a response");
+  let output;
+  try {
+    output = await generator(history, {
+      max_new_tokens: maxNewTokens,
+      // Greedy (do_sample: false) by default — deterministic, which is
+      // right for most calls, but means a caller that got malformed output
+      // back (quiz-gen.ts's parser dropping an unparseable question, say)
+      // gains nothing from simply calling again with the same input:
+      // greedy decoding would produce the exact same malformed output
+      // every time. `sample: true` (used only for that kind of one-off
+      // retry — see use-quiz.ts) turns on real randomness for a genuinely
+      // different attempt with an actual chance of coming out right.
+      do_sample: sample,
+      ...(sample ? { temperature: 0.7, top_p: 0.9 } : {}),
+      no_repeat_ngram_size: 3,
+      streamer,
+    });
+  } finally {
+    await markAiOperationFinished();
+  }
   const lastTurn = output?.[0]?.generated_text?.at(-1);
   const content = lastTurn && typeof lastTurn === "object" ? lastTurn.content : undefined;
   if (!content) throw new Error("Model returned no response");
@@ -298,11 +361,14 @@ export async function generateChatLocally(
 /** Runs one turn of conversation through the on-device model, off the main
  * thread (see DEV_LOG.md, Feature 51) — same signature and streaming
  * semantics as before the worker migration, so existing callers
- * (use-ai-chat.ts, use-collection-chat.ts, use-quiz.ts) need no changes. */
+ * (use-ai-chat.ts, use-collection-chat.ts) that don't pass `sample` need no
+ * changes. `sample` is currently only used by use-quiz.ts's parse-failure
+ * retry — see generateChatLocally's own comment above for why. */
 export async function askChatModel(
   history: ChatTurn[],
   onToken?: (piece: string) => void,
   maxNewTokens: number = MAX_NEW_TOKENS,
+  sample = false,
 ): Promise<string> {
-  return generateChatViaWorker(history, onToken, maxNewTokens);
+  return generateChatViaWorker(history, onToken, maxNewTokens, sample);
 }
