@@ -56,6 +56,19 @@ type RawLine = {
   // precedent as the rest of this file.
   boldChars: number;
   charCount: number;
+  // Character count per raw pdf.js font resource name on this line — backs
+  // a fallback heading signal for documents where bold/size detection
+  // above can't work at all. Found via real testing on a Google-Docs-
+  // exported PDF (TestDoc/"1-Week5A PRS821 Domains of Security-S1.pdf"):
+  // every font in the document resolves through pdf.js's `content.styles`
+  // to a generic `fontFamily: "sans-serif"` with no weight information,
+  // and its real headings ("Network Security", "Application Security")
+  // render at the exact same point size as body text — so neither the
+  // size-ratio nor the bold-name check has anything to key off, even
+  // though the heading text visibly uses a distinct underlying font
+  // resource (`g_d0_f3` vs body's `g_d0_f5`) that pdf.js just doesn't
+  // expose as "bold". See bodyFontName/classifyLine below.
+  fontChars: Record<string, number>;
   // Per-cell text and each cell's left edge, split wherever a fragment gap
   // is wide enough to look like column padding rather than an ordinary
   // word space (see CELL_GAP_RATIO). An ordinary prose line just ends up
@@ -284,24 +297,55 @@ const BOLD_MAJORITY_RATIO = 0.6;
  * size or offset that's huge in one PDF is ordinary in another with a
  * larger base font or margin), so every threshold here is a ratio/delta
  * against the document's own `bodySize`/`bodyX`, not an absolute value. */
-function classifyLine(line: RawLine, bodySize: number, bodyX: number): LineKind {
+function classifyLine(
+  line: RawLine,
+  bodySize: number,
+  bodyX: number,
+  bodyFontName: string,
+): LineKind {
   const ratio = bodySize > 0 ? line.size / bodySize : 1;
   const boldRatio = line.charCount > 0 ? line.boldChars / line.charCount : 0;
   const trimmed = line.text.trim();
   const looksLikeHeadingText =
-    !SENTENCE_TERMINAL.test(trimmed) && trimmed.split(/\s+/).length <= MAX_HEADING_WORDS;
+    /\p{L}/u.test(trimmed) &&
+    !SENTENCE_TERMINAL.test(trimmed) &&
+    trimmed.split(/\s+/).length <= MAX_HEADING_WORDS;
+  const hasListMarker =
+    BULLET_PATTERN.test(line.text) ||
+    NUMBERED_PATTERN.test(line.text) ||
+    CITATION_MARKER_PATTERN.test(line.text);
+  // Fallback signal for documents (Google Docs PDF exports, real-world
+  // example: TestDoc/"1-Week5A PRS821 Domains of Security-S1.pdf") where
+  // every font resolves through pdf.js to the same generic family with no
+  // weight info, so boldRatio can never be anything but 0 and a heading
+  // never gets a size bump either — see RawLine.fontChars' own comment.
+  // Only trusted at body-like size and never on a line that already has a
+  // real list marker, so a numbered/citation/bullet line that happens to
+  // use a differently-keyed font fragment still falls through to "bullet"
+  // below rather than being misread as a heading. Reuses BOLD_MAJORITY_RATIO
+  // rather than a stricter cutoff on purpose: a stricter ratio was tried
+  // (real testing against TestDoc/"4-Week5D PRS821 Network Attacks-1of2.pdf",
+  // whose scrambled reading order on one dense lettered list produces one
+  // genuinely garbled heading either way) and made a *different* real
+  // document worse — TestDoc/"2-Week5B PRS821 Database Security-S1.pdf"
+  // dropped from 9 correctly-detected headings to 2. The known, accepted
+  // cost of the looser ratio is that one garbled heading in 4-Week5D;
+  // every other document across the full 25-file TestDoc/ corpus came out
+  // clean or improved. Not a threshold worth re-chasing without a genuinely
+  // different signal (e.g. per-page-scoped font-name reuse isn't reliable —
+  // pdf.js's raw resource names like "g_d0_f2" aren't guaranteed consistent
+  // across a multi-page document's separate content streams).
+  const bodyFontChars = bodyFontName ? (line.fontChars[bodyFontName] ?? 0) : line.charCount;
+  const offBodyFontRatio = line.charCount > 0 ? 1 - bodyFontChars / line.charCount : 0;
+  const usesDistinctFont =
+    !hasListMarker && ratio >= 0.95 && ratio <= 1.15 && offBodyFontRatio >= BOLD_MAJORITY_RATIO;
   if (ratio >= 1.4 && looksLikeHeadingText) return "heading";
   if (
-    (ratio >= 1.15 || (boldRatio >= BOLD_MAJORITY_RATIO && ratio >= 0.95)) &&
+    (ratio >= 1.15 || (boldRatio >= BOLD_MAJORITY_RATIO && ratio >= 0.95) || usesDistinctFont) &&
     looksLikeHeadingText
   )
     return "subheading";
-  if (
-    BULLET_PATTERN.test(line.text) ||
-    NUMBERED_PATTERN.test(line.text) ||
-    CITATION_MARKER_PATTERN.test(line.text)
-  )
-    return "bullet";
+  if (hasListMarker) return "bullet";
   if (ratio >= 0.85 && ratio <= 1.15 && line.x - bodyX >= LIST_INDENT_THRESHOLD) return "bullet";
   return "body";
 }
@@ -586,6 +630,7 @@ export async function extractPdfText(
       const size = "height" in item && item.height > 0 ? item.height : Math.abs(item.transform[3]);
       const fontStyle = "fontName" in item ? content.styles[item.fontName] : undefined;
       const bold = /bold/i.test(fontStyle?.fontFamily ?? "");
+      const fontName = "fontName" in item ? item.fontName : "";
       const existing = lines.find((l) => Math.abs(l.y - y) < 3);
       if (existing) {
         // pdf.js sometimes splits one visual word across separate text
@@ -614,6 +659,7 @@ export async function extractPdfText(
         }
         existing.size = Math.max(existing.size, size);
         existing.boldChars += bold ? item.str.length : 0;
+        existing.fontChars[fontName] = (existing.fontChars[fontName] ?? 0) + item.str.length;
         existing.charCount += item.str.length;
         existing.x = Math.min(existing.x, x);
         existing.endX = Math.max(existing.endX, x + width);
@@ -625,6 +671,7 @@ export async function extractPdfText(
           text: item.str,
           size,
           boldChars: bold ? item.str.length : 0,
+          fontChars: { [fontName]: item.str.length },
           charCount: item.str.length,
           cells: [item.str],
           cellX: [x],
@@ -700,6 +747,28 @@ export async function extractPdfText(
     }
   }
 
+  // The document's own dominant pdf.js font resource — same char-weighted
+  // vote as bodySize, backing the fallback heading signal described on
+  // RawLine.fontChars above. A document where bold/size detection already
+  // works fine still computes this harmlessly; it only changes anything in
+  // classifyLine when the other two signals have nothing to go on.
+  const fontVotes = new Map<string, number>();
+  for (const lines of pageLines) {
+    for (const line of lines) {
+      for (const [font, count] of Object.entries(line.fontChars)) {
+        fontVotes.set(font, (fontVotes.get(font) ?? 0) + count);
+      }
+    }
+  }
+  let bodyFontName = "";
+  let bestFontVotes = -1;
+  for (const [font, votes] of fontVotes) {
+    if (votes > bestFontVotes) {
+      bestFontVotes = votes;
+      bodyFontName = font;
+    }
+  }
+
   // The document's own left margin for body-sized text specifically — a
   // title page's centered heading shouldn't pull this toward the middle of
   // the page, so only lines already close to bodySize vote here.
@@ -766,7 +835,7 @@ export async function extractPdfText(
     return lines.map((line, i) =>
       tableFlags[i]
         ? { kind: "table-row" as const, text: line.text, cells: line.cells }
-        : { kind: classifyLine(line, bodySize, bodyX), text: line.text },
+        : { kind: classifyLine(line, bodySize, bodyX, bodyFontName), text: line.text },
     );
   }
 
