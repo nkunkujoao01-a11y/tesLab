@@ -42,6 +42,21 @@ function parseBlocks(text: string): Block[] {
 
 const MAX_CARDS = 12;
 
+// Real, reported bug: a heading like "Download" — a short navigational/
+// structural label, not a real concept — mechanically became "What does
+// 'Download' cover?" with a thin, low-value answer underneath (e.g. just
+// "Android device iOS device" from a mobile-app instruction guide). No
+// fixed blocklist of "bad" heading words would generalize across
+// documents (a "Download" section is a real, substantive topic in a
+// different PDF) — the reliable, generic signal is the *answer*, not the
+// heading: a heading with real explanatory text under it makes a real
+// flashcard; one with only a line or two of thin content doesn't, no
+// matter what the heading itself says. Same "exclude, don't fake"
+// discipline this file already applies to a document with no heading
+// structure at all — a card testing recall of almost nothing isn't worth
+// including just to pad the deck.
+const MIN_BACK_CHARS = 60;
+
 // A numbered/lettered heading prefix ("11. Software Requirements Skill
 // Area", "A. Contributors") reads awkwardly once wrapped in a question —
 // stripped before building the front, real heading text kept as-is.
@@ -82,8 +97,9 @@ export function generateFlashcards(text: string): Flashcard[] {
   let backParts: string[] = [];
 
   const flush = () => {
-    if (front && backParts.length > 0) {
-      cards.push({ front, back: backParts.join(" ") });
+    const back = backParts.join(" ");
+    if (front && back.length >= MIN_BACK_CHARS) {
+      cards.push({ front, back });
     }
     backParts = [];
   };
