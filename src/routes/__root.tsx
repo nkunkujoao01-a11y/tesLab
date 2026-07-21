@@ -59,15 +59,19 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              router.invalidate();
-              reset();
+              // reset() must wait for invalidate()'s re-run of the failed
+              // loader to actually finish — clearing the error boundary
+              // first (as this used to) could re-render with the same
+              // stale error before the fresh attempt had resolved either
+              // way, making the button look like it did nothing.
+              void router.invalidate().finally(() => reset());
             }}
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Try again
           </button>
           <a
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center justify-center rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             Go home

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckCircle2, Download, FileText, ChevronRight } from "lucide-react";
+import { CheckCircle2, Download, FileText, Sparkles, ChevronRight } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { LibrarySearchButton } from "@/components/LibrarySearch";
 import { formatMb } from "@/lib/mock-data";
@@ -39,22 +39,42 @@ function Courses() {
       />
 
       <div className="space-y-8 px-6 lg:px-10 lg:pb-16">
-        {/* My documents */}
-        <Link
-          to="/documents"
-          className="animate-rise group flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-border/60 transition-colors hover:ring-prestige-gold/40"
-        >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-            <FileText className="h-4 w-4" strokeWidth={1.75} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-prestige-deep">My documents</p>
-            <p className="text-[11px] text-muted-foreground">
-              Upload your own PDFs — extracted and summarised on this device
-            </p>
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={2} />
-        </Link>
+        {/* My documents + Summaries */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link
+            to="/documents"
+            className="animate-rise group flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-border/60 transition-colors hover:ring-prestige-gold/40"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+              <FileText className="h-4 w-4" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-prestige-deep">My documents</p>
+              <p className="text-[11px] text-muted-foreground">
+                Upload your own PDFs — extracted and summarised on this device
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={2} />
+          </Link>
+
+          {/* Moved here from its own bottom-nav slot — see MobileShell.tsx's
+           * own comment on why. */}
+          <Link
+            to="/summaries"
+            className="animate-rise group flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-border/60 transition-colors hover:ring-prestige-gold/40"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+              <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-prestige-deep">Summaries</p>
+              <p className="text-[11px] text-muted-foreground">
+                Every AI summary you've generated, kept alongside its source
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={2} />
+          </Link>
+        </div>
 
         {/* Featured hero */}
         <Link

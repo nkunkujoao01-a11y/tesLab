@@ -53,18 +53,44 @@ export type ChatModelInfo = {
 };
 
 export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
+  // dtype was "q4" (block-quantized) until real-device testing surfaced a
+  // hard failure generating every quiz question: "Can't create a session
+  // ... Could not find an implementation for GatherBlockQuantized(1) node
+  // with name '/model/embed_tokens/Gather_Quant'" — a real ONNX Runtime Web
+  // kernel gap for this model's block-quantized embedding lookup, not a
+  // timeout or a device-capability issue (this project's own sandboxed
+  // testing hits the model's genuine slowness, a different failure mode,
+  // never this exact error — this fix is grounded in the real error text
+  // and the model's actual published files, not verified end-to-end here).
+  // "int8" is a plain per-tensor quantization (DequantizeLinear/
+  // MatMulInteger, not GatherBlockQuantized/MatMulNBits) that's had broad
+  // WASM kernel support for a long time, and onnx-community's own published
+  // int8 file for this model is 363MB — smaller than q4's 386MB, not a
+  // tradeoff. Needs a real device to confirm this actually resolves it.
   smollm2: {
     id: "onnx-community/SmolLM2-360M-Instruct-ONNX",
-    dtype: "q4",
+    dtype: "int8",
     label: "SmolLM2 (360M)",
     description: "Small and fast — the default. Good for quick answers and quiz generation.",
-    approxSizeMb: 387,
+    approxSizeMb: 363,
   },
+  // Real-device testing also reported the device crashing during this
+  // model's download/install (SmolLM2 self-recovered via a page refresh;
+  // this one reportedly took the whole system down). Left at "q4" rather
+  // than switched to a broadly-compatible dtype the way smollm2 was above:
+  // onnx-community's own int8 file for THIS model is 1GB vs q4's 859MB —
+  // a real ~140MB increase, not a free win — and a crash on the larger of
+  // the two chat models is at least as plausibly plain memory pressure on
+  // a constrained device as it is the same kernel gap, so a bigger file
+  // could easily make that worse rather than better. Surfacing this
+  // honestly in the description below instead of guessing at a dtype
+  // change with a real chance of making things worse.
   "gemma3-1b": {
     id: "onnx-community/gemma-3-1b-it-ONNX",
     dtype: "q4",
     label: "Gemma 3 (1B)",
-    description: "Larger and more capable, at more than double the download size.",
+    description:
+      "Larger and more capable, at more than double the download size. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
     approxSizeMb: 859,
   },
 };
@@ -120,6 +146,20 @@ function delay(ms: number): Promise<void> {
 // session, and loading one model never blocks or clobbers the other.
 const pipelinePromises = new Map<ChatModelChoice, Promise<Generator>>();
 
+// Real bug found via real-device testing: leaving the /assistant page (or
+// any component calling loadChatModel) while a download was in flight, then
+// coming back, made the download look like it "started over or stopped" —
+// it didn't actually restart (pipelinePromises above already dedupes that
+// correctly), but progress_callback is bound to whichever caller's
+// onProgress happened to be passed the *first* time this model started
+// downloading, at pipeline() call time — a second caller returning to an
+// already-in-flight download had no way to observe its progress at all, so
+// its own UI just sat at a fresh 0% (or looked stuck) until the original,
+// unrelated promise resolved. This set lets every current caller's
+// onProgress subscribe to the one real in-flight download, not just the
+// first one to start it.
+const progressSubscribers = new Map<ChatModelChoice, Set<(p: ModelProgress) => void>>();
+
 /** Loads the given model (or, if omitted, whichever the user has selected
  * in Profile > AI Settings — see getSelectedChatModel). Existing callers
  * that don't care which model — they just want "the current one" — don't
@@ -130,16 +170,26 @@ export async function loadChatModel(
 ): Promise<Generator> {
   const choice = modelChoice ?? (await getSelectedChatModel());
   const existing = pipelinePromises.get(choice);
-  if (existing) return existing;
+  if (existing) {
+    if (onProgress) progressSubscribers.get(choice)?.add(onProgress);
+    return existing;
+  }
 
   const { id, dtype } = CHAT_MODELS[choice];
+  const subscribers = new Set<(p: ModelProgress) => void>();
+  if (onProgress) subscribers.add(onProgress);
+  progressSubscribers.set(choice, subscribers);
+  const broadcastProgress = (p: ModelProgress) => {
+    for (const subscriber of subscribers) subscriber(p);
+  };
+
   const promise = (async () => {
     const { pipeline } = await import("@huggingface/transformers");
     for (let attempt = 0; ; attempt++) {
       try {
         return await pipeline("text-generation", id, {
           dtype,
-          progress_callback: onProgress,
+          progress_callback: broadcastProgress,
         });
       } catch (err) {
         if (attempt >= TRANSIENT_RETRY_ATTEMPTS || !isTransientFetchError(err)) throw err;
@@ -156,6 +206,12 @@ export async function loadChatModel(
   // next attempt retries clean instead of failing forever.
   promise.catch(() => {
     pipelinePromises.delete(choice);
+  });
+  // No more progress events will ever come once this settles either way —
+  // release the closures so a long-finished download doesn't keep every
+  // component that ever observed it alive in memory.
+  promise.finally(() => {
+    progressSubscribers.delete(choice);
   });
   return promise;
 }

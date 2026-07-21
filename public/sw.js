@@ -18,6 +18,7 @@ const PRECACHE_ROUTES = [
   "/login",
   "/dashboard",
   "/courses",
+  "/documents",
   "/summaries",
   "/assistant",
   "/progress",

@@ -2,16 +2,30 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 
-// Mirrors MobileShell.tsx's NAV array plus /login — see the SW-side
-// PRECACHE_ROUTES list in public/sw.js for the HTML-caching half of this.
+// Mirrors MobileShell.tsx's NAV array plus /login and /documents — see the
+// SW-side PRECACHE_ROUTES list in public/sw.js for the HTML-caching half of
+// this. /documents ("My documents") isn't a bottom-nav item — it's reached
+// via a link from /courses (Library) — so without listing it explicitly
+// here too, a document opened for the first time while offline (having
+// never visited /documents itself this session) fails: its own route chunk,
+// and the per-document detail route's chunk below, were never fetched.
 const PRECACHE_PATHS = [
   "/dashboard",
   "/courses",
+  "/documents",
   "/summaries",
   "/assistant",
   "/progress",
   "/profile",
 ];
+
+// /documents/$docId can't go through PRECACHE_PATHS above — that list
+// assumes each entry is a real, literal, fetchable URL (for the SW's
+// HTML-caching half), but this route needs a docId no route list can know
+// in advance. router.preloadRoute() below only needs to resolve which route
+// matches and trigger *that route's* lazy import — it doesn't render the
+// component or need the placeholder id to correspond to a real document —
+// so a dummy id is enough to warm the chunk cache for every real docId.
 
 /** Proactively warms this session's offline caches for the main nav
  * routes once actually signed in (not at service-worker install time,
@@ -55,6 +69,14 @@ export function usePrecacheRoutes(): void {
         } catch (err) {
           console.error(`Failed to preload route chunk for ${to}`, err);
         }
+      }
+      try {
+        await router.preloadRoute({
+          to: "/documents/$docId",
+          params: { docId: "__precache__" },
+        } as unknown as Parameters<typeof router.preloadRoute>[0]);
+      } catch (err) {
+        console.error("Failed to preload route chunk for /documents/$docId", err);
       }
     })();
 

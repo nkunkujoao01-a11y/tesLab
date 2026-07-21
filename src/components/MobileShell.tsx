@@ -2,7 +2,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Home,
   BookOpen,
-  Sparkles,
   BarChart3,
   User,
   WifiOff,
@@ -27,15 +26,19 @@ type NavItem = {
   match?: (path: string) => boolean;
 };
 
+// Summaries dropped from here (was its own bottom-nav slot) after
+// real-device testing reported 6 items feeling cramped — it's reachable
+// from Library now instead (see courses.index.tsx's own link card, same
+// pattern "My documents" already used), since a summary is always
+// generated from something opened in Library anyway.
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: Home },
   {
     to: "/courses",
     label: "Library",
     icon: BookOpen,
-    match: (p) => p.startsWith("/courses"),
+    match: (p) => p.startsWith("/courses") || p === "/summaries",
   },
-  { to: "/summaries", label: "Summaries", icon: Sparkles },
   { to: "/assistant", label: "Ask AI", icon: Bot },
   { to: "/progress", label: "Progress", icon: BarChart3 },
   { to: "/profile", label: "Profile", icon: User },
@@ -172,16 +175,23 @@ export function MobileShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile bottom nav */}
-      {/* Text labels collide/run together below ~380px with 6 items (found
+      {/* Text labels collide/run together below ~380px with 5 items (found
        * via a real viewport sweep down to 320px, the budget-Android width
        * this app's own NFRs target — not assumed fine because it looked ok
        * at one desktop-resized-down width). Icon-only under that breakpoint
        * is the standard fix (same pattern as most mobile apps' bottom
        * navs) rather than shrinking text further, which would hurt
        * legibility instead of fixing the crowding. `aria-label` keeps the
-       * icon-only rows accessible even though the visible text is hidden. */}
+       * icon-only rows accessible even though the visible text is hidden.
+       * grid-cols-5 must match NAV.length — a real bug found when Summaries
+       * was dropped from 6 items to 5 without updating this: the grid kept
+       * reserving a 6th, empty column, so the 5 real buttons stayed
+       * squeezed into the left five-sixths of the row instead of actually
+       * spreading across the full width, which is exactly what read as
+       * "too close together" on a real device even after the item count
+       * dropped. */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/85 backdrop-blur-md lg:hidden">
-        <ul className="mx-auto grid max-w-[440px] grid-cols-6 gap-x-2 px-3 py-3 min-[380px]:gap-x-3 min-[380px]:px-5">
+        <ul className="mx-auto grid max-w-[440px] grid-cols-5 gap-x-2 px-3 py-3 min-[380px]:gap-x-3 min-[380px]:px-5">
           {NAV.map((item) => {
             const active = item.match ? item.match(path) : path === item.to;
             return (
@@ -189,14 +199,17 @@ export function MobileShell({ children }: { children: ReactNode }) {
                 <Link
                   to={item.to}
                   aria-label={item.label}
-                  className="flex flex-col items-center gap-1 py-1 active:scale-[0.94] transition-transform"
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 transition-all active:scale-[0.94]",
+                    active && "bg-prestige-deep/10",
+                  )}
                 >
                   <item.icon
                     className={cn(
                       "h-5 w-5",
                       active ? "text-prestige-deep" : "text-prestige-deep/60",
                     )}
-                    strokeWidth={1.75}
+                    strokeWidth={active ? 2.25 : 1.75}
                   />
                   <span
                     className={cn(
@@ -206,6 +219,17 @@ export function MobileShell({ children }: { children: ReactNode }) {
                   >
                     {item.label}
                   </span>
+                  {/* A color-only difference between active/inactive read as
+                   * too subtle on a real device — this dot, plus the pill
+                   * background and bolder icon stroke above, give three
+                   * independent, unambiguous signals for which tab is
+                   * active, not just one. */}
+                  <span
+                    className={cn(
+                      "h-1 w-1 rounded-full transition-opacity",
+                      active ? "bg-prestige-gold opacity-100" : "opacity-0",
+                    )}
+                  />
                 </Link>
               </li>
             );

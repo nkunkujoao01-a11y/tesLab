@@ -291,7 +291,14 @@ function DocumentDetail() {
        * collision never surfaces. Same proven pattern already used by
        * assistant.tsx's input bar and the collection chat page. */}
       <div className="fixed inset-x-0 bottom-20 z-20 border-t border-border/60 bg-background/95 backdrop-blur-md lg:bottom-0 lg:ml-64">
-        <div className="mx-auto flex max-w-[720px] items-center justify-end gap-2 overflow-x-auto px-5 py-4">
+        {/* justify-end paired with overflow-x-auto on the same element
+         * right-aligned this row's default (unscrolled) scroll position,
+         * clipping the first button ("Flashcards") off-screen to the left
+         * on narrow phones — found via a real 375px-viewport screenshot
+         * showing only "CARDS" visible at the left edge. justify-start
+         * keeps the natural reading order visible from the start, with any
+         * overflow scrollable to the right instead. */}
+        <div className="mx-auto flex max-w-[720px] items-center justify-start gap-2 overflow-x-auto px-5 py-4">
           <button
             type="button"
             disabled={isGeneratingFlashcards}

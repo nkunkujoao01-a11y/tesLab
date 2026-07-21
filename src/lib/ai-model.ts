@@ -71,15 +71,32 @@ function delay(ms: number): Promise<void> {
 
 let pipelinePromise: Promise<Summarizer> | null = null;
 
+// Real bug found via real-device testing on ai-chat.ts's equivalent (see
+// its own comment on this same pattern) — progress_callback is bound to
+// whichever caller's onProgress happened to be passed the *first* time
+// this model started downloading. A second caller (e.g. after navigating
+// away and back mid-download) had no way to observe an already-in-flight
+// download's progress, so its own UI just sat at a fresh 0% or looked
+// stuck. This set lets every current caller's onProgress subscribe to the
+// one real in-flight download.
+let progressSubscribers: Set<(p: ModelProgress) => void> | null = null;
+
 export function loadSummarizerModel(onProgress?: (p: ModelProgress) => void): Promise<Summarizer> {
   if (!pipelinePromise) {
+    const subscribers = new Set<(p: ModelProgress) => void>();
+    if (onProgress) subscribers.add(onProgress);
+    progressSubscribers = subscribers;
+    const broadcastProgress = (p: ModelProgress) => {
+      for (const subscriber of subscribers) subscriber(p);
+    };
+
     pipelinePromise = (async () => {
       const { pipeline } = await import("@huggingface/transformers");
       for (let attempt = 0; ; attempt++) {
         try {
           const summarizer = await pipeline("summarization", MODEL_ID, {
             dtype: MODEL_DTYPE,
-            progress_callback: onProgress,
+            progress_callback: broadcastProgress,
           });
           return summarizer as unknown as Summarizer;
         } catch (err) {
@@ -97,6 +114,12 @@ export function loadSummarizerModel(onProgress?: (p: ModelProgress) => void): Pr
     pipelinePromise.catch(() => {
       pipelinePromise = null;
     });
+    // No more progress events will ever come once this settles either way.
+    pipelinePromise.finally(() => {
+      progressSubscribers = null;
+    });
+  } else if (onProgress) {
+    progressSubscribers?.add(onProgress);
   }
   return pipelinePromise;
 }
