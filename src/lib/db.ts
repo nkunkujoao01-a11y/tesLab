@@ -288,6 +288,52 @@ export type QuizAttempt = {
   submittedAt: number;
 };
 
+/** A student's real NUST eLearning (Moodle) course — pulled down from the
+ * moodle_courses Supabase table (written server-side by the background
+ * sync job, see moodle-cron-handler.ts), read-only offline cache, same
+ * "cache, not source of truth" role every other synced table here plays. */
+export type MoodleCourse = {
+  id: number;
+  fullName: string;
+  shortName: string;
+  summary?: string;
+  courseImage?: string;
+  lecturerName?: string;
+  lastSyncedAt: number;
+};
+
+export type MoodleCourseSection = {
+  key: string;
+  courseId: number;
+  sectionId: number;
+  name?: string;
+  position: number;
+  summary?: string;
+};
+
+export type MoodleCourseModule = {
+  key: string;
+  courseId: number;
+  sectionId: number;
+  moduleId: number;
+  name: string;
+  modname: string;
+  url?: string;
+  contents?: unknown;
+};
+
+export type MoodleGrade = {
+  key: string;
+  courseId: number;
+  itemName: string;
+  itemType?: string;
+  gradeRaw?: number;
+  gradeFormatted?: string;
+  gradeMax?: number;
+  weight?: number;
+  feedback?: string;
+};
+
 /** A student-created folder for organizing their own personal documents —
  * "the library planner" (see DEV_LOG.md, Feature 33). Deliberately scoped
  * to personal documents only, not the shared catalog — confirmed with the
@@ -380,6 +426,10 @@ class UserDB extends Dexie {
   generatedQuizzes!: EntityTable<GeneratedQuiz, "docId">;
   pendingDeletions!: EntityTable<PendingDeletion, "key">;
   quizAttempts!: EntityTable<QuizAttempt, "id">;
+  moodleCourses!: EntityTable<MoodleCourse, "id">;
+  moodleCourseSections!: EntityTable<MoodleCourseSection, "key">;
+  moodleCourseModules!: EntityTable<MoodleCourseModule, "key">;
+  moodleGrades!: EntityTable<MoodleGrade, "key">;
 
   constructor(userId: string) {
     super(`elearn_user_${userId}`);
@@ -394,42 +444,68 @@ class UserDB extends Dexie {
     // a client-generated uuid — the old numeric ids have no meaning across
     // devices, which sync needs. No migration of old rows: same precedent
     // as Feature 9/15 (local-only dev data, not worth preserving).
+    //
+    // BUG (fixed): this originally tried to redeclare activityEvents
+    // in-place as `"id, timestamp"` in this same version — but changing a
+    // store's keyPath (here: dropping "++id"'s auto-increment) isn't
+    // something IndexedDB allows in place; Dexie throws
+    // `UpgradeError: Not yet support for changing primary key`, which
+    // aborts the *entire* database open — not just this one table — so
+    // every returning user whose browser still had v1 cached got a
+    // permanently broken UserDB (DatabaseClosedError on every table read,
+    // app-wide) the moment this version shipped. New users never hit it,
+    // since Dexie creates a fresh DB straight at the latest version with
+    // no upgrade transaction at all — that's why this went unnoticed for
+    // so long. The correct way to change a keyPath in Dexie is to delete
+    // the store in one version and recreate it in the next; see v3 below.
     this.version(2).stores({
-      activityEvents: "id, timestamp",
+      activityEvents: null,
       syncMeta: "key",
     });
     this.version(3).stores({
-      personalDocuments: "id, uploadedAt",
+      activityEvents: "id, timestamp",
     });
     this.version(4).stores({
+      personalDocuments: "id, uploadedAt",
+    });
+    this.version(5).stores({
       personalDocuments: "id, uploadedAt, collectionId",
       documentCollections: "id, updatedAt",
     });
-    this.version(5).stores({
+    this.version(6).stores({
       assistantMessages: "id, timestamp",
     });
-    this.version(6).stores({
+    this.version(7).stores({
       collectionMessages: "key, collectionId, timestamp",
     });
-    this.version(7).stores({
+    this.version(8).stores({
       generatedFlashcardSets: "docId",
       generatedQuizzes: "docId",
     });
-    this.version(8).stores({
+    this.version(9).stores({
       pendingDeletions: "key, entityType",
     });
-    // v9: the original uploaded PDF file, kept device-local — see
+    // The original uploaded PDF file, kept device-local — see
     // PersonalDocumentFile's own comment for why this is a separate table
     // rather than a field on personalDocuments.
-    this.version(9).stores({
+    this.version(10).stores({
       personalDocumentFiles: "docId",
     });
-    // v10: a new table only — no existing store's keyPath changes, so this
-    // is a safe additive upgrade (see the DatabaseClosedError/"changing
-    // primary key" class of failure a keyPath change causes, which this
-    // deliberately avoids).
-    this.version(10).stores({
+    // A new table only — no existing store's keyPath changes, so this is
+    // a safe additive upgrade (see v2/v3's own comment above for the
+    // failure mode this deliberately avoids).
+    this.version(11).stores({
       quizAttempts: "id, docId, submittedAt",
+    });
+    // NUST eLearning (Moodle) courses/materials/grades — read-only local
+    // cache of the four moodle_* Supabase tables, filled by
+    // pullMoodleContent() (sync.ts), never written to directly by the UI.
+    // Also purely additive.
+    this.version(12).stores({
+      moodleCourses: "id",
+      moodleCourseSections: "key, courseId",
+      moodleCourseModules: "key, courseId, sectionId",
+      moodleGrades: "key, courseId",
     });
   }
 }

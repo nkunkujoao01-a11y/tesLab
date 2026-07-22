@@ -6,6 +6,7 @@ import {
   CircleCheck,
   TriangleAlert,
   CloudCog,
+  GraduationCap,
   ArrowUpRight,
   Unlink,
   RotateCcw,
@@ -38,6 +39,7 @@ import {
 } from "@/hooks/use-ai-chat";
 import { CHAT_MODELS, type ChatModelChoice } from "@/lib/ai-chat";
 import { useCloudAiKey, useCloudAiEnabled, useCloudAiQuota } from "@/hooks/use-cloud-ai";
+import { useMoodleConnection } from "@/hooks/use-moodle";
 import { Switch } from "@/components/ui/switch";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useClearCache } from "@/hooks/use-clear-cache";
@@ -77,12 +79,24 @@ function Settings() {
   const [cloudEnabled, setCloudEnabled] = useCloudAiEnabled();
   const cloudQuota = useCloudAiQuota();
   const [keyInput, setKeyInput] = useState("");
+  const moodle = useMoodleConnection();
+  const [moodleStudentNumber, setMoodleStudentNumber] = useState("");
+  const [moodlePassword, setMoodlePassword] = useState("");
   const { clearCacheAndReload, clearing } = useClearCache();
 
   const handleConnect = async (e: FormEvent) => {
     e.preventDefault();
     const ok = await connect(keyInput);
     if (ok) setKeyInput("");
+  };
+
+  const handleMoodleConnect = async (e: FormEvent) => {
+    e.preventDefault();
+    const ok = await moodle.connect(moodleStudentNumber, moodlePassword);
+    if (ok) {
+      setMoodleStudentNumber("");
+      setMoodlePassword("");
+    }
   };
 
   return (
@@ -220,6 +234,96 @@ function Settings() {
                   {!isOnline
                     ? "You're offline — reconnect to save your key."
                     : "Free, no credit card. Your key is encrypted and only ever usable by your own account."}
+                </p>
+              </form>
+            )}
+          </div>
+        </section>
+
+        {/* NUST eLearning (Moodle) connection */}
+        <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+          <div className="flex items-center gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+              <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-prestige-deep">NUST eLearning</p>
+              <p className="text-[11px] text-muted-foreground">
+                Pull in your real courses, materials, and grades from elearning.nust.na — your
+                password is sent once to connect and never stored, only a revocable access token is.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {!moodle.loaded ? null : moodle.connected ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
+                    <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
+                    Connected{moodle.fullName ? ` as ${moodle.fullName}` : ""}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void moodle.disconnect()}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-destructive ring-1 ring-destructive/30 transition-colors hover:bg-destructive/5"
+                  >
+                    <Unlink className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Disconnect
+                  </button>
+                </div>
+
+                {moodle.needsReconnect && (
+                  <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                    <p>
+                      Your NUST eLearning connection needs to be reconnected — your access token was
+                      revoked or expired. Disconnect, then connect again below.
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-muted-foreground">
+                  {moodle.lastSyncAt
+                    ? `Last synced ${new Date(moodle.lastSyncAt).toLocaleString()}`
+                    : "Not synced yet — your courses will appear after the first sync."}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={(e) => void handleMoodleConnect(e)} className="space-y-3">
+                <div className="flex flex-col gap-2">
+                  <input
+                    value={moodleStudentNumber}
+                    onChange={(e) => setMoodleStudentNumber(e.target.value)}
+                    placeholder="Student number"
+                    autoComplete="username"
+                    className="h-10 flex-1 rounded-lg border border-border/70 bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                  />
+                  <input
+                    type="password"
+                    value={moodlePassword}
+                    onChange={(e) => setMoodlePassword(e.target.value)}
+                    placeholder="NUST eLearning password"
+                    autoComplete="current-password"
+                    className="h-10 flex-1 rounded-lg border border-border/70 bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={
+                      moodle.connecting ||
+                      !moodleStudentNumber.trim() ||
+                      !moodlePassword ||
+                      !isOnline
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
+                  >
+                    {moodle.connecting ? "Connecting…" : "Connect"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {!isOnline
+                    ? "You're offline — reconnect to connect your account."
+                    : "Same login you use at elearning.nust.na. Sent once to connect, never stored."}
                 </p>
               </form>
             )}

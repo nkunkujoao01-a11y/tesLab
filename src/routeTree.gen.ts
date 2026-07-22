@@ -29,11 +29,13 @@ import { Route as DocumentsDocIdRouteImport } from './routes/documents.$docId'
 import { Route as CoursesModuleIdRouteImport } from './routes/courses.$moduleId'
 import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
 import { Route as DocumentsDocIdIndexRouteImport } from './routes/documents.$docId.index'
+import { Route as CoursesMoodleIndexRouteImport } from './routes/courses.moodle.index'
 import { Route as CoursesModuleIdIndexRouteImport } from './routes/courses.$moduleId.index'
 import { Route as AdminModulesIndexRouteImport } from './routes/admin.modules.index'
 import { Route as DocumentsCollectionsCollectionIdRouteImport } from './routes/documents.collections.$collectionId'
 import { Route as DocumentsDocIdSummaryRouteImport } from './routes/documents.$docId.summary'
 import { Route as DocumentsDocIdNotesRouteImport } from './routes/documents.$docId.notes'
+import { Route as CoursesMoodleCourseIdRouteImport } from './routes/courses.moodle.$courseId'
 import { Route as AdminModulesNewRouteImport } from './routes/admin.modules.new'
 import { Route as AdminModulesModuleIdRouteImport } from './routes/admin.modules.$moduleId'
 import { Route as DocumentsCollectionsCollectionIdIndexRouteImport } from './routes/documents.collections.$collectionId.index'
@@ -141,6 +143,11 @@ const DocumentsDocIdIndexRoute = DocumentsDocIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DocumentsDocIdRoute,
 } as any)
+const CoursesMoodleIndexRoute = CoursesMoodleIndexRouteImport.update({
+  id: '/moodle/',
+  path: '/moodle/',
+  getParentRoute: () => CoursesRoute,
+} as any)
 const CoursesModuleIdIndexRoute = CoursesModuleIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -166,6 +173,11 @@ const DocumentsDocIdNotesRoute = DocumentsDocIdNotesRouteImport.update({
   id: '/notes',
   path: '/notes',
   getParentRoute: () => DocumentsDocIdRoute,
+} as any)
+const CoursesMoodleCourseIdRoute = CoursesMoodleCourseIdRouteImport.update({
+  id: '/moodle/$courseId',
+  path: '/moodle/$courseId',
+  getParentRoute: () => CoursesRoute,
 } as any)
 const AdminModulesNewRoute = AdminModulesNewRouteImport.update({
   id: '/modules/new',
@@ -224,11 +236,13 @@ export interface FileRoutesByFullPath {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
+  '/courses/moodle/': typeof CoursesMoodleIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
   '/courses/$moduleId/summary/$docId': typeof CoursesModuleIdSummaryDocIdRoute
@@ -252,10 +266,12 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/admin/modules': typeof AdminModulesIndexRoute
   '/courses/$moduleId': typeof CoursesModuleIdIndexRoute
+  '/courses/moodle': typeof CoursesMoodleIndexRoute
   '/documents/$docId': typeof DocumentsDocIdIndexRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
   '/courses/$moduleId/summary/$docId': typeof CoursesModuleIdSummaryDocIdRoute
@@ -285,11 +301,13 @@ export interface FileRoutesById {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
+  '/courses/moodle/': typeof CoursesMoodleIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
   '/courses/$moduleId/summary/$docId': typeof CoursesModuleIdSummaryDocIdRoute
@@ -320,11 +338,13 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/courses/moodle/$courseId'
     | '/documents/$docId/notes'
     | '/documents/$docId/summary'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
     | '/courses/$moduleId/'
+    | '/courses/moodle/'
     | '/documents/$docId/'
     | '/courses/$moduleId/read/$docId'
     | '/courses/$moduleId/summary/$docId'
@@ -348,10 +368,12 @@ export interface FileRouteTypes {
     | '/documents'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/courses/moodle/$courseId'
     | '/documents/$docId/notes'
     | '/documents/$docId/summary'
     | '/admin/modules'
     | '/courses/$moduleId'
+    | '/courses/moodle'
     | '/documents/$docId'
     | '/courses/$moduleId/read/$docId'
     | '/courses/$moduleId/summary/$docId'
@@ -380,11 +402,13 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/courses/moodle/$courseId'
     | '/documents/$docId/notes'
     | '/documents/$docId/summary'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
     | '/courses/$moduleId/'
+    | '/courses/moodle/'
     | '/documents/$docId/'
     | '/courses/$moduleId/read/$docId'
     | '/courses/$moduleId/summary/$docId'
@@ -550,6 +574,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocumentsDocIdIndexRouteImport
       parentRoute: typeof DocumentsDocIdRoute
     }
+    '/courses/moodle/': {
+      id: '/courses/moodle/'
+      path: '/moodle'
+      fullPath: '/courses/moodle/'
+      preLoaderRoute: typeof CoursesMoodleIndexRouteImport
+      parentRoute: typeof CoursesRoute
+    }
     '/courses/$moduleId/': {
       id: '/courses/$moduleId/'
       path: '/'
@@ -584,6 +615,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/documents/$docId/notes'
       preLoaderRoute: typeof DocumentsDocIdNotesRouteImport
       parentRoute: typeof DocumentsDocIdRoute
+    }
+    '/courses/moodle/$courseId': {
+      id: '/courses/moodle/$courseId'
+      path: '/moodle/$courseId'
+      fullPath: '/courses/moodle/$courseId'
+      preLoaderRoute: typeof CoursesMoodleCourseIdRouteImport
+      parentRoute: typeof CoursesRoute
     }
     '/admin/modules/new': {
       id: '/admin/modules/new'
@@ -667,11 +705,15 @@ const CoursesModuleIdRouteWithChildren = CoursesModuleIdRoute._addFileChildren(
 interface CoursesRouteChildren {
   CoursesModuleIdRoute: typeof CoursesModuleIdRouteWithChildren
   CoursesIndexRoute: typeof CoursesIndexRoute
+  CoursesMoodleCourseIdRoute: typeof CoursesMoodleCourseIdRoute
+  CoursesMoodleIndexRoute: typeof CoursesMoodleIndexRoute
 }
 
 const CoursesRouteChildren: CoursesRouteChildren = {
   CoursesModuleIdRoute: CoursesModuleIdRouteWithChildren,
   CoursesIndexRoute: CoursesIndexRoute,
+  CoursesMoodleCourseIdRoute: CoursesMoodleCourseIdRoute,
+  CoursesMoodleIndexRoute: CoursesMoodleIndexRoute,
 }
 
 const CoursesRouteWithChildren =

@@ -18,7 +18,12 @@ import {
   type PersonalDocument,
   type DocumentCollection,
   type PendingDeletion,
+  type MoodleCourse,
+  type MoodleCourseSection,
+  type MoodleCourseModule,
+  type MoodleGrade,
 } from "@/lib/db";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 function toIso(ms: number): string {
@@ -413,6 +418,129 @@ function toLocalCollectionRow(row: {
   };
 }
 
+// Typed locally rather than added to supabase.ts's shared Database type —
+// see ai-cloud.ts's identical comment on why (RPC Functions there, plain
+// Tables here, same reasoning). Only pullMoodleContent below ever reads
+// these four tables from the client; moodle-cron-handler.ts (the only
+// writer) has its own separate local typing for the same reason.
+type Row<T> = { Row: T; Insert: T; Update: Partial<T>; Relationships: [] };
+type MoodleContentTables = {
+  moodle_courses: Row<{
+    id: number;
+    user_id: string;
+    full_name: string;
+    short_name: string;
+    summary: string | null;
+    course_image: string | null;
+    lecturer_name: string | null;
+    last_synced_at: string;
+  }>;
+  moodle_course_sections: Row<{
+    course_id: number;
+    user_id: string;
+    section_id: number;
+    name: string | null;
+    position: number;
+    summary: string | null;
+  }>;
+  moodle_course_modules: Row<{
+    course_id: number;
+    user_id: string;
+    section_id: number;
+    module_id: number;
+    name: string;
+    modname: string;
+    url: string | null;
+    contents: unknown;
+  }>;
+  moodle_grades: Row<{
+    course_id: number;
+    user_id: string;
+    item_name: string;
+    item_type: string | null;
+    grade_raw: number | null;
+    grade_formatted: string | null;
+    grade_max: number | null;
+    weight: number | null;
+    feedback: string | null;
+  }>;
+};
+const moodleContentClient = supabase as unknown as SupabaseClient<{
+  public: {
+    Tables: MoodleContentTables;
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+  };
+}>;
+
+/** Read-only pull of the student's synced NUST eLearning data (written
+ * server-side by the background cron job, see moodle-cron-handler.ts) into
+ * the local offline cache — one direction only, unlike every other sync
+ * function in this file, since the UI never writes these tables itself. A
+ * full replace each run, not an incremental diff — same "a few KB, not
+ * worth the complexity" reasoning as this file's own header comment,
+ * scaled to a handful of courses/sections/modules/grades rather than a
+ * handful of progress rows. */
+async function pullMoodleContent(userId: string): Promise<void> {
+  const db = getUserDb(userId);
+  const [courses, sections, modules, grades] = await Promise.all([
+    moodleContentClient.from("moodle_courses").select("*").eq("user_id", userId),
+    moodleContentClient.from("moodle_course_sections").select("*").eq("user_id", userId),
+    moodleContentClient.from("moodle_course_modules").select("*").eq("user_id", userId),
+    moodleContentClient.from("moodle_grades").select("*").eq("user_id", userId),
+  ]);
+  if (courses.error) throw courses.error;
+  if (sections.error) throw sections.error;
+  if (modules.error) throw modules.error;
+  if (grades.error) throw grades.error;
+
+  const localCourses: MoodleCourse[] = (courses.data ?? []).map((c) => ({
+    id: c.id,
+    fullName: c.full_name,
+    shortName: c.short_name,
+    summary: c.summary ?? undefined,
+    courseImage: c.course_image ?? undefined,
+    lecturerName: c.lecturer_name ?? undefined,
+    lastSyncedAt: toMs(c.last_synced_at),
+  }));
+  const localSections: MoodleCourseSection[] = (sections.data ?? []).map((s) => ({
+    key: `${s.course_id}::${s.section_id}`,
+    courseId: s.course_id,
+    sectionId: s.section_id,
+    name: s.name ?? undefined,
+    position: s.position,
+    summary: s.summary ?? undefined,
+  }));
+  const localModules: MoodleCourseModule[] = (modules.data ?? []).map((m) => ({
+    key: `${m.course_id}::${m.module_id}`,
+    courseId: m.course_id,
+    sectionId: m.section_id,
+    moduleId: m.module_id,
+    name: m.name,
+    modname: m.modname,
+    url: m.url ?? undefined,
+    contents: m.contents ?? undefined,
+  }));
+  const localGrades: MoodleGrade[] = (grades.data ?? []).map((g) => ({
+    key: `${g.course_id}::${g.item_name}`,
+    courseId: g.course_id,
+    itemName: g.item_name,
+    itemType: g.item_type ?? undefined,
+    gradeRaw: g.grade_raw ?? undefined,
+    gradeFormatted: g.grade_formatted ?? undefined,
+    gradeMax: g.grade_max ?? undefined,
+    weight: g.weight ?? undefined,
+    feedback: g.feedback ?? undefined,
+  }));
+
+  await Promise.all([
+    db.moodleCourses.clear().then(() => db.moodleCourses.bulkPut(localCourses)),
+    db.moodleCourseSections.clear().then(() => db.moodleCourseSections.bulkPut(localSections)),
+    db.moodleCourseModules.clear().then(() => db.moodleCourseModules.bulkPut(localModules)),
+    db.moodleGrades.clear().then(() => db.moodleGrades.bulkPut(localGrades)),
+  ]);
+}
+
 const LAST_SYNCED_KEY = "lastSyncedAt";
 
 /** Pulls and pushes read state, activity history, and AI summaries against
@@ -446,6 +574,14 @@ export async function syncProgress(userId: string): Promise<void> {
     await syncDocumentCollections(userId);
   } catch (err) {
     console.error("Failed to sync document collections", err);
+  }
+  // Own try/catch, same reasoning as document collections above — a
+  // Moodle-sync-specific failure (e.g. migration 0019 not applied yet on
+  // some environment) must not block the four unrelated syncs below.
+  try {
+    await pullMoodleContent(userId);
+  } catch (err) {
+    console.error("Failed to pull NUST eLearning content", err);
   }
   await Promise.all([
     syncReadMaterials(userId),

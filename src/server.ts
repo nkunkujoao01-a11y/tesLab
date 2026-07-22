@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { handleMoodleCronSync } from "./lib/moodle-cron-handler";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -47,6 +48,15 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Intercepted here, before TanStack Start's own routing, since this
+      // is called by Supabase's pg_cron (a shared-secret header, not a
+      // browser session) on a stable URL — see moodle-cron-handler.ts's
+      // own comment for why this isn't a createServerFn.
+      const url = new URL(request.url);
+      if (url.pathname === "/api/moodle/cron-sync" && request.method === "POST") {
+        return await handleMoodleCronSync(request, env);
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
