@@ -187,6 +187,19 @@ export type StructuredSummaryResult = {
   method: "cloud" | "neural" | "extractive";
 };
 
+/** Renders a generated summary as the same lightweight `#`/`##`/`-` markup
+ * structured-export.ts's buildStructuredExportHtml already knows how to
+ * turn into a styled HTML download — same reuse-not-reinvent approach as
+ * quiz-gen.ts's buildQuizExportText/buildFlashcardsExportText. */
+export function buildSummaryExportText(overview: string, sections: SummarySection[]): string {
+  const parts = [`## Overview\n\n${overview}`];
+  for (const section of sections) {
+    const keyPoints = (section.keyPoints ?? []).map((k) => `- ${k}`).join("\n\n");
+    parts.push([`## ${section.heading}`, section.body, keyPoints].filter(Boolean).join("\n\n"));
+  }
+  return parts.join("\n\n");
+}
+
 /** Generates a real, whole-document summary: a short overview plus one
  * summary per real section, covering all of `text` — not just whatever
  * fit in one model call. Tries the student's own cloud AI key first (see

@@ -1,5 +1,49 @@
 import { useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, RotateCw, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export type AiContentTabKey = "summary" | "flashcards" | "quiz";
+
+/** A small segmented control for switching between a material's generated
+ * AI content — summary, flashcards, and quiz used to all render stacked on
+ * one page at once (increasingly long scroll as a student generated more
+ * of them); this lets the reader routes show exactly one at a time
+ * instead, while keeping each route's own summary/flashcard/quiz JSX
+ * otherwise unchanged (just wrapped in `activeTab === "…"` in the caller)
+ * rather than forcing all three routes through one big shared content
+ * component that would need to reconcile their genuinely different
+ * layouts. */
+export function AiContentTabStrip({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: { key: AiContentTabKey; label: string; available: boolean }[];
+  active: AiContentTabKey;
+  onChange: (key: AiContentTabKey) => void;
+}) {
+  const visible = tabs.filter((t) => t.available);
+  if (visible.length < 2) return null;
+  return (
+    <div className="mt-10 flex items-center gap-1.5 overflow-x-auto rounded-full bg-secondary/60 p-1">
+      {visible.map((tab) => (
+        <button
+          key={tab.key}
+          type="button"
+          onClick={() => onChange(tab.key)}
+          className={cn(
+            "shrink-0 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-widest transition-all",
+            active === tab.key
+              ? "bg-prestige-deep text-prestige-cream"
+              : "text-prestige-mid hover:text-prestige-deep",
+          )}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** Shared flashcard/quiz rendering for Phase J — originally written inline
  * in documents.$docId.tsx (personal documents), extracted here so the
@@ -63,17 +107,34 @@ export function FlashcardDeck({ cards }: { cards: { front: string; back: string 
 
 export function QuizPanel({
   questions,
+  onSubmit,
+  attempts,
 }: {
   questions: { question: string; options: string[]; correctIndex: number }[];
+  // Called with the final score/answers when the student submits — see
+  // db.ts's QuizAttempt for why the caller persists this as history rather
+  // than this component owning any storage itself (it's pure render+local
+  // state, same as FlashcardDeck above).
+  onSubmit?: (score: number, total: number, answers: Record<number, number>) => void;
+  // Newest-first, from useQuizAttempts(docId) — optional so existing
+  // callers that haven't wired attempt history yet still render fine.
+  attempts?: { score: number; total: number }[];
 }) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const allAnswered = Object.keys(answers).length === questions.length;
   const score = questions.filter((q, i) => answers[i] === q.correctIndex).length;
+  const bestScore =
+    attempts && attempts.length > 0 ? Math.max(...attempts.map((a) => a.score)) : undefined;
 
   const selectAnswer = (qIndex: number, optIndex: number) => {
     if (submitted) return;
     setAnswers((prev) => ({ ...prev, [qIndex]: optIndex }));
+  };
+
+  const submit = () => {
+    setSubmitted(true);
+    onSubmit?.(score, questions.length, answers);
   };
 
   const retake = () => {
@@ -87,10 +148,18 @@ export function QuizPanel({
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prestige-mid">
           Quiz
         </p>
-        {submitted && (
+        {submitted ? (
           <p className="text-[10px] uppercase tracking-widest text-prestige-mid">
             Score: {score} / {questions.length}
           </p>
+        ) : (
+          attempts &&
+          attempts.length > 0 && (
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Best: {bestScore} / {questions.length} &middot; {attempts.length}{" "}
+              {attempts.length === 1 ? "attempt" : "attempts"}
+            </p>
+          )
         )}
       </div>
       <div className="mt-3 space-y-5">
@@ -159,7 +228,7 @@ export function QuizPanel({
           <button
             type="button"
             disabled={!allAnswered}
-            onClick={() => setSubmitted(true)}
+            onClick={submit}
             className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
           >
             Submit quiz

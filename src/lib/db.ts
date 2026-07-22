@@ -271,6 +271,23 @@ export type GeneratedQuiz = {
   method?: "cloud" | "on-device";
 };
 
+/** One submitted attempt at a GeneratedQuiz — kept as a full history (not
+ * overwritten on retake) so "how did I do on this quiz" survives a retake
+ * and, later, could back a real progress view. Device-local like every
+ * other AI-generated table here (see GeneratedQuiz), so recording an
+ * attempt while offline needs nothing beyond IndexedDB already being
+ * available — no network round trip on submit. `docId` matches whichever
+ * GeneratedQuiz it was an attempt at (same overloaded id space — see that
+ * type's own callers). */
+export type QuizAttempt = {
+  id: string;
+  docId: string;
+  score: number;
+  total: number;
+  answers: Record<number, number>;
+  submittedAt: number;
+};
+
 /** A student-created folder for organizing their own personal documents —
  * "the library planner" (see DEV_LOG.md, Feature 33). Deliberately scoped
  * to personal documents only, not the shared catalog — confirmed with the
@@ -362,6 +379,7 @@ class UserDB extends Dexie {
   generatedFlashcardSets!: EntityTable<GeneratedFlashcardSet, "docId">;
   generatedQuizzes!: EntityTable<GeneratedQuiz, "docId">;
   pendingDeletions!: EntityTable<PendingDeletion, "key">;
+  quizAttempts!: EntityTable<QuizAttempt, "id">;
 
   constructor(userId: string) {
     super(`elearn_user_${userId}`);
@@ -405,6 +423,13 @@ class UserDB extends Dexie {
     // rather than a field on personalDocuments.
     this.version(9).stores({
       personalDocumentFiles: "docId",
+    });
+    // v10: a new table only — no existing store's keyPath changes, so this
+    // is a safe additive upgrade (see the DatabaseClosedError/"changing
+    // primary key" class of failure a keyPath change causes, which this
+    // deliberately avoids).
+    this.version(10).stores({
+      quizAttempts: "id, docId, submittedAt",
     });
   }
 }

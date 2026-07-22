@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { liveQuery } from "dexie";
 import { toast } from "sonner";
-import { getUserDb, type GeneratedFlashcardSet, type GeneratedQuiz } from "@/lib/db";
+import {
+  getUserDb,
+  type GeneratedFlashcardSet,
+  type GeneratedQuiz,
+  type QuizAttempt,
+} from "@/lib/db";
 import {
   generateFlashcards,
   buildSingleQuestionPrompt,
@@ -180,6 +185,53 @@ export function useQuiz(docId: string): GeneratedQuiz | undefined {
   }, [user, docId]);
 
   return quiz;
+}
+
+/** Every submitted attempt at one quiz, newest first — see db.ts's
+ * QuizAttempt for why this is a full history rather than a single
+ * overwritten row. */
+export function useQuizAttempts(docId: string): QuizAttempt[] {
+  const { user } = useAuth();
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      setAttempts([]);
+      return;
+    }
+    const db = getUserDb(user.id);
+    const sub = liveQuery(() =>
+      db.quizAttempts.where("docId").equals(docId).reverse().sortBy("submittedAt"),
+    ).subscribe({
+      next: setAttempts,
+      error: (err) => console.error("Failed to read quiz attempts", err),
+    });
+    return () => sub.unsubscribe();
+  }, [user, docId]);
+
+  return attempts;
+}
+
+/** Records one submitted quiz attempt — a plain local IndexedDB write, so
+ * this works identically online or offline (no network round trip, unlike
+ * the generation calls elsewhere in this file). */
+export function useRecordQuizAttempt() {
+  const { user } = useAuth();
+
+  return useCallback(
+    async (docId: string, score: number, total: number, answers: Record<number, number>) => {
+      if (!user) return;
+      await getUserDb(user.id).quizAttempts.add({
+        id: crypto.randomUUID(),
+        docId,
+        score,
+        total,
+        answers,
+        submittedAt: Date.now(),
+      });
+    },
+    [user],
+  );
 }
 
 // One question per model call (see buildSingleQuestionPrompt's own

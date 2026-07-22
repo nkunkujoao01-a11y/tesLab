@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
   ArrowLeft,
+  Download,
   FileText,
   Upload,
   Loader2,
@@ -14,8 +15,15 @@ import {
   X,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
-import { FlashcardDeck, QuizPanel } from "@/components/QuizFlashcards";
+import {
+  AiContentTabStrip,
+  FlashcardDeck,
+  QuizPanel,
+  type AiContentTabKey,
+} from "@/components/QuizFlashcards";
 import { formatMb, formatRelative } from "@/lib/mock-data";
+import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
+import { buildQuizExportText, buildFlashcardsExportText } from "@/lib/quiz-gen";
 import {
   usePersonalDocuments,
   useUploadDocument,
@@ -24,7 +32,14 @@ import {
   useRenameCollection,
   useSetDocumentCollection,
 } from "@/hooks/use-documents";
-import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
+import {
+  useFlashcardSet,
+  useGenerateFlashcards,
+  useQuiz,
+  useGenerateQuiz,
+  useQuizAttempts,
+  useRecordQuizAttempt,
+} from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -211,6 +226,37 @@ function CollectionDetail() {
   const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
   const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
+  const quizAttempts = useQuizAttempts(collectionId);
+  const recordQuizAttempt = useRecordQuizAttempt();
+
+  // See courses.$moduleId.read.$docId.tsx's identical comment — flashcards/
+  // quiz used to both render stacked at once (no summary tab here, since
+  // collections don't have a whole-collection summary feature at all).
+  const [activeTab, setActiveTab] = useState<AiContentTabKey>("flashcards");
+
+  const downloadFlashcards = () => {
+    if (!flashcardSet) return;
+    const html = buildStructuredExportHtml(
+      `${collection?.name ?? "Collection"} — Flashcards`,
+      buildFlashcardsExportText(flashcardSet.cards),
+    );
+    downloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${collection?.name ?? "Collection"} — Flashcards.html`,
+    );
+  };
+  const downloadQuiz = () => {
+    if (!quiz) return;
+    const html = buildStructuredExportHtml(
+      `${collection?.name ?? "Collection"} — Quiz`,
+      buildQuizExportText(quiz.questions),
+    );
+    downloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${collection?.name ?? "Collection"} — Quiz.html`,
+    );
+  };
+
   // Each member document already has its own `#`/`##` structure from
   // pdf-extract.ts; wrapping each one in its own top-level `# title`
   // heading too guarantees at least one flashcard per document even for
@@ -333,7 +379,10 @@ function CollectionDetail() {
             <button
               type="button"
               disabled={isGeneratingFlashcards}
-              onClick={() => void generateFlashcardsFor(collectionId, flashcardSourceText)}
+              onClick={() => {
+                setActiveTab("flashcards");
+                void generateFlashcardsFor(collectionId, flashcardSourceText);
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.97] disabled:opacity-60"
             >
               {isGeneratingFlashcards ? (
@@ -351,7 +400,10 @@ function CollectionDetail() {
                   ? "Connect a free cloud AI key (Settings) or download the on-device assistant from Ask AI"
                   : undefined
               }
-              onClick={() => void generateQuizFor(collectionId, quizSourceText)}
+              onClick={() => {
+                setActiveTab("quiz");
+                void generateQuizFor(collectionId, quizSourceText);
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.97] disabled:opacity-60"
             >
               {isGeneratingQuiz ? (
@@ -370,18 +422,55 @@ function CollectionDetail() {
           </div>
         )}
 
-        {isGeneratingQuiz && (
+        <AiContentTabStrip
+          active={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { key: "flashcards", label: "Flashcards", available: !!flashcardSet },
+            { key: "quiz", label: "Quiz", available: !!quiz || isGeneratingQuiz },
+          ]}
+        />
+
+        {activeTab === "flashcards" && flashcardSet && flashcardSet.cards.length > 0 && (
+          <>
+            <FlashcardDeck cards={flashcardSet.cards} />
+            <button
+              type="button"
+              onClick={downloadFlashcards}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
+            >
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Download
+            </button>
+          </>
+        )}
+
+        {activeTab === "quiz" && quiz && quiz.questions.length > 0 && (
+          <>
+            <QuizPanel
+              questions={quiz.questions}
+              attempts={quizAttempts}
+              onSubmit={(score, total, answers) =>
+                void recordQuizAttempt(collectionId, score, total, answers)
+              }
+            />
+            <button
+              type="button"
+              onClick={downloadQuiz}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
+            >
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Download
+            </button>
+          </>
+        )}
+
+        {activeTab === "quiz" && isGeneratingQuiz && (
           <p className="mt-3 text-[11px] text-muted-foreground">
             Writing a quiz question by question can take a few minutes on this device — this is
             genuinely working, not stuck.
           </p>
         )}
-
-        {flashcardSet && flashcardSet.cards.length > 0 && (
-          <FlashcardDeck cards={flashcardSet.cards} />
-        )}
-
-        {quiz && quiz.questions.length > 0 && <QuizPanel questions={quiz.questions} />}
 
         <div className="mt-8">
           {members.length === 0 ? (

@@ -38,6 +38,7 @@ import {
 } from "@/hooks/use-ai-chat";
 import { CHAT_MODELS, type ChatModelChoice } from "@/lib/ai-chat";
 import { useCloudAiKey, useCloudAiEnabled, useCloudAiQuota } from "@/hooks/use-cloud-ai";
+import { Switch } from "@/components/ui/switch";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useClearCache } from "@/hooks/use-clear-cache";
 
@@ -154,23 +155,11 @@ function Settings() {
                       and you're online; otherwise the on-device AI handles them.
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={cloudEnabled}
-                    onClick={() => setCloudEnabled(!cloudEnabled)}
-                    className={cn(
-                      "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-                      cloudEnabled ? "bg-prestige-deep" : "bg-border",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "absolute top-0.5 h-5 w-5 rounded-full bg-prestige-cream transition-transform",
-                        cloudEnabled ? "translate-x-5" : "translate-x-0.5",
-                      )}
-                    />
-                  </button>
+                  <Switch
+                    checked={cloudEnabled}
+                    onCheckedChange={setCloudEnabled}
+                    className="shrink-0 data-[state=checked]:bg-prestige-deep"
+                  />
                 </label>
 
                 <p className="text-[11px] text-muted-foreground">

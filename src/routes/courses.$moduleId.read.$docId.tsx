@@ -6,6 +6,7 @@ import {
   Sparkles,
   CloudDownload,
   Copy,
+  Download,
   Layers,
   ListChecks,
   LogIn,
@@ -20,6 +21,7 @@ import {
   useDownloadedMaterialContent,
 } from "@/hooks/use-downloads";
 import { useMaterialSummary, useGenerateSummary } from "@/hooks/use-summaries";
+import { buildSummaryExportText } from "@/lib/summarize-structured";
 import {
   markMaterialRead,
   updateMaterialReadProgress,
@@ -27,13 +29,27 @@ import {
 } from "@/hooks/use-activity";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { useAuth } from "@/hooks/use-auth";
-import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
+import {
+  useFlashcardSet,
+  useGenerateFlashcards,
+  useQuiz,
+  useGenerateQuiz,
+  useQuizAttempts,
+  useRecordQuizAttempt,
+} from "@/hooks/use-quiz";
+import { buildQuizExportText, buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
-import { FlashcardDeck, QuizPanel } from "@/components/QuizFlashcards";
+import {
+  AiContentTabStrip,
+  FlashcardDeck,
+  QuizPanel,
+  type AiContentTabKey,
+} from "@/components/QuizFlashcards";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
+import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 
 export const Route = createFileRoute("/courses/$moduleId/read/$docId")({
   loader: async ({ params }) => {
@@ -134,6 +150,15 @@ function Reader() {
   const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
   const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
+  const quizAttempts = useQuizAttempts(key);
+  const recordQuizAttempt = useRecordQuizAttempt();
+
+  // Summary/flashcards/quiz used to all render stacked below the article
+  // at once — this switches to showing exactly one at a time. Defaults to
+  // whichever already has content so returning to a page you've already
+  // generated something for doesn't require re-selecting a tab.
+  const [activeTab, setActiveTab] = useState<AiContentTabKey>("summary");
+
   const [copied, setCopied] = useState(false);
   const copyToNotes = () => {
     if (!summary) return;
@@ -141,6 +166,31 @@ function Reader() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
+  };
+
+  const downloadSummary = () => {
+    if (!summary) return;
+    const text = summary.sections
+      ? buildSummaryExportText(summary.body, summary.sections)
+      : summary.body;
+    const html = buildStructuredExportHtml(`${doc.title} — Summary`, text);
+    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Summary.html`);
+  };
+  const downloadFlashcards = () => {
+    if (!flashcardSet) return;
+    const html = buildStructuredExportHtml(
+      `${doc.title} — Flashcards`,
+      buildFlashcardsExportText(flashcardSet.cards),
+    );
+    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Flashcards.html`);
+  };
+  const downloadQuiz = () => {
+    if (!quiz) return;
+    const html = buildStructuredExportHtml(
+      `${doc.title} — Quiz`,
+      buildQuizExportText(quiz.questions),
+    );
+    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Quiz.html`);
   };
 
   if (authLoading) {
@@ -275,8 +325,18 @@ function Reader() {
           <p className="text-sm text-muted-foreground">Loading downloaded content…</p>
         )}
 
-        {(summary || isSummarizing) && (
-          <div className="relative mt-12">
+        <AiContentTabStrip
+          active={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { key: "summary", label: "Summary", available: !!summary || isSummarizing },
+            { key: "flashcards", label: "Flashcards", available: !!flashcardSet },
+            { key: "quiz", label: "Quiz", available: !!quiz || isGeneratingQuiz },
+          ]}
+        />
+
+        {activeTab === "summary" && (summary || isSummarizing) && (
+          <div className="relative mt-6">
             <div className="pointer-events-none absolute -inset-1 rounded-2xl border-t border-l border-prestige-gold/40" />
             <div className="relative rounded-2xl bg-prestige-deep p-6 text-prestige-cream">
               <div className="flex items-center justify-between">
@@ -311,6 +371,14 @@ function Reader() {
                       <Copy className="h-3.5 w-3.5" strokeWidth={2} />
                       {copied ? "Copied" : "Copy to notes"}
                     </button>
+                    <button
+                      type="button"
+                      onClick={downloadSummary}
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-prestige-cream ring-1 ring-prestige-cream/25 transition-colors hover:bg-prestige-cream/10"
+                    >
+                      <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      Download
+                    </button>
                     {summary?.sections && summary.sections.length > 0 && (
                       <Link
                         to="/courses/$moduleId/summary/$docId"
@@ -328,13 +396,41 @@ function Reader() {
           </div>
         )}
 
-        {flashcardSet && flashcardSet.cards.length > 0 && (
-          <FlashcardDeck cards={flashcardSet.cards} />
+        {activeTab === "flashcards" && flashcardSet && flashcardSet.cards.length > 0 && (
+          <>
+            <FlashcardDeck cards={flashcardSet.cards} />
+            <button
+              type="button"
+              onClick={downloadFlashcards}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
+            >
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Download
+            </button>
+          </>
         )}
 
-        {quiz && quiz.questions.length > 0 && <QuizPanel questions={quiz.questions} />}
+        {activeTab === "quiz" && quiz && quiz.questions.length > 0 && (
+          <>
+            <QuizPanel
+              questions={quiz.questions}
+              attempts={quizAttempts}
+              onSubmit={(score, total, answers) =>
+                void recordQuizAttempt(key, score, total, answers)
+              }
+            />
+            <button
+              type="button"
+              onClick={downloadQuiz}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
+            >
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Download
+            </button>
+          </>
+        )}
 
-        {isGeneratingQuiz && (
+        {activeTab === "quiz" && isGeneratingQuiz && (
           <p className="mt-6 text-center text-[11px] text-muted-foreground">
             Writing a quiz question by question can take a few minutes on this device — this is
             genuinely working, not stuck.
@@ -349,7 +445,10 @@ function Reader() {
             <button
               type="button"
               disabled={isGeneratingFlashcards || !content}
-              onClick={() => void generateFlashcardsFor(key, flashcardSourceText)}
+              onClick={() => {
+                setActiveTab("flashcards");
+                void generateFlashcardsFor(key, flashcardSourceText);
+              }}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
             >
               {isGeneratingFlashcards ? (
@@ -367,7 +466,10 @@ function Reader() {
                   ? "Connect a free cloud AI key (Settings) or download the on-device assistant from Ask AI"
                   : undefined
               }
-              onClick={() => void generateQuizFor(key, pageSourceText)}
+              onClick={() => {
+                setActiveTab("quiz");
+                void generateQuizFor(key, pageSourceText);
+              }}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
             >
               {isGeneratingQuiz ? (
@@ -386,14 +488,15 @@ function Reader() {
             <button
               type="button"
               disabled={isSummarizing || !content}
-              onClick={() =>
+              onClick={() => {
+                setActiveTab("summary");
                 void generateSummary(
                   doc.id,
                   module.id,
                   pageSourceText,
                   content?.heading ?? doc.title,
-                )
-              }
+                );
+              }}
               className="inline-flex shrink-0 items-center gap-2 rounded-full bg-prestige-gold px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep transition-transform active:scale-[0.97] disabled:opacity-60"
             >
               {isSummarizing ? (

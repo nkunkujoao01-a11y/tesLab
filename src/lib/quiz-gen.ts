@@ -329,3 +329,29 @@ export function parseCloudFlashcardsJson(raw: string): Flashcard[] {
   }
   return cards.slice(0, MAX_CARDS);
 }
+
+/** Renders a generated quiz as the same lightweight `#`/`##`/`-` markup
+ * structured-export.ts's buildStructuredExportHtml already knows how to
+ * turn into a styled HTML download — reusing that exporter unchanged
+ * rather than writing a second one, per each question its correct answer
+ * bolded in-place via a leading "Correct:" bullet so the downloaded file is
+ * a real study sheet, not just a blank quiz. */
+export function buildQuizExportText(questions: QuizQuestion[]): string {
+  return questions
+    .map((q, i) => {
+      const options = q.options.map((opt, j) => `- ${String.fromCharCode(65 + j)}. ${opt}`);
+      return [
+        `## ${i + 1}. ${q.question}`,
+        options.join("\n\n"),
+        `- Correct: ${String.fromCharCode(65 + q.correctIndex)}. ${q.options[q.correctIndex]}`,
+      ].join("\n\n");
+    })
+    .join("\n\n");
+}
+
+/** Same purpose as buildQuizExportText, for a flashcard set — one heading
+ * per card (the front) with its back as the body beneath, so the download
+ * reads as real study notes rather than a raw data dump. */
+export function buildFlashcardsExportText(cards: Flashcard[]): string {
+  return cards.map((c, i) => `## ${i + 1}. ${c.front}\n\n${c.back}`).join("\n\n");
+}
