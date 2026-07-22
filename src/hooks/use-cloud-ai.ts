@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import { liveQuery } from "dexie";
 import { toast } from "sonner";
-import { hasCloudKey, saveCloudKey, clearCloudKey } from "@/lib/ai-cloud";
+import {
+  hasCloudKey,
+  saveCloudKey,
+  clearCloudKey,
+  getCloudAiUsageToday,
+  CLOUD_AI_ENABLED_KEY,
+  CLOUD_AI_DAILY_LIMIT,
+} from "@/lib/ai-cloud";
+import { deviceDb } from "@/lib/db";
 import { useAuth } from "@/hooks/use-auth";
 
 export type CloudAiKeyState = {
@@ -76,4 +85,59 @@ export function useCloudAiKey(): CloudAiKeyState {
   }, []);
 
   return { connected, connecting, connect, disconnect };
+}
+
+/** Whether the online AI should be *tried* at all — independent of whether
+ * a key is connected. Default true (missing row = enabled) so a student who
+ * already connected a key before this setting existed sees no behavior
+ * change until they deliberately turn it off; when off, generation goes
+ * straight to the on-device path even while online with a valid key, same
+ * as being offline. Device-local, same liveQuery-backed appSettings pattern
+ * as useReadingWidth/useChatModelChoice — a preference about this device,
+ * not account data. */
+export function useCloudAiEnabled(): [boolean, (enabled: boolean) => void] {
+  const [enabled, setEnabledState] = useState(true);
+
+  useEffect(() => {
+    const sub = liveQuery(() => deviceDb.appSettings.get(CLOUD_AI_ENABLED_KEY)).subscribe({
+      next: (row) => setEnabledState(row?.value !== "false"),
+      error: (err) => console.error("Failed to read cloud AI enabled setting", err),
+    });
+    return () => sub.unsubscribe();
+  }, []);
+
+  const setEnabled = useCallback((next: boolean) => {
+    setEnabledState(next);
+    deviceDb.appSettings
+      .put({ key: CLOUD_AI_ENABLED_KEY, value: next ? "true" : "false" })
+      .catch((err) => console.error("Failed to save cloud AI enabled setting", err));
+  }, []);
+
+  return [enabled, setEnabled];
+}
+
+export type CloudAiQuota = { used: number; limit: number };
+
+/** Today's cloud AI usage for the signed-in student, refetched whenever the
+ * settings screen mounts — a plain one-shot read (not a liveQuery) since
+ * syncMeta's counter is written from deep inside ai-cloud.ts's request path
+ * across several other hooks/routes, not through a single mutator this
+ * screen could subscribe to as cheaply; good enough for "roughly how much
+ * of today's limit is left" rather than a live ticking counter. */
+export function useCloudAiQuota(): CloudAiQuota {
+  const { user } = useAuth();
+  const [quota, setQuota] = useState<CloudAiQuota>({ used: 0, limit: CLOUD_AI_DAILY_LIMIT });
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void getCloudAiUsageToday(user.id).then((used) => {
+      if (!cancelled) setQuota({ used, limit: CLOUD_AI_DAILY_LIMIT });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  return quota;
 }

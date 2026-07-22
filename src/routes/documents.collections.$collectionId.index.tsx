@@ -26,6 +26,8 @@ import {
 } from "@/hooks/use-documents";
 import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
+import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -200,6 +202,14 @@ function CollectionDetail() {
   const quizQuestionProgress = quizProgress[collectionId];
   const chatModelStatus = useChatModelStatus();
   const chatModelReady = chatModelStatus === "ready";
+  const { connected: cloudConnected } = useCloudAiKey();
+  const [cloudEnabled] = useCloudAiEnabled();
+  const isOnline = useOnlineStatus();
+  // See courses.$moduleId.read.$docId.tsx's identical comment — a
+  // connected, enabled cloud key with real internet can serve a quiz
+  // without the on-device model ever being downloaded.
+  const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
+  const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
   // Each member document already has its own `#`/`##` structure from
   // pdf-extract.ts; wrapping each one in its own top-level `# title`
@@ -335,8 +345,12 @@ function CollectionDetail() {
             </button>
             <button
               type="button"
-              disabled={isGeneratingQuiz || !chatModelReady}
-              title={!chatModelReady ? "Download the assistant from Ask AI first" : undefined}
+              disabled={isGeneratingQuiz || quizUnavailable}
+              title={
+                quizUnavailable
+                  ? "Connect a free cloud AI key (Settings) or download the on-device assistant from Ask AI"
+                  : undefined
+              }
               onClick={() => void generateQuizFor(collectionId, quizSourceText)}
               className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.97] disabled:opacity-60"
             >

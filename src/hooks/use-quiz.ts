@@ -112,7 +112,11 @@ export function useGenerateFlashcards() {
         let cards = [] as ReturnType<typeof generateFlashcards>;
         let method: "cloud" | "extractive" = "extractive";
         try {
-          const raw = await generateViaCloud("flashcards", sourceText.slice(0, CLOUD_SOURCE_CHARS));
+          const raw = await generateViaCloud(
+            "flashcards",
+            sourceText.slice(0, CLOUD_SOURCE_CHARS),
+            user.id,
+          );
           const cloudCards = parseCloudFlashcardsJson(raw);
           if (cloudCards.length > 0) {
             cards = cloudCards;
@@ -230,7 +234,11 @@ export function useGenerateQuiz() {
       let method: "cloud" | "on-device" = "on-device";
       try {
         try {
-          const raw = await generateViaCloud("quiz", sourceText.slice(0, CLOUD_SOURCE_CHARS));
+          const raw = await generateViaCloud(
+            "quiz",
+            sourceText.slice(0, CLOUD_SOURCE_CHARS),
+            user.id,
+          );
           const cloudQuestions = parseCloudQuizJson(raw);
           if (cloudQuestions.length > 0) {
             questions.push(...cloudQuestions);

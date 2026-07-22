@@ -30,6 +30,8 @@ import {
 } from "@/hooks/use-documents";
 import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
+import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -90,6 +92,15 @@ function DocumentDetail() {
   // time.
   const chatModelStatus = useChatModelStatus();
   const chatModelReady = chatModelStatus === "ready";
+  const { connected: cloudConnected } = useCloudAiKey();
+  const [cloudEnabled] = useCloudAiEnabled();
+  const isOnline = useOnlineStatus();
+  // A connected, enabled cloud key with real internet can serve a quiz
+  // without ever needing the on-device model downloaded — see
+  // courses.$moduleId.read.$docId.tsx's identical comment for why this
+  // used to wrongly gate on chatModelReady alone.
+  const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
+  const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
   const copyToNotes = () => {
     if (!doc?.summary) return;
@@ -273,13 +284,17 @@ function DocumentDetail() {
           </p>
         )}
 
-        {!chatModelReady && !quiz && !isGeneratingQuiz && (
+        {quizUnavailable && !quiz && !isGeneratingQuiz && (
           <p className="mt-6 text-[11px] text-muted-foreground">
-            Quizzes need the on-device assistant — download it from the{" "}
+            Quizzes need either a connected{" "}
+            <Link to="/settings" className="gold-underline font-medium text-prestige-deep">
+              free cloud AI key
+            </Link>{" "}
+            (while online) or the on-device assistant — download it from the{" "}
             <Link to="/assistant" className="gold-underline font-medium text-prestige-deep">
               Ask AI
             </Link>{" "}
-            tab first. Flashcards don't need it and work right now.
+            tab. Flashcards don't need either and work right now.
           </p>
         )}
 
@@ -328,8 +343,12 @@ function DocumentDetail() {
           </button>
           <button
             type="button"
-            disabled={isGeneratingQuiz || !chatModelReady}
-            title={!chatModelReady ? "Download the assistant from Ask AI first" : undefined}
+            disabled={isGeneratingQuiz || quizUnavailable}
+            title={
+              quizUnavailable
+                ? "Connect a free cloud AI key (Settings) or download the on-device assistant from Ask AI"
+                : undefined
+            }
             onClick={() => void generateQuizFor(docId, doc.text)}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
           >

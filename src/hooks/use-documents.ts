@@ -248,6 +248,7 @@ export function useGenerateDocumentSummary() {
         const { overview, sections, method } = await generateStructuredSummary(
           sourceText,
           existing.title,
+          user.id,
         );
         await db.personalDocuments.put({
           ...existing,
@@ -298,7 +299,11 @@ export function useGenerateNotes() {
       try {
         const existing = await db.personalDocuments.get(docId);
         if (!existing) return;
-        const notes = await generateViaCloud("notes", sourceText.slice(0, NOTES_CLOUD_SOURCE_CHARS));
+        const notes = await generateViaCloud(
+          "notes",
+          sourceText.slice(0, NOTES_CLOUD_SOURCE_CHARS),
+          user.id,
+        );
         await db.personalDocuments.put({
           ...existing,
           aiNotes: notes,

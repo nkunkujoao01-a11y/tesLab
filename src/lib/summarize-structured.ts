@@ -202,10 +202,12 @@ export type StructuredSummaryResult = {
 export async function generateStructuredSummary(
   text: string,
   fallbackTitle: string,
+  userId: string,
 ): Promise<StructuredSummaryResult> {
   try {
     const raw = await callGeminiWithPrompt(
       buildCloudStructuredSummaryPrompt(text.slice(0, CLOUD_SOURCE_CHARS)),
+      userId,
     );
     const cloudResult = parseCloudStructuredSummary(raw);
     if (cloudResult) {
@@ -220,8 +222,7 @@ export async function generateStructuredSummary(
     // a requirement.
   }
 
-  const modelDownloaded =
-    (await deviceDb.appSettings.get(MODEL_DOWNLOADED_KEY))?.value === "true";
+  const modelDownloaded = (await deviceDb.appSettings.get(MODEL_DOWNLOADED_KEY))?.value === "true";
   let method: "neural" | "extractive" = modelDownloaded ? "neural" : "extractive";
 
   const rawSections = splitIntoSections(text, fallbackTitle);

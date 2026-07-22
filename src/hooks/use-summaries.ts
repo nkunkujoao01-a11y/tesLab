@@ -155,6 +155,7 @@ export function useGenerateSummary() {
         const { overview, sections, method } = await generateStructuredSummary(
           sourceText,
           fallbackTitle,
+          user.id,
         );
         await db.materialSummaries.put({
           key,

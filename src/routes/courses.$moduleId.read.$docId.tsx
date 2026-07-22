@@ -29,6 +29,8 @@ import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { useAuth } from "@/hooks/use-auth";
 import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
+import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import { FlashcardDeck, QuizPanel } from "@/components/QuizFlashcards";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
@@ -120,6 +122,17 @@ function Reader() {
   const quizQuestionProgress = quizProgress[key];
   const chatModelStatus = useChatModelStatus();
   const chatModelReady = chatModelStatus === "ready";
+  const { connected: cloudConnected } = useCloudAiKey();
+  const [cloudEnabled] = useCloudAiEnabled();
+  const isOnline = useOnlineStatus();
+  // A quiz needs *some* AI path — either the downloaded on-device model, or
+  // the online AI (connected key, turned on in settings, actual internet).
+  // Previously this button only ever checked chatModelReady, so a student
+  // who'd connected a free cloud key but never downloaded the on-device
+  // model saw a permanently disabled Quiz button despite cloud generation
+  // already working end-to-end.
+  const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
+  const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
   const [copied, setCopied] = useState(false);
   const copyToNotes = () => {
@@ -172,7 +185,9 @@ function Reader() {
         <button
           type="button"
           disabled={isPending}
-          onClick={() => void downloadMaterial(doc.id, module.id, doc.sizeMb, doc.content, doc.kind)}
+          onClick={() =>
+            void downloadMaterial(doc.id, module.id, doc.sizeMb, doc.content, doc.kind)
+          }
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-5 py-2.5 text-sm font-medium text-prestige-cream transition-transform active:scale-[0.97] disabled:opacity-60"
         >
           {isPending ? (
@@ -346,8 +361,12 @@ function Reader() {
             </button>
             <button
               type="button"
-              disabled={isGeneratingQuiz || !content || !chatModelReady}
-              title={!chatModelReady ? "Download the assistant from Ask AI first" : undefined}
+              disabled={isGeneratingQuiz || !content || quizUnavailable}
+              title={
+                quizUnavailable
+                  ? "Connect a free cloud AI key (Settings) or download the on-device assistant from Ask AI"
+                  : undefined
+              }
               onClick={() => void generateQuizFor(key, pageSourceText)}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
             >
@@ -368,7 +387,12 @@ function Reader() {
               type="button"
               disabled={isSummarizing || !content}
               onClick={() =>
-                void generateSummary(doc.id, module.id, pageSourceText, content?.heading ?? doc.title)
+                void generateSummary(
+                  doc.id,
+                  module.id,
+                  pageSourceText,
+                  content?.heading ?? doc.title,
+                )
               }
               className="inline-flex shrink-0 items-center gap-2 rounded-full bg-prestige-gold px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep transition-transform active:scale-[0.97] disabled:opacity-60"
             >

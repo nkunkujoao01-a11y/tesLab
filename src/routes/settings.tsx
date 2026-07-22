@@ -37,7 +37,7 @@ import {
   useStaleAiOperationWarning,
 } from "@/hooks/use-ai-chat";
 import { CHAT_MODELS, type ChatModelChoice } from "@/lib/ai-chat";
-import { useCloudAiKey } from "@/hooks/use-cloud-ai";
+import { useCloudAiKey, useCloudAiEnabled, useCloudAiQuota } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useClearCache } from "@/hooks/use-clear-cache";
 
@@ -73,6 +73,8 @@ function Settings() {
   };
   const isOnline = useOnlineStatus();
   const { connected, connecting, connect, disconnect } = useCloudAiKey();
+  const [cloudEnabled, setCloudEnabled] = useCloudAiEnabled();
+  const cloudQuota = useCloudAiQuota();
   const [keyInput, setKeyInput] = useState("");
   const { clearCacheAndReload, clearing } = useClearCache();
 
@@ -122,19 +124,60 @@ function Settings() {
 
           <div className="mt-4">
             {connected === undefined ? null : connected ? (
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
-                  <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
-                  Connected &middot; used automatically when you're online
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
+                    <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
+                    Connected
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void disconnect()}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-destructive ring-1 ring-destructive/30 transition-colors hover:bg-destructive/5"
+                  >
+                    <Unlink className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Disconnect
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void disconnect()}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-destructive ring-1 ring-destructive/30 transition-colors hover:bg-destructive/5"
-                >
-                  <Unlink className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Disconnect
-                </button>
+
+                {/* Separate from "connected" — a saved key alone used to
+                 * mean "always used when online," with no way to opt back
+                 * out to on-device-only without disconnecting the key
+                 * entirely (and losing it, since it's never shown again). */}
+                <label className="flex items-center justify-between gap-4 rounded-xl bg-secondary/60 px-3.5 py-3">
+                  <span className="min-w-0">
+                    <span className="block text-xs font-medium text-prestige-deep">
+                      Use automatically when online
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      Quizzes, flashcards, notes, and summaries prefer the cloud AI while this is on
+                      and you're online; otherwise the on-device AI handles them.
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={cloudEnabled}
+                    onClick={() => setCloudEnabled(!cloudEnabled)}
+                    className={cn(
+                      "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                      cloudEnabled ? "bg-prestige-deep" : "bg-border",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 h-5 w-5 rounded-full bg-prestige-cream transition-transform",
+                        cloudEnabled ? "translate-x-5" : "translate-x-0.5",
+                      )}
+                    />
+                  </button>
+                </label>
+
+                <p className="text-[11px] text-muted-foreground">
+                  {cloudQuota.used} of {cloudQuota.limit} free AI generations used today &middot;
+                  resets at midnight. Once reached, generation falls back to on-device
+                  automatically.
+                </p>
               </div>
             ) : (
               <form onSubmit={(e) => void handleConnect(e)} className="space-y-3">
