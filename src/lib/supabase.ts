@@ -34,6 +34,7 @@ export type MaterialRow = {
 export type ProfileRow = {
   id: string;
   full_name: string;
+  email: string;
   program: string;
   university: string;
   faculty: string;
