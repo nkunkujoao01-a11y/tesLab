@@ -16,6 +16,7 @@ import { useAutoSync } from "@/hooks/use-sync";
 import { usePrecacheRoutes } from "@/hooks/use-precache-routes";
 import { Toaster } from "@/components/ui/sonner";
 import { WelcomeTour } from "@/components/WelcomeTour";
+import { ByokPrompt } from "@/components/ByokPrompt";
 
 function NotFoundComponent() {
   return (
@@ -178,6 +179,7 @@ function RootComponent() {
         <PrecacheRoutes />
         <Outlet />
         <WelcomeTour />
+        <ByokPrompt />
         <Toaster position="bottom-center" richColors closeButton />
       </AuthProvider>
     </QueryClientProvider>

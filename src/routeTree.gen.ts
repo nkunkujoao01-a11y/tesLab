@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SummariesRouteImport } from './routes/summaries'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LibraryRouteImport } from './routes/library'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoursesRouteImport } from './routes/courses'
@@ -31,6 +33,7 @@ import { Route as CoursesModuleIdIndexRouteImport } from './routes/courses.$modu
 import { Route as AdminModulesIndexRouteImport } from './routes/admin.modules.index'
 import { Route as DocumentsCollectionsCollectionIdRouteImport } from './routes/documents.collections.$collectionId'
 import { Route as DocumentsDocIdSummaryRouteImport } from './routes/documents.$docId.summary'
+import { Route as DocumentsDocIdNotesRouteImport } from './routes/documents.$docId.notes'
 import { Route as AdminModulesNewRouteImport } from './routes/admin.modules.new'
 import { Route as AdminModulesModuleIdRouteImport } from './routes/admin.modules.$moduleId'
 import { Route as DocumentsCollectionsCollectionIdIndexRouteImport } from './routes/documents.collections.$collectionId.index'
@@ -48,6 +51,11 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgressRoute = ProgressRouteImport.update({
   id: '/progress',
   path: '/progress',
@@ -61,6 +69,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -149,6 +162,11 @@ const DocumentsDocIdSummaryRoute = DocumentsDocIdSummaryRouteImport.update({
   path: '/summary',
   getParentRoute: () => DocumentsDocIdRoute,
 } as any)
+const DocumentsDocIdNotesRoute = DocumentsDocIdNotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
+  getParentRoute: () => DocumentsDocIdRoute,
+} as any)
 const AdminModulesNewRoute = AdminModulesNewRouteImport.update({
   id: '/modules/new',
   path: '/modules/new',
@@ -191,9 +209,11 @@ export interface FileRoutesByFullPath {
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/documents': typeof DocumentsRouteWithChildren
+  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -204,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
@@ -218,9 +239,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
   '/dashboard': typeof DashboardRoute
+  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -229,6 +252,7 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/admin/modules': typeof AdminModulesIndexRoute
   '/courses/$moduleId': typeof CoursesModuleIdIndexRoute
@@ -246,9 +270,11 @@ export interface FileRoutesById {
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/documents': typeof DocumentsRouteWithChildren
+  '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -259,6 +285,7 @@ export interface FileRoutesById {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
@@ -278,9 +305,11 @@ export interface FileRouteTypes {
     | '/courses'
     | '/dashboard'
     | '/documents'
+    | '/library'
     | '/login'
     | '/profile'
     | '/progress'
+    | '/settings'
     | '/signup'
     | '/summaries'
     | '/admin/feedback'
@@ -291,6 +320,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/documents/$docId/notes'
     | '/documents/$docId/summary'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
@@ -305,9 +335,11 @@ export interface FileRouteTypes {
     | '/'
     | '/assistant'
     | '/dashboard'
+    | '/library'
     | '/login'
     | '/profile'
     | '/progress'
+    | '/settings'
     | '/signup'
     | '/summaries'
     | '/admin/feedback'
@@ -316,6 +348,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/documents/$docId/notes'
     | '/documents/$docId/summary'
     | '/admin/modules'
     | '/courses/$moduleId'
@@ -332,9 +365,11 @@ export interface FileRouteTypes {
     | '/courses'
     | '/dashboard'
     | '/documents'
+    | '/library'
     | '/login'
     | '/profile'
     | '/progress'
+    | '/settings'
     | '/signup'
     | '/summaries'
     | '/admin/feedback'
@@ -345,6 +380,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/documents/$docId/notes'
     | '/documents/$docId/summary'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
@@ -363,9 +399,11 @@ export interface RootRouteChildren {
   CoursesRoute: typeof CoursesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   DocumentsRoute: typeof DocumentsRouteWithChildren
+  LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   ProgressRoute: typeof ProgressRoute
+  SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SummariesRoute: typeof SummariesRoute
 }
@@ -384,6 +422,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/progress': {
@@ -405,6 +450,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -526,6 +578,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocumentsDocIdSummaryRouteImport
       parentRoute: typeof DocumentsDocIdRoute
     }
+    '/documents/$docId/notes': {
+      id: '/documents/$docId/notes'
+      path: '/notes'
+      fullPath: '/documents/$docId/notes'
+      preLoaderRoute: typeof DocumentsDocIdNotesRouteImport
+      parentRoute: typeof DocumentsDocIdRoute
+    }
     '/admin/modules/new': {
       id: '/admin/modules/new'
       path: '/modules/new'
@@ -619,11 +678,13 @@ const CoursesRouteWithChildren =
   CoursesRoute._addFileChildren(CoursesRouteChildren)
 
 interface DocumentsDocIdRouteChildren {
+  DocumentsDocIdNotesRoute: typeof DocumentsDocIdNotesRoute
   DocumentsDocIdSummaryRoute: typeof DocumentsDocIdSummaryRoute
   DocumentsDocIdIndexRoute: typeof DocumentsDocIdIndexRoute
 }
 
 const DocumentsDocIdRouteChildren: DocumentsDocIdRouteChildren = {
+  DocumentsDocIdNotesRoute: DocumentsDocIdNotesRoute,
   DocumentsDocIdSummaryRoute: DocumentsDocIdSummaryRoute,
   DocumentsDocIdIndexRoute: DocumentsDocIdIndexRoute,
 }
@@ -674,9 +735,11 @@ const rootRouteChildren: RootRouteChildren = {
   CoursesRoute: CoursesRouteWithChildren,
   DashboardRoute: DashboardRoute,
   DocumentsRoute: DocumentsRouteWithChildren,
+  LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   ProgressRoute: ProgressRoute,
+  SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SummariesRoute: SummariesRoute,
 }

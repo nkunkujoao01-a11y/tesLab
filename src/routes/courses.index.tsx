@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckCircle2, Download, FileText, Sparkles, ChevronRight } from "lucide-react";
+import { CheckCircle2, Download, FileQuestion, FileText, Sparkles, ChevronRight } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { LibrarySearchButton } from "@/components/LibrarySearch";
 import { formatMb } from "@/lib/mock-data";
@@ -39,8 +39,8 @@ function Courses() {
       />
 
       <div className="space-y-8 px-6 lg:px-10 lg:pb-16">
-        {/* My documents + Summaries */}
-        <div className="grid gap-3 sm:grid-cols-2">
+        {/* My documents + Summaries + Quiz/flashcard library */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Link
             to="/documents"
             className="animate-rise group flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-border/60 transition-colors hover:ring-prestige-gold/40"
@@ -70,6 +70,22 @@ function Courses() {
               <p className="text-sm font-medium text-prestige-deep">Summaries</p>
               <p className="text-[11px] text-muted-foreground">
                 Every AI summary you've generated, kept alongside its source
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={2} />
+          </Link>
+
+          <Link
+            to="/library"
+            className="animate-rise group flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-border/60 transition-colors hover:ring-prestige-gold/40"
+          >
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+              <FileQuestion className="h-4 w-4" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-prestige-deep">Quizzes & flashcards</p>
+              <p className="text-[11px] text-muted-foreground">
+                Every quiz and flashcard set you've generated, in one place
               </p>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={2} />

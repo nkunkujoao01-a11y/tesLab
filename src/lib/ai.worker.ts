@@ -21,6 +21,7 @@
 // a worker from inside a worker on every request.
 import { generateChatLocally } from "@/lib/ai-chat";
 import { summarizeLocally } from "@/lib/ai-model";
+import { answerQuestionLocally } from "@/lib/ai-qa";
 import { classifyModelError } from "@/lib/ai-error-classifier";
 import type { WorkerRequest, WorkerResponse } from "@/lib/ai-worker-protocol";
 
@@ -52,21 +53,26 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   currentRequestId = msg.requestId;
   suppressedRequestId = null;
   try {
-    const result =
-      msg.type === "chat-generate"
-        ? await generateChatLocally(
-            msg.turns,
-            msg.stream
-              ? (piece) => {
-                  if (suppressedRequestId !== msg.requestId) {
-                    post({ type: "token", requestId: msg.requestId, piece });
-                  }
-                }
-              : undefined,
-            msg.maxNewTokens,
-            msg.sample,
-          )
-        : await summarizeLocally(msg.text);
+    let result: string;
+    if (msg.type === "chat-generate") {
+      result = await generateChatLocally(
+        msg.turns,
+        msg.stream
+          ? (piece) => {
+              if (suppressedRequestId !== msg.requestId) {
+                post({ type: "token", requestId: msg.requestId, piece });
+              }
+            }
+          : undefined,
+        msg.maxNewTokens,
+        msg.sample,
+      );
+    } else if (msg.type === "qa") {
+      const qaResult = await answerQuestionLocally(msg.question, msg.context);
+      result = JSON.stringify(qaResult);
+    } else {
+      result = await summarizeLocally(msg.text);
+    }
 
     if (suppressedRequestId !== msg.requestId) {
       post({ type: "done", requestId: msg.requestId, result });

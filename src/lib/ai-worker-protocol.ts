@@ -23,12 +23,26 @@ export type SummarizeRequest = {
   text: string;
 };
 
+// Grounds a quiz question's answer in real source text (see ai-qa.ts) —
+// deliberately reuses the existing DoneMessage's plain-string `result`
+// rather than adding a new response variant: the response is JSON-encoded
+// (`{answer, score}`) and decoded back into an object client-side (see
+// answerQuestionViaWorker in ai-worker-client.ts). This keeps WorkerResponse
+// untouched, so nothing about chat-generate/summarize response handling
+// changes.
+export type QaRequest = {
+  type: "qa";
+  requestId: string;
+  question: string;
+  context: string;
+};
+
 export type CancelRequest = {
   type: "cancel";
   requestId: string;
 };
 
-export type WorkerRequest = ChatGenerateRequest | SummarizeRequest | CancelRequest;
+export type WorkerRequest = ChatGenerateRequest | SummarizeRequest | QaRequest | CancelRequest;
 
 export type TokenMessage = { type: "token"; requestId: string; piece: string };
 export type DoneMessage = { type: "done"; requestId: string; result: string };

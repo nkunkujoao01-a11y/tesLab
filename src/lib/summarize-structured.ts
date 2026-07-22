@@ -17,6 +17,61 @@
 import { deviceDb, type SummarySection } from "@/lib/db";
 import { summarizeText } from "@/lib/summarize";
 import { summarizeWithModel } from "@/lib/ai-model";
+import { callGeminiWithPrompt, CloudUnavailableError, stripJsonFence } from "@/lib/ai-cloud";
+
+// Cloud models handle far more context per call than the small on-device
+// summarizer's MODEL_INPUT_BUDGET below — this is a generous but still
+// bounded budget so a very large document doesn't balloon a single request
+// against the student's own free-tier token quota (see ai-cloud.ts).
+const CLOUD_SOURCE_CHARS = 12_000;
+
+type CloudStructuredSummary = { overview: string; sections: SummarySection[] };
+
+/** Parses the cloud model's JSON reply into the same shape the rest of
+ * this file already produces, applying the same "drop what doesn't
+ * validate, don't guess" discipline as quiz-gen.ts's cloud parsers. Any
+ * malformed or unparseable reply returns null so the caller falls straight
+ * through to the existing chunked on-device/extractive pipeline below,
+ * unchanged. */
+function parseCloudStructuredSummary(raw: string): CloudStructuredSummary | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(stripJsonFence(raw));
+  } catch {
+    return null;
+  }
+  const obj = data as Record<string, unknown> | null;
+  if (!obj || typeof obj.overview !== "string" || !Array.isArray(obj.sections)) return null;
+
+  const sections: SummarySection[] = [];
+  for (const entry of obj.sections) {
+    const s = entry as Record<string, unknown>;
+    if (
+      s &&
+      typeof s.heading === "string" &&
+      typeof s.body === "string" &&
+      (s.keyPoints === undefined ||
+        (Array.isArray(s.keyPoints) && s.keyPoints.every((k) => typeof k === "string")))
+    ) {
+      sections.push({
+        heading: s.heading,
+        body: s.body,
+        keyPoints: s.keyPoints as string[] | undefined,
+      });
+    }
+  }
+  return sections.length > 0 ? { overview: obj.overview, sections } : null;
+}
+
+function buildCloudStructuredSummaryPrompt(text: string): string {
+  return (
+    `Summarize the study material below as a short overview plus one summary per real section ` +
+    `of the material (matching its own heading structure). Respond with ONLY a JSON object, no ` +
+    `other text, matching this shape exactly: ` +
+    `{"overview": string, "sections": [{"heading": string, "body": string, "keyPoints": [string]}]}. ` +
+    `Study material:\n${text}`
+  );
+}
 
 const MODEL_DOWNLOADED_KEY = "ai_model_downloaded";
 // Mirrors ai-model.ts's own MAX_INPUT_CHARS — kept as a separate constant
@@ -129,19 +184,42 @@ function chunkForModel(text: string, maxChars: number): string[] {
 export type StructuredSummaryResult = {
   overview: string;
   sections: SummarySection[];
-  method: "neural" | "extractive";
+  method: "cloud" | "neural" | "extractive";
 };
 
 /** Generates a real, whole-document summary: a short overview plus one
  * summary per real section, covering all of `text` — not just whatever
- * fit in one model call. Uses the on-device neural summarizer when it's
- * been downloaded (Profile > AI settings), falling back to the extractive
- * summarizer per-chunk on any failure, same degrade-gracefully rule as
- * the rest of this app's AI features (FR44). */
+ * fit in one model call. Tries the student's own cloud AI key first (see
+ * ai-cloud.ts) — genuinely better quality than the on-device model, which
+ * this app has already deliberately not chased further on-device (see
+ * DEV_LOG.md: a larger on-device summarizer measured ~10 minutes for a
+ * 2-page document and was rejected). Any cloud failure — offline, no key,
+ * bad JSON, rate limit — falls straight through to the existing on-device
+ * neural summarizer when it's been downloaded (Profile > AI settings), and
+ * from there to the extractive summarizer per-chunk on any *further*
+ * failure — same degrade-gracefully rule as the rest of this app's AI
+ * features (FR44), just with one more rung added above it. */
 export async function generateStructuredSummary(
   text: string,
   fallbackTitle: string,
 ): Promise<StructuredSummaryResult> {
+  try {
+    const raw = await callGeminiWithPrompt(
+      buildCloudStructuredSummaryPrompt(text.slice(0, CLOUD_SOURCE_CHARS)),
+    );
+    const cloudResult = parseCloudStructuredSummary(raw);
+    if (cloudResult) {
+      return { ...cloudResult, method: "cloud" };
+    }
+  } catch (err) {
+    if (!(err instanceof CloudUnavailableError)) {
+      console.error("Unexpected error calling cloud AI for summarization", err);
+    }
+    // Any cloud failure falls straight through to the existing on-device/
+    // extractive pipeline below — cloud is an optional enhancement, never
+    // a requirement.
+  }
+
   const modelDownloaded =
     (await deviceDb.appSettings.get(MODEL_DOWNLOADED_KEY))?.value === "true";
   let method: "neural" | "extractive" = modelDownloaded ? "neural" : "extractive";

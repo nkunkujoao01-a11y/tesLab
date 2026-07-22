@@ -9,6 +9,7 @@ import {
 } from "@/lib/db";
 import { extractPdfText, PdfExtractionError, type ExtractProgress } from "@/lib/pdf-extract";
 import { generateStructuredSummary } from "@/lib/summarize-structured";
+import { generateViaCloud, CloudUnavailableError } from "@/lib/ai-cloud";
 import { logActivity } from "@/hooks/use-activity";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
@@ -271,6 +272,59 @@ export function useGenerateDocumentSummary() {
   );
 
   return { generateSummary, pendingIds };
+}
+
+// Cloud models handle far more context per call than the on-device
+// pipeline's own chunk budgets — see ai-cloud.ts/summarize-structured.ts's
+// own identical constant and comment.
+const NOTES_CLOUD_SOURCE_CHARS = 12_000;
+
+/** AI study notes for a personal document — cloud-only (see ai-cloud.ts
+ * and db.ts's own comment on PersonalDocument.aiNotes for why there's no
+ * on-device fallback for this one). Callers should gate the UI that
+ * triggers this behind hasCloudKey() rather than relying solely on the
+ * CloudUnavailableError thrown here, so a student without a connected key
+ * sees an honest "connect a free key" prompt instead of a "generate"
+ * button that always fails. */
+export function useGenerateNotes() {
+  const { user } = useAuth();
+  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
+
+  const generateNotes = useCallback(
+    async (docId: string, sourceText: string) => {
+      if (!user) return;
+      const db = getUserDb(user.id);
+      setPendingIds((prev) => new Set(prev).add(docId));
+      try {
+        const existing = await db.personalDocuments.get(docId);
+        if (!existing) return;
+        const notes = await generateViaCloud("notes", sourceText.slice(0, NOTES_CLOUD_SOURCE_CHARS));
+        await db.personalDocuments.put({
+          ...existing,
+          aiNotes: notes,
+          aiNotesGeneratedAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        void logActivity(user.id, "summary");
+      } catch (err) {
+        if (err instanceof CloudUnavailableError) {
+          toast.error("AI notes need a connected free cloud AI key and an internet connection.");
+        } else {
+          console.error("Failed to generate AI notes", err);
+          toast.error("Couldn't generate notes. Try again.");
+        }
+      } finally {
+        setPendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(docId);
+          return next;
+        });
+      }
+    },
+    [user],
+  );
+
+  return { generateNotes, pendingIds };
 }
 
 /** Every collection the signed-in user has created (the "library

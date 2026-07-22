@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { GoogleGlyph } from "@/components/GoogleGlyph";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
@@ -20,6 +21,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,6 +34,23 @@ function Login() {
       return;
     }
     void navigate({ to: "/dashboard" });
+  };
+
+  // Redirects out to Google and back — the page reloads on return, so
+  // there's no "reset loading" step here; a stuck spinner on this specific
+  // click would mean the redirect itself never fired, which the error
+  // branch below already surfaces.
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/dashboard` },
+    });
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -98,6 +117,22 @@ function Login() {
             )}
           </button>
         </form>
+
+        <div className="mt-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">or</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-medium text-prestige-deep shadow-sm transition-transform active:scale-[0.97] disabled:opacity-60"
+        >
+          <GoogleGlyph className="h-4 w-4" />
+          <span>{googleLoading ? "Redirecting…" : "Continue with Google"}</span>
+        </button>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           New here?{" "}

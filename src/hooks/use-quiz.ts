@@ -5,12 +5,17 @@ import { getUserDb, type GeneratedFlashcardSet, type GeneratedQuiz } from "@/lib
 import {
   generateFlashcards,
   buildSingleQuestionPrompt,
+  buildQuestionSource,
   parseQuizResponse,
+  parseCloudQuizJson,
+  parseCloudFlashcardsJson,
+  matchAnswerToOption,
   QUIZ_QUESTION_COUNT,
   type QuizQuestion,
 } from "@/lib/quiz-gen";
 import { askChatModel } from "@/lib/ai-chat";
-import { WorkerBusyError } from "@/lib/ai-worker-client";
+import { WorkerBusyError, answerQuestionViaWorker } from "@/lib/ai-worker-client";
+import { generateViaCloud, CloudUnavailableError } from "@/lib/ai-cloud";
 import {
   classifyModelError,
   isFatalCategory,
@@ -18,6 +23,57 @@ import {
 } from "@/lib/ai-error-classifier";
 import { useAuth } from "@/hooks/use-auth";
 import { logActivity } from "@/hooks/use-activity";
+
+// Cloud models handle far more context per call than the small on-device
+// ones (MAX_SOURCE_CHARS in quiz-gen.ts) — this is a generous but still
+// bounded budget so a very large document doesn't balloon a single
+// request against the student's own free-tier token quota.
+const CLOUD_SOURCE_CHARS = 12_000;
+
+/** Every flashcard set the signed-in user has ever generated, across all
+ * documents — used by the quiz/flashcard library view (src/routes/library.tsx)
+ * to know which documents actually have real content to show, grouped by
+ * collection there. */
+export function useAllFlashcardSets(): GeneratedFlashcardSet[] {
+  const { user } = useAuth();
+  const [sets, setSets] = useState<GeneratedFlashcardSet[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      setSets([]);
+      return;
+    }
+    const db = getUserDb(user.id);
+    const sub = liveQuery(() => db.generatedFlashcardSets.toArray()).subscribe({
+      next: setSets,
+      error: (err) => console.error("Failed to read flashcard sets", err),
+    });
+    return () => sub.unsubscribe();
+  }, [user]);
+
+  return sets;
+}
+
+/** Same purpose as useAllFlashcardSets above, for generated quizzes. */
+export function useAllQuizzes(): GeneratedQuiz[] {
+  const { user } = useAuth();
+  const [quizzes, setQuizzes] = useState<GeneratedQuiz[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      setQuizzes([]);
+      return;
+    }
+    const db = getUserDb(user.id);
+    const sub = liveQuery(() => db.generatedQuizzes.toArray()).subscribe({
+      next: setQuizzes,
+      error: (err) => console.error("Failed to read quizzes", err),
+    });
+    return () => sub.unsubscribe();
+  }, [user]);
+
+  return quizzes;
+}
 
 export function useFlashcardSet(docId: string): GeneratedFlashcardSet | undefined {
   const { user } = useAuth();
@@ -39,9 +95,11 @@ export function useFlashcardSet(docId: string): GeneratedFlashcardSet | undefine
   return set;
 }
 
-/** Extractive, so this is instant and needs no chat model download — the
- * "generating" state exists only for a consistent UX with the AI-backed
- * quiz generator below, not because this is genuinely slow. */
+/** Extractive by default, so this is normally instant and needs no chat
+ * model download — the "generating" state exists partly for a consistent
+ * UX with the AI-backed quiz generator below, and partly because the
+ * cloud attempt tried first here (see ai-cloud.ts) is a real network call,
+ * not instant like the extractive fallback it may fall through to. */
 export function useGenerateFlashcards() {
   const { user } = useAuth();
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
@@ -51,7 +109,27 @@ export function useGenerateFlashcards() {
       if (!user) return;
       setPendingIds((prev) => new Set(prev).add(docId));
       try {
-        const cards = generateFlashcards(sourceText);
+        let cards = [] as ReturnType<typeof generateFlashcards>;
+        let method: "cloud" | "extractive" = "extractive";
+        try {
+          const raw = await generateViaCloud("flashcards", sourceText.slice(0, CLOUD_SOURCE_CHARS));
+          const cloudCards = parseCloudFlashcardsJson(raw);
+          if (cloudCards.length > 0) {
+            cards = cloudCards;
+            method = "cloud";
+          }
+        } catch (err) {
+          if (!(err instanceof CloudUnavailableError)) {
+            console.error("Unexpected error calling cloud AI for flashcard generation", err);
+          }
+          // Any cloud failure (offline, no key, bad JSON, rate limit) falls
+          // straight through to the existing extractive path below — cloud
+          // is an optional enhancement, never a requirement.
+        }
+
+        if (cards.length === 0) {
+          cards = generateFlashcards(sourceText);
+        }
         if (cards.length === 0) {
           toast.error("This document doesn't have enough heading structure for flashcards yet.");
           return;
@@ -60,6 +138,7 @@ export function useGenerateFlashcards() {
           docId,
           cards,
           generatedAt: Date.now(),
+          method,
         });
         void logActivity(user.id, "summary");
       } catch (err) {
@@ -104,6 +183,12 @@ export function useQuiz(docId: string): GeneratedQuiz | undefined {
 // attempt — a single question's worth of output, not several.
 const QUIZ_MAX_NEW_TOKENS = 150;
 
+// Below this extractive-QA confidence score, the answer span isn't trusted
+// enough to override the chat model's own stated answer — an unverified
+// starting threshold (see ai-qa.ts's own comment on this model not yet
+// having a real-device confirmation pass), not a tuned one.
+const MIN_QA_SCORE = 0.1;
+
 export type QuizProgress = { current: number; total: number };
 
 /** Genuinely needs the on-device chat model (the same one "Ask AI" and
@@ -142,8 +227,30 @@ export function useGenerateQuiz() {
       if (alreadyRunning) return;
 
       const questions: QuizQuestion[] = [];
+      let method: "cloud" | "on-device" = "on-device";
       try {
-        for (let i = 1; i <= QUIZ_QUESTION_COUNT; i++) {
+        try {
+          const raw = await generateViaCloud("quiz", sourceText.slice(0, CLOUD_SOURCE_CHARS));
+          const cloudQuestions = parseCloudQuizJson(raw);
+          if (cloudQuestions.length > 0) {
+            questions.push(...cloudQuestions);
+            method = "cloud";
+          }
+        } catch (err) {
+          if (!(err instanceof CloudUnavailableError)) {
+            console.error("Unexpected error calling cloud AI for quiz generation", err);
+          }
+          // Any cloud failure (offline, no key, bad JSON, rate limit) falls
+          // straight through to the existing on-device loop below — cloud
+          // is an optional enhancement, never a requirement.
+        }
+
+        // Skipped entirely when the cloud attempt above already produced
+        // real questions — checked once via `usedCloud`, not by re-reading
+        // questions.length each iteration, since that grows as this same
+        // loop pushes its own on-device questions into it.
+        const usedCloud = method === "cloud";
+        for (let i = 1; !usedCloud && i <= QUIZ_QUESTION_COUNT; i++) {
           setProgress((prev) => ({ ...prev, [docId]: { current: i, total: QUIZ_QUESTION_COUNT } }));
           const prompt = buildSingleQuestionPrompt(
             sourceText,
@@ -190,7 +297,34 @@ export function useGenerateQuiz() {
               );
               parsed = parseQuizResponse(resampled);
             }
-            if (parsed.length > 0) questions.push(parsed[0]);
+            if (parsed.length > 0) {
+              const parsedQuestion = parsed[0];
+              try {
+                const { answer, score } = await answerQuestionViaWorker(
+                  parsedQuestion.question,
+                  buildQuestionSource(sourceText),
+                );
+                // QA grounding is a best-effort validation step, not a
+                // required one — only override the chat model's own stated
+                // answer when the extracted span is both confident and
+                // clearly matches a *different* option than the one it
+                // already picked. A low-confidence or non-matching result
+                // leaves the chat model's answer as-is rather than losing
+                // the question over an optional check.
+                if (score >= MIN_QA_SCORE) {
+                  const matchedIndex = matchAnswerToOption(answer, parsedQuestion.options);
+                  if (matchedIndex >= 0 && matchedIndex !== parsedQuestion.correctIndex) {
+                    parsedQuestion.correctIndex = matchedIndex;
+                  }
+                }
+              } catch (err) {
+                console.error(
+                  `QA grounding failed for question ${i}, keeping the model's own answer`,
+                  err,
+                );
+              }
+              questions.push(parsedQuestion);
+            }
           } catch (err) {
             console.error(`Failed to generate question ${i}`, err);
             const category = classifyModelError(err);
@@ -215,6 +349,7 @@ export function useGenerateQuiz() {
           docId,
           questions,
           generatedAt: Date.now(),
+          method,
         });
         void logActivity(user.id, "summary");
       } catch (err) {

@@ -8,6 +8,7 @@ import {
   LogIn,
   TriangleAlert,
   Bot,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -41,6 +42,7 @@ const NAV: NavItem[] = [
   },
   { to: "/assistant", label: "Ask AI", icon: Bot },
   { to: "/progress", label: "Progress", icon: BarChart3 },
+  { to: "/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "Profile", icon: User },
 ];
 
@@ -175,23 +177,24 @@ export function MobileShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile bottom nav */}
-      {/* Text labels collide/run together below ~380px with 5 items (found
-       * via a real viewport sweep down to 320px, the budget-Android width
-       * this app's own NFRs target — not assumed fine because it looked ok
-       * at one desktop-resized-down width). Icon-only under that breakpoint
-       * is the standard fix (same pattern as most mobile apps' bottom
-       * navs) rather than shrinking text further, which would hurt
+      {/* Text labels collide/run together below ~380px with too many items
+       * (found via a real viewport sweep down to 320px, the budget-Android
+       * width this app's own NFRs target — not assumed fine because it
+       * looked ok at one desktop-resized-down width). Icon-only under that
+       * breakpoint is the standard fix (same pattern as most mobile apps'
+       * bottom navs) rather than shrinking text further, which would hurt
        * legibility instead of fixing the crowding. `aria-label` keeps the
        * icon-only rows accessible even though the visible text is hidden.
-       * grid-cols-5 must match NAV.length — a real bug found when Summaries
+       * grid-cols-6 must match NAV.length — a real bug found when Summaries
        * was dropped from 6 items to 5 without updating this: the grid kept
-       * reserving a 6th, empty column, so the 5 real buttons stayed
-       * squeezed into the left five-sixths of the row instead of actually
-       * spreading across the full width, which is exactly what read as
-       * "too close together" on a real device even after the item count
-       * dropped. */}
+       * reserving an empty extra column, so the real buttons stayed
+       * squeezed into part of the row instead of actually spreading across
+       * the full width, which is exactly what read as "too close together"
+       * on a real device even after the item count changed. (Settings was
+       * added back to 6 items — this comment's own history is the
+       * reminder to check this again next time NAV's length changes.) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/85 backdrop-blur-md lg:hidden">
-        <ul className="mx-auto grid max-w-[440px] grid-cols-5 gap-x-2 px-3 py-3 min-[380px]:gap-x-3 min-[380px]:px-5">
+        <ul className="mx-auto grid max-w-[440px] grid-cols-6 gap-x-2 px-3 py-3 min-[380px]:gap-x-3 min-[380px]:px-5">
           {NAV.map((item) => {
             const active = item.match ? item.match(path) : path === item.to;
             return (

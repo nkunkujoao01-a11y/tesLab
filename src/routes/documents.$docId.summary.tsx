@@ -53,7 +53,11 @@ function DocumentSummaryPage() {
           </Link>
           <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-prestige-gold">
             <Sparkles className="h-3 w-3" strokeWidth={2} />
-            On-device{doc.summaryMethod === "neural" ? " · Neural model" : " · Extractive"}
+            {doc.summaryMethod === "cloud"
+              ? "Cloud AI"
+              : doc.summaryMethod === "neural"
+                ? "On-device · Neural model"
+                : "On-device · Extractive"}
           </span>
         </div>
       </header>

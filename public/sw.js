@@ -1,4 +1,18 @@
-const CACHE_NAME = "elearn-shell-v2";
+// Bumped v2 -> v3: real reports of the app rendering unstyled bare HTML
+// after a new deploy until the user manually cleared their browser cache.
+// Root cause: this cache-first strategy keys static assets by their exact
+// hashed URL, so a stale cached HTML shell (SHELL_CACHE_KEY, or a
+// previously-cached exact-URL navigate response) can go on referencing a
+// previous build's now-deleted hashed JS/CSS filenames until this SW
+// itself is detected as changed and updates — which the browser only
+// checks periodically, not instantly on every deploy. Changing this
+// string is what actually triggers that update-and-cutover (see
+// "activate" below, which deletes any cache whose name isn't the current
+// one) — bumping it here clears out whatever's currently stuck for
+// existing installs. See also the CLEAR_CACHE message handler below, a
+// user-facing self-service escape hatch for the same underlying problem
+// (Settings > "Clear cache & reload").
+const CACHE_NAME = "elearn-shell-v3";
 // .wasm covers the self-hosted OCR engine under public/tesseract/ (see
 // pdf-ocr.ts) — cache-first here is what lets a scanned-PDF upload actually
 // OCR while offline after the first successful run, not just born-digital
@@ -142,8 +156,21 @@ self.addEventListener("fetch", (event) => {
 // this session still works if you go offline before ever clicking into it
 // yourself.
 self.addEventListener("message", (event) => {
-  if (event.data?.type !== "PRECACHE_ROUTES") return;
-  event.waitUntil(precacheRoutes());
+  if (event.data?.type === "PRECACHE_ROUTES") {
+    event.waitUntil(precacheRoutes());
+    return;
+  }
+  // Self-service escape hatch for the stale-shell-after-deploy problem
+  // this file's CACHE_NAME comment describes (Settings > "Clear cache &
+  // reload" — see use-clear-cache.ts) — deletes every cache this SW owns
+  // so the next load is guaranteed to fetch everything fresh, without
+  // requiring the user to know how to clear their browser's cache
+  // manually (which is what real users have had to do so far).
+  if (event.data?.type === "CLEAR_CACHE") {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))),
+    );
+  }
 });
 
 async function precacheRoutes() {

@@ -218,6 +218,15 @@ export type Database = {
     // instead of raising a clear error (learned the hard way debugging
     // Feature 23's new tables).
     Views: Record<string, never>;
+    // Deliberately left empty here rather than typed with the BYOK RPCs
+    // (supabase/migrations/0014_ai_provider_keys.sql) — populating this
+    // with a concrete function map was found to change how the PostgREST
+    // client resolves *unrelated* embedded-relationship `.select()` calls
+    // elsewhere (admin-console-api.ts, modules-api.ts querying
+    // modules→materials/module_quizzes), surfacing real type errors there
+    // that this change shouldn't be responsible for fixing. Those RPCs are
+    // instead typed locally, scoped to the one module that calls them —
+    // see ai-cloud.ts's own `rpcClient`.
     Functions: Record<string, never>;
   };
 };

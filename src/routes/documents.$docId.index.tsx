@@ -10,6 +10,7 @@ import {
   Layers,
   ListChecks,
   Loader2,
+  NotebookPen,
   Sparkles,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
@@ -214,12 +215,13 @@ function DocumentDetail() {
                   AI summary
                 </p>
                 <p className="text-[10px] uppercase tracking-widest text-prestige-cream/50">
-                  On-device
-                  {doc.summaryMethod === "neural"
-                    ? " · Neural model"
-                    : doc.summaryMethod === "extractive"
-                      ? " · Extractive"
-                      : ""}
+                  {doc.summaryMethod === "cloud"
+                    ? "Cloud AI"
+                    : doc.summaryMethod === "neural"
+                      ? "On-device · Neural model"
+                      : doc.summaryMethod === "extractive"
+                        ? "On-device · Extractive"
+                        : "On-device"}
                 </p>
               </div>
               {isSummarizing ? (
@@ -280,6 +282,18 @@ function DocumentDetail() {
             tab first. Flashcards don't need it and work right now.
           </p>
         )}
+
+        <Link
+          to="/documents/$docId/notes"
+          params={{ docId }}
+          className="mt-8 flex items-center justify-between gap-3 rounded-xl bg-secondary/60 px-4 py-3.5 text-sm font-medium text-prestige-deep transition-colors hover:bg-secondary"
+        >
+          <span className="inline-flex items-center gap-2">
+            <NotebookPen className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
+            {doc.aiNotes ? "View AI notes" : "Generate AI notes"}
+          </span>
+          <ArrowUpRight className="h-3.5 w-3.5 text-prestige-mid" strokeWidth={1.75} />
+        </Link>
       </article>
 
       {/* bottom-20 + lg:bottom-0 lg:ml-64: this page renders inside

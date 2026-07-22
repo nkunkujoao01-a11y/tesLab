@@ -71,7 +71,7 @@ export type AnySummary =
       title: string;
       body: string;
       generatedAt: number;
-      method?: "neural" | "extractive";
+      method?: "neural" | "extractive" | "cloud";
       sections?: SummarySection[];
     };
 
@@ -86,7 +86,7 @@ export type MaterialSummary = {
   // Which summarizer actually produced this text — surfaced in the reader
   // so "on-device" isn't a vague claim. Optional: rows written before the
   // neural model existed are implicitly "extractive".
-  method?: "neural" | "extractive";
+  method?: "neural" | "extractive" | "cloud";
   // Per-section breakdown covering the whole document — see
   // src/lib/summarize-structured.ts. Optional: summaries generated before
   // this existed only have `body`, and still render correctly with it.
@@ -144,9 +144,19 @@ export type PersonalDocument = {
   uploadedAt: number;
   updatedAt: number;
   summary?: string;
-  summaryMethod?: "neural" | "extractive";
+  summaryMethod?: "neural" | "extractive" | "cloud";
   // Per-section summary breakdown — see MaterialSummary.sections.
   summarySections?: SummarySection[];
+  // AI-generated study notes (see ai-cloud.ts, src/routes/documents.$docId.notes.tsx)
+  // — a distinct feature from the summary above, not just a renamed one:
+  // free-form, revision-oriented markdown text written specifically to be
+  // read as notes, not a condensed overview. Cloud-only — there's no
+  // on-device equivalent (see DEV_LOG.md's own conclusion that a
+  // meaningfully more capable on-device model isn't worth its real
+  // multi-minute generation cost), so this stays undefined for a student
+  // who hasn't connected a free cloud AI key.
+  aiNotes?: string;
+  aiNotesGeneratedAt?: number;
   // Same real scroll-based tracking as ReadMaterial.progressPct, for a
   // student's own uploaded PDF rather than a catalog material.
   readProgressPct?: number;
@@ -240,16 +250,25 @@ export type GeneratedFlashcardSet = {
   docId: string;
   cards: Flashcard[];
   generatedAt: number;
+  // Which path actually produced these cards — "cloud" only when the
+  // student's own BYOK Gemini key (see ai-cloud.ts) was used; absent for
+  // every row written before this existed, which were always extractive.
+  // A plain optional property, not a new indexed field, so this needs no
+  // Dexie schema version bump.
+  method?: "cloud" | "extractive";
 };
 
 /** A generated multiple-choice quiz for one personal document (Phase J).
- * Unlike flashcards, this genuinely needs the on-device chat model (see
- * quiz-gen.ts) — plausible wrong answers can't be extracted, only
- * generated. One row per document, replaced wholesale on regenerate. */
+ * Unlike flashcards, this genuinely needs either the on-device chat model
+ * or the cloud path (see quiz-gen.ts / ai-cloud.ts) — plausible wrong
+ * answers can't be extracted, only generated. One row per document,
+ * replaced wholesale on regenerate. */
 export type GeneratedQuiz = {
   docId: string;
   questions: QuizQuestion[];
   generatedAt: number;
+  // Same purpose as GeneratedFlashcardSet.method above.
+  method?: "cloud" | "on-device";
 };
 
 /** A student-created folder for organizing their own personal documents —

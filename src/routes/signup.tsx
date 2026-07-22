@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { ChevronRight, MailCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { GoogleGlyph } from "@/components/GoogleGlyph";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/signup")({
@@ -22,6 +23,24 @@ function Signup() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Same account creation as email/password, just via Google's OAuth
+  // consent instead of a form — Supabase creates the `profiles` row (see
+  // the existing signup trigger) identically either way, so no separate
+  // "new user" handling is needed here.
+  const handleGoogleSignUp = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/dashboard` },
+    });
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -146,6 +165,22 @@ function Signup() {
             )}
           </button>
         </form>
+
+        <div className="mt-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">or</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignUp}
+          disabled={googleLoading}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-medium text-prestige-deep shadow-sm transition-transform active:scale-[0.97] disabled:opacity-60"
+        >
+          <GoogleGlyph className="h-4 w-4" />
+          <span>{googleLoading ? "Redirecting…" : "Continue with Google"}</span>
+        </button>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}

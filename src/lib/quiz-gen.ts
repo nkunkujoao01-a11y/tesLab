@@ -14,6 +14,15 @@
 //   the existing on-device chat model from ai-chat.ts (the same one
 //   powering "Ask AI" and collection chat) rather than a new download.
 
+// A third technique, alongside the two above (see ai-cloud.ts): an
+// optional cloud model can generate either kind directly as JSON, when the
+// student has their own BYOK key and is online — parseCloudQuizJson/
+// parseCloudFlashcardsJson below apply the same "drop what doesn't
+// validate, don't guess" discipline as parseQuizResponse to that reply,
+// since a cloud model's JSON-formatting compliance isn't any more
+// guaranteed than the on-device model's own format compliance was.
+import { stripJsonFence } from "@/lib/ai-cloud";
+
 export type Flashcard = { front: string; back: string };
 
 type Block = { kind: "heading" | "subheading" | "bullet" | "body" | "table"; content: string };
@@ -158,12 +167,22 @@ function stripTableBlocks(text: string): string {
     .join("\n\n");
 }
 
+/** The same source-text preparation (table-stripped, truncated to the
+ * model's small char budget) used to build the generation prompt below —
+ * exported so use-quiz.ts's QA-grounding step (see matchAnswerToOption) can
+ * run the extractive QA model against the *exact* same chunk the question
+ * was generated from, rather than a separately-recomputed one that could
+ * silently drift out of sync with it. */
+export function buildQuestionSource(text: string): string {
+  return stripTableBlocks(text).slice(0, MAX_SOURCE_CHARS);
+}
+
 export function buildSingleQuestionPrompt(
   text: string,
   questionNumber: number,
   alreadyAsked: string[],
 ): string {
-  const source = stripTableBlocks(text).slice(0, MAX_SOURCE_CHARS);
+  const source = buildQuestionSource(text);
   const avoid =
     alreadyAsked.length > 0
       ? `Do not repeat these already-asked questions: ${alreadyAsked.join(" | ")}\n`
@@ -214,4 +233,99 @@ export function parseQuizResponse(raw: string): QuizQuestion[] {
     }
   }
   return questions;
+}
+
+// Below this ratio, the extracted answer and the option it overlaps with
+// don't share enough text to call it a real match — an unverified starting
+// threshold (see ai-qa.ts's own comment on this model not yet having a
+// real-device confirmation pass), not a tuned one.
+const MIN_ANSWER_OVERLAP_RATIO = 0.5;
+
+/** Best-effort fuzzy match between the QA model's extracted answer span
+ * (ai-qa.ts) and this question's 4 MCQ option strings, so a genuinely
+ * different answer than what the chat model asserted as "Correct" can
+ * override it — grounding the quiz's scored answer in text actually pulled
+ * from the source, not just the chat model's own self-reported letter.
+ * Returns -1 if no option overlaps the extracted answer meaningfully;
+ * callers should treat that as "inconclusive," not as "no option is
+ * correct" — a real substring/word-overlap check is a blunt instrument for
+ * short, differently-phrased option text, and a miss here doesn't mean the
+ * chat model's own answer was wrong. */
+export function matchAnswerToOption(extractedAnswer: string, options: string[]): number {
+  const normalize = (s: string) => s.toLowerCase().trim();
+  const answer = normalize(extractedAnswer);
+  if (!answer) return -1;
+
+  let bestIndex = -1;
+  let bestScore = 0;
+  options.forEach((option, i) => {
+    const opt = normalize(option);
+    if (!opt || !(opt.includes(answer) || answer.includes(opt))) return;
+    const score = Math.min(answer.length, opt.length) / Math.max(answer.length, opt.length);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  });
+  return bestScore >= MIN_ANSWER_OVERLAP_RATIO ? bestIndex : -1;
+}
+
+/** Parses a cloud model's JSON reply (see ai-cloud.ts's "quiz" prompt) into
+ * real question objects, dropping any entry that doesn't validate rather
+ * than guessing at a malformed one — same discipline as parseQuizResponse.
+ * A completely unparseable reply (bad JSON, wrong shape, a non-array)
+ * returns an empty array so the caller treats it exactly like any other
+ * cloud failure and falls back to on-device generation. */
+export function parseCloudQuizJson(raw: string): QuizQuestion[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(stripJsonFence(raw));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+
+  const questions: QuizQuestion[] = [];
+  for (const entry of data) {
+    const item = entry as Record<string, unknown>;
+    if (
+      item &&
+      typeof item.question === "string" &&
+      Array.isArray(item.options) &&
+      item.options.length === 4 &&
+      item.options.every((o) => typeof o === "string") &&
+      typeof item.correctIndex === "number" &&
+      item.correctIndex >= 0 &&
+      item.correctIndex < 4
+    ) {
+      questions.push({
+        question: item.question,
+        options: item.options as string[],
+        correctIndex: item.correctIndex,
+      });
+    }
+  }
+  return questions;
+}
+
+/** Same validation discipline as parseCloudQuizJson, for the "flashcards"
+ * cloud prompt — capped at the same MAX_CARDS as the extractive path so a
+ * cloud-generated deck can't come back unbounded. */
+export function parseCloudFlashcardsJson(raw: string): Flashcard[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(stripJsonFence(raw));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+
+  const cards: Flashcard[] = [];
+  for (const entry of data) {
+    const item = entry as Record<string, unknown>;
+    if (item && typeof item.front === "string" && typeof item.back === "string") {
+      cards.push({ front: item.front, back: item.back });
+    }
+  }
+  return cards.slice(0, MAX_CARDS);
 }

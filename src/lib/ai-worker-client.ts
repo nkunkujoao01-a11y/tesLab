@@ -15,10 +15,12 @@ import type {
   ChatGenerateRequest,
   CancelRequest,
   SummarizeRequest,
+  QaRequest,
   WorkerRequest,
   WorkerResponse,
 } from "@/lib/ai-worker-protocol";
 import type { ModelErrorCategory } from "@/lib/ai-error-classifier";
+import type { QaResult } from "@/lib/ai-qa";
 
 /** An error from the worker, carrying the same classification computed
  * worker-side (see ai.worker.ts) — lets a caller do
@@ -167,4 +169,29 @@ export function summarizeViaWorker(text: string): Promise<string> {
     text,
   };
   return send(request);
+}
+
+/** Grounds a quiz question's answer in real source text (see ai-qa.ts) —
+ * off the main thread, same as the other two worker calls. The worker
+ * encodes its `{answer, score}` result as a JSON string (see
+ * ai-worker-protocol.ts's QaRequest comment on why); this is the one place
+ * that decodes it back into an object for callers, so a malformed/garbled
+ * result reads as a real thrown error here rather than a caller getting a
+ * raw unparsed string and silently misusing it. */
+export async function answerQuestionViaWorker(
+  question: string,
+  context: string,
+): Promise<QaResult> {
+  const request: QaRequest = {
+    type: "qa",
+    requestId: makeRequestId(),
+    question,
+    context,
+  };
+  const raw = await send(request);
+  const parsed = JSON.parse(raw) as Partial<QaResult>;
+  if (typeof parsed.answer !== "string" || typeof parsed.score !== "number") {
+    throw new Error("QA worker returned a malformed result");
+  }
+  return { answer: parsed.answer, score: parsed.score };
 }

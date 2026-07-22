@@ -116,7 +116,14 @@ function Summaries() {
                           : material
                             ? `From ${material.title}`
                             : "Open in reader"}
-                        {s.method && ` · ${s.method === "neural" ? "Neural model" : "Extractive"}`}
+                        {s.method &&
+                          ` · ${
+                            s.method === "cloud"
+                              ? "Cloud AI"
+                              : s.method === "neural"
+                                ? "Neural model"
+                                : "Extractive"
+                          }`}
                       </span>
                       <button
                         aria-label="Copy summary"
