@@ -27,7 +27,7 @@ function MoodleCourses() {
 
       <div className="space-y-4 px-6 pb-16 lg:px-10">
         {!moodle.loaded ? null : !moodle.connected ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
+          <div className="animate-rise mx-auto max-w-[440px] rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
             <GraduationCap className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">
               Connect your NUST eLearning account
@@ -43,7 +43,7 @@ function MoodleCourses() {
             </Link>
           </div>
         ) : courses.length === 0 ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
+          <div className="animate-rise mx-auto max-w-[440px] rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
             <GraduationCap className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">
               {moodle.lastSyncAt ? "No courses found" : "Not synced yet"}
@@ -55,7 +55,7 @@ function MoodleCourses() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {courses.map((course) => (
               <Link
                 key={course.id}

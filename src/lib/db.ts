@@ -334,6 +334,17 @@ export type MoodleGrade = {
   feedback?: string;
 };
 
+/** A Moodle resource file, fetched through fetchMoodleFile (moodle-server.ts,
+ * proxied server-side so the wstoken never touches a client-visible URL)
+ * and cached here so re-opening the same material doesn't refetch —
+ * same shape/purpose as PersonalDocumentFile above, one row per module. */
+export type MoodleFile = {
+  moduleKey: string;
+  blob: Blob;
+  mimeType: string;
+  fetchedAt: number;
+};
+
 /** A student-created folder for organizing their own personal documents —
  * "the library planner" (see DEV_LOG.md, Feature 33). Deliberately scoped
  * to personal documents only, not the shared catalog — confirmed with the
@@ -430,6 +441,7 @@ class UserDB extends Dexie {
   moodleCourseSections!: EntityTable<MoodleCourseSection, "key">;
   moodleCourseModules!: EntityTable<MoodleCourseModule, "key">;
   moodleGrades!: EntityTable<MoodleGrade, "key">;
+  moodleFiles!: EntityTable<MoodleFile, "moduleKey">;
 
   constructor(userId: string) {
     super(`elearn_user_${userId}`);
@@ -506,6 +518,11 @@ class UserDB extends Dexie {
       moodleCourseSections: "key, courseId",
       moodleCourseModules: "key, courseId, sectionId",
       moodleGrades: "key, courseId",
+    });
+    // Fetched Moodle file blobs (see MoodleFile's own comment) — also
+    // purely additive.
+    this.version(13).stores({
+      moodleFiles: "moduleKey",
     });
   }
 }

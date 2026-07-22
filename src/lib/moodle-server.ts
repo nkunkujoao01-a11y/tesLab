@@ -185,3 +185,66 @@ export const connectMoodleAccount = createServerFn({ method: "POST" })
 
     return { connected: true, fullName: siteInfo.fullname };
   });
+
+type GetOwnMoodleFileTokenFn = {
+  get_own_moodle_file_token: { Args: Record<string, never>; Returns: string };
+};
+
+type FetchFileInput = { fileUrl: string; accessToken: string };
+type FetchFileResult =
+  | { ok: true; contentType: string; base64: string }
+  | { ok: false; reason: "not_connected" | "fetch_failed" | "unexpected" };
+
+// Moodle's file URLs (pluginfile.php/...) require ?token=<wstoken> to be
+// fetchable without a separate browser login session — appending it here,
+// server-side, means the token is never present in any client-visible URL
+// (browser history, Referer header, etc.), unlike a direct <a href> would
+// be. Returns the file as base64 rather than a streamed Response: this
+// server function is invoked the same client-callable way
+// connectMoodleAccount is (see moodle-cloud.ts), and a plain
+// JSON-serializable return value is the well-supported path through that
+// call convention — fine for the lecture-note-sized files this feature
+// actually deals with.
+export const fetchMoodleFile = createServerFn({ method: "POST" })
+  .validator((data: FetchFileInput) => data)
+  .handler(async ({ data }): Promise<FetchFileResult> => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !anonKey) {
+      console.error("Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY on the server");
+      return { ok: false, reason: "unexpected" };
+    }
+    const userScopedClient = createClient(url, anonKey, {
+      global: { headers: { Authorization: `Bearer ${data.accessToken}` } },
+    }) as unknown as SupabaseClient<{
+      public: {
+        Tables: Record<string, never>;
+        Views: Record<string, never>;
+        Functions: GetOwnMoodleFileTokenFn;
+      };
+    }>;
+    const { data: token, error } = await userScopedClient.rpc("get_own_moodle_file_token");
+    if (error || !token) {
+      console.error("Failed to get own Moodle file token", error);
+      return { ok: false, reason: "not_connected" };
+    }
+
+    const separator = data.fileUrl.includes("?") ? "&" : "?";
+    let response: Response;
+    try {
+      response = await fetch(`${data.fileUrl}${separator}token=${encodeURIComponent(token)}`);
+    } catch (err) {
+      console.error("Failed to fetch Moodle file", err);
+      return { ok: false, reason: "fetch_failed" };
+    }
+    if (!response.ok) {
+      console.error(`Moodle file fetch failed: ${response.status}`);
+      return { ok: false, reason: "fetch_failed" };
+    }
+
+    const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return { ok: true, contentType, base64: btoa(binary) };
+  });
