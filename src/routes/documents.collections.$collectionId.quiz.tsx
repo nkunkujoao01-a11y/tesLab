@@ -1,12 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download, ListChecks, Loader2, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Download,
+  ListChecks,
+  Loader2,
+  RefreshCw,
+  Share2,
+} from "lucide-react";
 import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
 import { useQuiz, useQuizAttempts, useRecordQuizAttempt, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useOnlineStatus, useCanShareFiles } from "@/hooks/use-online-status";
 import { buildQuizExportText } from "@/lib/quiz-gen";
-import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
+import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 import { QuizPanel } from "@/components/QuizFlashcards";
 
 export const Route = createFileRoute("/documents/collections/$collectionId/quiz")({
@@ -44,6 +52,7 @@ function CollectionQuizPage() {
   const isOnline = useOnlineStatus();
   const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
   const quizUnavailable = !chatModelReady && !cloudQuizReady;
+  const canShare = useCanShareFiles();
 
   if (collection === undefined) {
     return <div className="min-h-screen bg-background" />;
@@ -54,7 +63,11 @@ function CollectionQuizPage() {
   const download = () => {
     if (!quiz) return;
     const html = buildStructuredExportHtml(`${title} — Quiz`, buildQuizExportText(quiz.questions));
-    downloadBlob(new Blob([html], { type: "text/html" }), `${title} — Quiz.html`);
+    void shareOrDownloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${title} — Quiz.html`,
+      `${title} — Quiz`,
+    );
   };
 
   return (
@@ -115,8 +128,12 @@ function CollectionQuizPage() {
                 onClick={download}
                 className="inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2.5 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
               >
-                <Download className="h-3.5 w-3.5" strokeWidth={2} />
-                Download
+                {canShare ? (
+                  <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
+                ) : (
+                  <Download className="h-3.5 w-3.5" strokeWidth={2} />
+                )}
+                {canShare ? "Share" : "Download"}
               </button>
               <button
                 type="button"

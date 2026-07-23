@@ -1,14 +1,22 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download, ListChecks, Loader2, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Download,
+  ListChecks,
+  Loader2,
+  RefreshCw,
+  Share2,
+} from "lucide-react";
 import { fetchModule } from "@/lib/modules-api";
 import { materialKey } from "@/lib/db";
 import { useDownloadedMaterialContent } from "@/hooks/use-downloads";
 import { useQuiz, useQuizAttempts, useRecordQuizAttempt, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useOnlineStatus, useCanShareFiles } from "@/hooks/use-online-status";
 import { buildQuizExportText } from "@/lib/quiz-gen";
-import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
+import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 import { QuizPanel } from "@/components/QuizFlashcards";
 
 export const Route = createFileRoute("/courses/$moduleId/quiz/$docId")({
@@ -50,6 +58,7 @@ function MaterialQuizPage() {
   const isOnline = useOnlineStatus();
   const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
   const quizUnavailable = !chatModelReady && !cloudQuizReady;
+  const canShare = useCanShareFiles();
 
   const download = () => {
     if (!quiz) return;
@@ -57,7 +66,11 @@ function MaterialQuizPage() {
       `${doc.title} — Quiz`,
       buildQuizExportText(quiz.questions),
     );
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Quiz.html`);
+    void shareOrDownloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${doc.title} — Quiz.html`,
+      `${doc.title} — Quiz`,
+    );
   };
 
   return (
@@ -119,8 +132,12 @@ function MaterialQuizPage() {
                 onClick={download}
                 className="inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2.5 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
               >
-                <Download className="h-3.5 w-3.5" strokeWidth={2} />
-                Download
+                {canShare ? (
+                  <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
+                ) : (
+                  <Download className="h-3.5 w-3.5" strokeWidth={2} />
+                )}
+                {canShare ? "Share" : "Download"}
               </button>
               <button
                 type="button"

@@ -1,5 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download, Layers, Loader2, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Download,
+  Layers,
+  Loader2,
+  RefreshCw,
+  Share2,
+} from "lucide-react";
 import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
 import {
   useFlashcardSet,
@@ -8,7 +16,8 @@ import {
   useRecordFlashcardReview,
 } from "@/hooks/use-quiz";
 import { buildFlashcardsExportText } from "@/lib/quiz-gen";
-import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
+import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
+import { useCanShareFiles } from "@/hooks/use-online-status";
 import { FlashcardDeck } from "@/components/QuizFlashcards";
 
 export const Route = createFileRoute("/documents/collections/$collectionId/flashcards")({
@@ -40,6 +49,7 @@ function CollectionFlashcardsPage() {
   const isGenerating = pendingIds.has(collectionId);
   const reviews = useFlashcardReviews(collectionId);
   const recordReview = useRecordFlashcardReview();
+  const canShare = useCanShareFiles();
 
   if (collection === undefined) {
     return <div className="min-h-screen bg-background" />;
@@ -53,7 +63,11 @@ function CollectionFlashcardsPage() {
       `${title} — Flashcards`,
       buildFlashcardsExportText(flashcardSet.cards),
     );
-    downloadBlob(new Blob([html], { type: "text/html" }), `${title} — Flashcards.html`);
+    void shareOrDownloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${title} — Flashcards.html`,
+      `${title} — Flashcards`,
+    );
   };
 
   return (
@@ -113,8 +127,12 @@ function CollectionFlashcardsPage() {
                 onClick={download}
                 className="inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2.5 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
               >
-                <Download className="h-3.5 w-3.5" strokeWidth={2} />
-                Download
+                {canShare ? (
+                  <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
+                ) : (
+                  <Download className="h-3.5 w-3.5" strokeWidth={2} />
+                )}
+                {canShare ? "Share" : "Download"}
               </button>
               <button
                 type="button"

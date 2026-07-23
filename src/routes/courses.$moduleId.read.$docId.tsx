@@ -12,6 +12,7 @@ import {
   ListChecks,
   LogIn,
   Loader2,
+  Share2,
 } from "lucide-react";
 import { formatMb } from "@/lib/mock-data";
 import { fetchModule } from "@/lib/modules-api";
@@ -33,10 +34,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useOnlineStatus, useCanShareFiles } from "@/hooks/use-online-status";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
-import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
+import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 
 export const Route = createFileRoute("/courses/$moduleId/read/$docId")({
   loader: async ({ params }) => {
@@ -136,6 +137,7 @@ function Reader() {
   // already working end-to-end.
   const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
   const quizUnavailable = !chatModelReady && !cloudQuizReady;
+  const canShare = useCanShareFiles();
 
   const navigate = useNavigate();
 
@@ -154,7 +156,11 @@ function Reader() {
       ? buildSummaryExportText(summary.body, summary.sections)
       : summary.body;
     const html = buildStructuredExportHtml(`${doc.title} — Summary`, text);
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Summary.html`);
+    void shareOrDownloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${doc.title} — Summary.html`,
+      `${doc.title} — Summary`,
+    );
   };
   if (authLoading) {
     return <div className="min-h-screen bg-background" />;
@@ -329,8 +335,12 @@ function Reader() {
                       onClick={downloadSummary}
                       className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-prestige-cream ring-1 ring-prestige-cream/25 transition-colors hover:bg-prestige-cream/10"
                     >
-                      <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Download
+                      {canShare ? (
+                        <Share2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      )}
+                      {canShare ? "Share" : "Download"}
                     </button>
                     {summary?.sections && summary.sections.length > 0 && (
                       <Link

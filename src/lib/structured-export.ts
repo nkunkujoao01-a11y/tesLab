@@ -116,3 +116,46 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** True when this browser can actually share a *file* via the native
+ * share sheet (`navigator.canShare({ files })`) — not just the older
+ * text/url-only `navigator.share`, which exists on some desktop browsers
+ * but can't take the file itself. Primarily true on mobile Chrome/Safari;
+ * false on most desktop browsers, where a plain download is the better
+ * (and only) option anyway. */
+export function canShareFiles(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    "share" in navigator &&
+    "canShare" in navigator &&
+    navigator.canShare({ files: [new File([""], "test.txt")] })
+  );
+}
+
+/** Shares `blob` via the OS-native share sheet when the browser supports
+ * it (see canShareFiles), falling back to a plain download otherwise —
+ * one call site for every "Download this" button in the app, so a
+ * student on a phone gets "Share to WhatsApp/Files/etc." instead of only
+ * ever landing in a Downloads folder they may not check. A user
+ * cancelling the share sheet throws a benign AbortError — that's a normal
+ * outcome, not a failure, so it's swallowed rather than falling back to a
+ * download the student never asked for. */
+export async function shareOrDownloadBlob(
+  blob: Blob,
+  fileName: string,
+  shareTitle?: string,
+): Promise<void> {
+  if (canShareFiles()) {
+    const file = new File([blob], fileName, { type: blob.type });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: shareTitle });
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        console.error("Native share failed, falling back to download", err);
+      }
+    }
+  }
+  downloadBlob(blob, fileName);
+}

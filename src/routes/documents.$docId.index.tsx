@@ -13,16 +13,18 @@ import {
   ListChecks,
   Loader2,
   NotebookPen,
+  Share2,
   Sparkles,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StructuredText } from "@/components/StructuredText";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { formatMb } from "@/lib/mock-data";
-import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
+import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 import { buildSummaryExportText } from "@/lib/summarize-structured";
 import { deriveDocumentLead } from "@/lib/document-lead";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
+import { useCanShareFiles } from "@/hooks/use-online-status";
 import {
   usePersonalDocument,
   usePersonalDocumentFile,
@@ -114,15 +116,21 @@ function DocumentDetail() {
     });
   };
 
+  const canShare = useCanShareFiles();
+
   const downloadOriginal = () => {
     if (!originalFile) return;
-    downloadBlob(originalFile.blob, originalFile.fileName);
+    void shareOrDownloadBlob(originalFile.blob, originalFile.fileName, doc?.title);
   };
 
   const downloadStructured = () => {
     if (!doc) return;
     const html = buildStructuredExportHtml(doc.title, doc.text);
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title}.html`);
+    void shareOrDownloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${doc.title}.html`,
+      doc.title,
+    );
   };
 
   const downloadSummary = () => {
@@ -131,7 +139,11 @@ function DocumentDetail() {
       ? buildSummaryExportText(doc.summary, doc.summarySections)
       : doc.summary;
     const html = buildStructuredExportHtml(`${doc.title} — Summary`, text);
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Summary.html`);
+    void shareOrDownloadBlob(
+      new Blob([html], { type: "text/html" }),
+      `${doc.title} — Summary.html`,
+      `${doc.title} — Summary`,
+    );
   };
 
   // A liveQuery-backed hook starts as `undefined` for a real document that
@@ -205,8 +217,12 @@ function DocumentDetail() {
                 onClick={downloadOriginal}
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium text-prestige-mid ring-1 ring-border/70 transition-colors hover:bg-secondary hover:text-prestige-deep"
               >
-                <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-                Download original PDF
+                {canShare ? (
+                  <Share2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                ) : (
+                  <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                )}
+                {canShare ? "Share original PDF" : "Download original PDF"}
               </button>
             </>
           )}
@@ -215,8 +231,12 @@ function DocumentDetail() {
             onClick={downloadStructured}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium text-prestige-mid ring-1 ring-border/70 transition-colors hover:bg-secondary hover:text-prestige-deep"
           >
-            <FileDown className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Download structured version
+            {canShare ? (
+              <Share2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+            ) : (
+              <FileDown className="h-3.5 w-3.5" strokeWidth={1.75} />
+            )}
+            {canShare ? "Share structured version" : "Download structured version"}
           </button>
         </div>
         {lead && (
@@ -282,8 +302,12 @@ function DocumentDetail() {
                       onClick={downloadSummary}
                       className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-prestige-cream ring-1 ring-prestige-cream/25 transition-colors hover:bg-prestige-cream/10"
                     >
-                      <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Download
+                      {canShare ? (
+                        <Share2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      )}
+                      {canShare ? "Share" : "Download"}
                     </button>
                     {doc.summarySections && doc.summarySections.length > 0 && (
                       <Link
