@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, FileText, BookOpen } from "lucide-react";
+import { Search, FileText, BookOpen, FolderOpen, GraduationCap } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -10,13 +10,18 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import type { Module } from "@/lib/modules-api";
+import { usePersonalDocuments, useDocumentCollections } from "@/hooks/use-documents";
+import { useMoodleCourses } from "@/hooks/use-moodle-courses";
 
-/** Real search over the module/material catalog already loaded by the
- * calling page (Dashboard/Library both already fetch it via their route
- * loader — no extra request here). cmdk handles the actual fuzzy-matching;
- * this just supplies real fields to match against and real routes to
- * navigate to on select. Replaces what was a decorative "Search library"
- * button with no onClick at all. */
+/** Real search over everything a student's library actually holds: the
+ * shared module/material catalog (passed in — already loaded by the
+ * calling page's own route loader, no extra request here), plus their own
+ * uploaded documents, collections, and synced NUST Moodle courses (read
+ * live from Dexie via the same hooks their own list pages use). One
+ * search surface instead of three separate ones the student would have to
+ * know to check individually. cmdk handles the actual fuzzy-matching; this
+ * just supplies real fields to match against and real routes to navigate
+ * to on select. */
 export function LibrarySearchButton({
   modules,
   className,
@@ -26,6 +31,9 @@ export function LibrarySearchButton({
 }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const personalDocuments = usePersonalDocuments();
+  const collections = useDocumentCollections();
+  const moodleCourses = useMoodleCourses();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -45,6 +53,18 @@ export function LibrarySearchButton({
   const openMaterial = (moduleId: string, docId: string) => {
     setOpen(false);
     void navigate({ to: "/courses/$moduleId/read/$docId", params: { moduleId, docId } });
+  };
+  const openPersonalDocument = (docId: string) => {
+    setOpen(false);
+    void navigate({ to: "/documents/$docId", params: { docId } });
+  };
+  const openCollection = (collectionId: string) => {
+    setOpen(false);
+    void navigate({ to: "/documents/collections/$collectionId", params: { collectionId } });
+  };
+  const openMoodleCourse = (courseId: number) => {
+    setOpen(false);
+    void navigate({ to: "/courses/moodle/$courseId", params: { courseId: String(courseId) } });
   };
 
   return (
@@ -85,6 +105,48 @@ export function LibrarySearchButton({
               ))}
             </CommandGroup>
           ))}
+          {personalDocuments.length > 0 && (
+            <CommandGroup heading="Your documents">
+              {personalDocuments.map((doc) => (
+                <CommandItem
+                  key={doc.id}
+                  value={`document ${doc.title}`}
+                  onSelect={() => openPersonalDocument(doc.id)}
+                >
+                  <FileText className="h-4 w-4" strokeWidth={1.75} />
+                  {doc.title}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {collections.length > 0 && (
+            <CommandGroup heading="Collections">
+              {collections.map((collection) => (
+                <CommandItem
+                  key={collection.id}
+                  value={`collection ${collection.name}`}
+                  onSelect={() => openCollection(collection.id)}
+                >
+                  <FolderOpen className="h-4 w-4" strokeWidth={1.75} />
+                  {collection.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {moodleCourses.length > 0 && (
+            <CommandGroup heading="NUST Moodle courses">
+              {moodleCourses.map((course) => (
+                <CommandItem
+                  key={course.id}
+                  value={`moodle ${course.shortName} ${course.fullName}`}
+                  onSelect={() => openMoodleCourse(course.id)}
+                >
+                  <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
+                  {course.fullName}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
         </CommandList>
       </CommandDialog>
     </>
