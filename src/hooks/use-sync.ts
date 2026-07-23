@@ -7,12 +7,21 @@ import { useAuth } from "@/hooks/use-auth";
 
 const LAST_SYNCED_KEY = "lastSyncedAt";
 
+// A student can stay on one page (e.g. the courses list, waiting for a
+// just-connected NUST account's modules) for a while without ever
+// reloading or toggling connectivity — the two triggers below (sign-in,
+// coming back online) alone left nothing to catch up an in-progress
+// server-side sync in that window. This is a light safety net on top of
+// those, not the primary mechanism.
+const PERIODIC_SYNC_MS = 5 * 60 * 1000;
+
 /** Fires a background sync on sign-in (including session restore on
- * reload) and whenever the device comes back online — silent on failure
- * (console-logged only; a background sync failing isn't something to
- * interrupt the user over, and it'll just retry on the next trigger).
- * Mount exactly once, at the app root — not per-page, or it would re-fire
- * on every navigation since most page components remount MobileShell. */
+ * reload), whenever the device comes back online, and periodically while
+ * the app stays open and online — silent on failure (console-logged only;
+ * a background sync failing isn't something to interrupt the user over,
+ * and it'll just retry on the next trigger). Mount exactly once, at the
+ * app root — not per-page, or it would re-fire on every navigation since
+ * most page components remount MobileShell. */
 export function useAutoSync(): void {
   const { user } = useAuth();
 
@@ -28,6 +37,15 @@ export function useAutoSync(): void {
     };
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      if (!navigator.onLine) return;
+      void syncProgress(user.id).catch((err) => console.error("Background sync failed", err));
+    }, PERIODIC_SYNC_MS);
+    return () => clearInterval(interval);
   }, [user]);
 }
 
