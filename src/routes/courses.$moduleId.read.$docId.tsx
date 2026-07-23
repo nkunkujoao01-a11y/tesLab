@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Bot,
   Sparkles,
   CloudDownload,
   Copy,
@@ -360,6 +361,14 @@ function Reader() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-[720px] items-center justify-end gap-2 px-5 py-4">
           <div className="flex items-center gap-2 overflow-x-auto">
+            <Link
+              to="/courses/$moduleId/chat/$docId"
+              params={{ moduleId: module.id, docId: doc.id }}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97]"
+            >
+              <Bot className="h-3.5 w-3.5" strokeWidth={2} />
+              Ask AI
+            </Link>
             <button
               type="button"
               disabled={isGeneratingFlashcards || !content}

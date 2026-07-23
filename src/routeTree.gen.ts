@@ -37,6 +37,7 @@ import { Route as DocumentsDocIdSummaryRouteImport } from './routes/documents.$d
 import { Route as DocumentsDocIdQuizRouteImport } from './routes/documents.$docId.quiz'
 import { Route as DocumentsDocIdNotesRouteImport } from './routes/documents.$docId.notes'
 import { Route as DocumentsDocIdFlashcardsRouteImport } from './routes/documents.$docId.flashcards'
+import { Route as DocumentsDocIdChatRouteImport } from './routes/documents.$docId.chat'
 import { Route as CoursesMoodleCourseIdRouteImport } from './routes/courses.moodle.$courseId'
 import { Route as AdminModulesNewRouteImport } from './routes/admin.modules.new'
 import { Route as AdminModulesModuleIdRouteImport } from './routes/admin.modules.$moduleId'
@@ -48,6 +49,7 @@ import { Route as CoursesModuleIdSummaryDocIdRouteImport } from './routes/course
 import { Route as CoursesModuleIdReadDocIdRouteImport } from './routes/courses.$moduleId.read.$docId'
 import { Route as CoursesModuleIdQuizDocIdRouteImport } from './routes/courses.$moduleId.quiz.$docId'
 import { Route as CoursesModuleIdFlashcardsDocIdRouteImport } from './routes/courses.$moduleId.flashcards.$docId'
+import { Route as CoursesModuleIdChatDocIdRouteImport } from './routes/courses.$moduleId.chat.$docId'
 
 const SummariesRoute = SummariesRouteImport.update({
   id: '/summaries',
@@ -191,6 +193,11 @@ const DocumentsDocIdFlashcardsRoute =
     path: '/flashcards',
     getParentRoute: () => DocumentsDocIdRoute,
   } as any)
+const DocumentsDocIdChatRoute = DocumentsDocIdChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => DocumentsDocIdRoute,
+} as any)
 const CoursesMoodleCourseIdRoute = CoursesMoodleCourseIdRouteImport.update({
   id: '/moodle/$courseId',
   path: '/moodle/$courseId',
@@ -254,6 +261,12 @@ const CoursesModuleIdFlashcardsDocIdRoute =
     path: '/flashcards/$docId',
     getParentRoute: () => CoursesModuleIdRoute,
   } as any)
+const CoursesModuleIdChatDocIdRoute =
+  CoursesModuleIdChatDocIdRouteImport.update({
+    id: '/chat/$docId',
+    path: '/chat/$docId',
+    getParentRoute: () => CoursesModuleIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -278,6 +291,7 @@ export interface FileRoutesByFullPath {
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
+  '/documents/$docId/chat': typeof DocumentsDocIdChatRoute
   '/documents/$docId/flashcards': typeof DocumentsDocIdFlashcardsRoute
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/quiz': typeof DocumentsDocIdQuizRoute
@@ -287,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
   '/courses/moodle/': typeof CoursesMoodleIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
+  '/courses/$moduleId/chat/$docId': typeof CoursesModuleIdChatDocIdRoute
   '/courses/$moduleId/flashcards/$docId': typeof CoursesModuleIdFlashcardsDocIdRoute
   '/courses/$moduleId/quiz/$docId': typeof CoursesModuleIdQuizDocIdRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
@@ -314,6 +329,7 @@ export interface FileRoutesByTo {
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
+  '/documents/$docId/chat': typeof DocumentsDocIdChatRoute
   '/documents/$docId/flashcards': typeof DocumentsDocIdFlashcardsRoute
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/quiz': typeof DocumentsDocIdQuizRoute
@@ -322,6 +338,7 @@ export interface FileRoutesByTo {
   '/courses/$moduleId': typeof CoursesModuleIdIndexRoute
   '/courses/moodle': typeof CoursesMoodleIndexRoute
   '/documents/$docId': typeof DocumentsDocIdIndexRoute
+  '/courses/$moduleId/chat/$docId': typeof CoursesModuleIdChatDocIdRoute
   '/courses/$moduleId/flashcards/$docId': typeof CoursesModuleIdFlashcardsDocIdRoute
   '/courses/$moduleId/quiz/$docId': typeof CoursesModuleIdQuizDocIdRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
@@ -355,6 +372,7 @@ export interface FileRoutesById {
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
+  '/documents/$docId/chat': typeof DocumentsDocIdChatRoute
   '/documents/$docId/flashcards': typeof DocumentsDocIdFlashcardsRoute
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/quiz': typeof DocumentsDocIdQuizRoute
@@ -364,6 +382,7 @@ export interface FileRoutesById {
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
   '/courses/moodle/': typeof CoursesMoodleIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
+  '/courses/$moduleId/chat/$docId': typeof CoursesModuleIdChatDocIdRoute
   '/courses/$moduleId/flashcards/$docId': typeof CoursesModuleIdFlashcardsDocIdRoute
   '/courses/$moduleId/quiz/$docId': typeof CoursesModuleIdQuizDocIdRoute
   '/courses/$moduleId/read/$docId': typeof CoursesModuleIdReadDocIdRoute
@@ -398,6 +417,7 @@ export interface FileRouteTypes {
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
     | '/courses/moodle/$courseId'
+    | '/documents/$docId/chat'
     | '/documents/$docId/flashcards'
     | '/documents/$docId/notes'
     | '/documents/$docId/quiz'
@@ -407,6 +427,7 @@ export interface FileRouteTypes {
     | '/courses/$moduleId/'
     | '/courses/moodle/'
     | '/documents/$docId/'
+    | '/courses/$moduleId/chat/$docId'
     | '/courses/$moduleId/flashcards/$docId'
     | '/courses/$moduleId/quiz/$docId'
     | '/courses/$moduleId/read/$docId'
@@ -434,6 +455,7 @@ export interface FileRouteTypes {
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
     | '/courses/moodle/$courseId'
+    | '/documents/$docId/chat'
     | '/documents/$docId/flashcards'
     | '/documents/$docId/notes'
     | '/documents/$docId/quiz'
@@ -442,6 +464,7 @@ export interface FileRouteTypes {
     | '/courses/$moduleId'
     | '/courses/moodle'
     | '/documents/$docId'
+    | '/courses/$moduleId/chat/$docId'
     | '/courses/$moduleId/flashcards/$docId'
     | '/courses/$moduleId/quiz/$docId'
     | '/courses/$moduleId/read/$docId'
@@ -474,6 +497,7 @@ export interface FileRouteTypes {
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
     | '/courses/moodle/$courseId'
+    | '/documents/$docId/chat'
     | '/documents/$docId/flashcards'
     | '/documents/$docId/notes'
     | '/documents/$docId/quiz'
@@ -483,6 +507,7 @@ export interface FileRouteTypes {
     | '/courses/$moduleId/'
     | '/courses/moodle/'
     | '/documents/$docId/'
+    | '/courses/$moduleId/chat/$docId'
     | '/courses/$moduleId/flashcards/$docId'
     | '/courses/$moduleId/quiz/$docId'
     | '/courses/$moduleId/read/$docId'
@@ -707,6 +732,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocumentsDocIdFlashcardsRouteImport
       parentRoute: typeof DocumentsDocIdRoute
     }
+    '/documents/$docId/chat': {
+      id: '/documents/$docId/chat'
+      path: '/chat'
+      fullPath: '/documents/$docId/chat'
+      preLoaderRoute: typeof DocumentsDocIdChatRouteImport
+      parentRoute: typeof DocumentsDocIdRoute
+    }
     '/courses/moodle/$courseId': {
       id: '/courses/moodle/$courseId'
       path: '/moodle/$courseId'
@@ -784,6 +816,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesModuleIdFlashcardsDocIdRouteImport
       parentRoute: typeof CoursesModuleIdRoute
     }
+    '/courses/$moduleId/chat/$docId': {
+      id: '/courses/$moduleId/chat/$docId'
+      path: '/chat/$docId'
+      fullPath: '/courses/$moduleId/chat/$docId'
+      preLoaderRoute: typeof CoursesModuleIdChatDocIdRouteImport
+      parentRoute: typeof CoursesModuleIdRoute
+    }
   }
 }
 
@@ -807,6 +846,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface CoursesModuleIdRouteChildren {
   CoursesModuleIdIndexRoute: typeof CoursesModuleIdIndexRoute
+  CoursesModuleIdChatDocIdRoute: typeof CoursesModuleIdChatDocIdRoute
   CoursesModuleIdFlashcardsDocIdRoute: typeof CoursesModuleIdFlashcardsDocIdRoute
   CoursesModuleIdQuizDocIdRoute: typeof CoursesModuleIdQuizDocIdRoute
   CoursesModuleIdReadDocIdRoute: typeof CoursesModuleIdReadDocIdRoute
@@ -815,6 +855,7 @@ interface CoursesModuleIdRouteChildren {
 
 const CoursesModuleIdRouteChildren: CoursesModuleIdRouteChildren = {
   CoursesModuleIdIndexRoute: CoursesModuleIdIndexRoute,
+  CoursesModuleIdChatDocIdRoute: CoursesModuleIdChatDocIdRoute,
   CoursesModuleIdFlashcardsDocIdRoute: CoursesModuleIdFlashcardsDocIdRoute,
   CoursesModuleIdQuizDocIdRoute: CoursesModuleIdQuizDocIdRoute,
   CoursesModuleIdReadDocIdRoute: CoursesModuleIdReadDocIdRoute,
@@ -843,6 +884,7 @@ const CoursesRouteWithChildren =
   CoursesRoute._addFileChildren(CoursesRouteChildren)
 
 interface DocumentsDocIdRouteChildren {
+  DocumentsDocIdChatRoute: typeof DocumentsDocIdChatRoute
   DocumentsDocIdFlashcardsRoute: typeof DocumentsDocIdFlashcardsRoute
   DocumentsDocIdNotesRoute: typeof DocumentsDocIdNotesRoute
   DocumentsDocIdQuizRoute: typeof DocumentsDocIdQuizRoute
@@ -851,6 +893,7 @@ interface DocumentsDocIdRouteChildren {
 }
 
 const DocumentsDocIdRouteChildren: DocumentsDocIdRouteChildren = {
+  DocumentsDocIdChatRoute: DocumentsDocIdChatRoute,
   DocumentsDocIdFlashcardsRoute: DocumentsDocIdFlashcardsRoute,
   DocumentsDocIdNotesRoute: DocumentsDocIdNotesRoute,
   DocumentsDocIdQuizRoute: DocumentsDocIdQuizRoute,

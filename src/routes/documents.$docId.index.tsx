@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Bot,
   Copy,
   Download,
   FileDown,
@@ -341,6 +342,14 @@ function DocumentDetail() {
          * keeps the natural reading order visible from the start, with any
          * overflow scrollable to the right instead. */}
         <div className="mx-auto flex max-w-[720px] items-center justify-start gap-2 overflow-x-auto px-5 py-4">
+          <Link
+            to="/documents/$docId/chat"
+            params={{ docId }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97]"
+          >
+            <Bot className="h-3.5 w-3.5" strokeWidth={2} />
+            Ask AI
+          </Link>
           <button
             type="button"
             disabled={isGeneratingFlashcards}
