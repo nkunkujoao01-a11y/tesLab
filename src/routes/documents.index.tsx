@@ -1,6 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { FileText, Folder, FolderPlus, Upload, Loader2, Trash2, ChevronRight } from "lucide-react";
+import {
+  FileText,
+  Folder,
+  FolderPlus,
+  Upload,
+  Loader2,
+  Trash2,
+  ChevronRight,
+  TriangleAlert,
+} from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { formatMb, formatRelative } from "@/lib/mock-data";
 import {
@@ -9,6 +18,7 @@ import {
   useDeletePersonalDocument,
   useDocumentCollections,
   useCreateCollection,
+  useStalePdfExtractionWarning,
 } from "@/hooks/use-documents";
 import {
   AlertDialog,
@@ -103,6 +113,7 @@ function DocumentsIndex() {
   const collections = useDocumentCollections();
   const { upload, status, progress } = useUploadDocument();
   const { deleteDocument } = useDeletePersonalDocument();
+  const staleExtraction = useStalePdfExtractionWarning();
 
   const uncategorized = docs.filter((doc) => !doc.collectionId);
   const countInCollection = (collectionId: string) =>
@@ -158,6 +169,17 @@ function DocumentsIndex() {
       />
 
       <div className="px-6 lg:px-10 lg:pb-16">
+        {staleExtraction && (
+          <div className="animate-rise mb-6 flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+            <p>
+              The upload of "{staleExtraction.fileName}" didn't finish last time — this can happen
+              if the app closed or crashed partway through. Try again, ideally with a smaller file;
+              if it keeps happening, testing with the device plugged into a computer (via Chrome's
+              remote inspector) will show the real error.
+            </p>
+          </div>
+        )}
         <p className="mb-6 max-w-[52ch] text-sm text-muted-foreground">
           Upload lecture notes or readings you already have as PDFs. Text is extracted right on this
           device — nothing is sent anywhere except your own account's storage, and it works offline

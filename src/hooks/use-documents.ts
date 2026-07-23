@@ -8,6 +8,12 @@ import {
   type DocumentCollection,
 } from "@/lib/db";
 import { extractPdfText, PdfExtractionError, type ExtractProgress } from "@/lib/pdf-extract";
+import {
+  markPdfExtractionStarted,
+  markPdfExtractionFinished,
+  checkAndConsumeStalePdfBreadcrumb,
+  type StalePdfBreadcrumb,
+} from "@/lib/pdf-crash-breadcrumb";
 import { generateStructuredSummary } from "@/lib/summarize-structured";
 import { generateViaCloud, CloudUnavailableError } from "@/lib/ai-cloud";
 import { logActivity } from "@/hooks/use-activity";
@@ -132,6 +138,15 @@ export function useUploadDocument() {
       }
       setStatus("extracting");
       setProgress(null);
+      // A genuine hard tab crash (a real risk on lower-RAM Android devices
+      // loading a large PDF into memory) happens below where JS can react
+      // at all — no error is ever thrown, so the catch block below can't
+      // see it either. This marker, mirroring ai-crash-breadcrumb.ts's
+      // exact pattern, is the one honest signal available for that
+      // specific case: if it's still here on next load, this extraction
+      // never got to clean up after itself, consistent with (not proof
+      // of) a crash.
+      await markPdfExtractionStarted(file.name);
       try {
         const { text, pageCount } = await extractPdfText(file, setProgress);
         const now = Date.now();
@@ -172,17 +187,39 @@ export function useUploadDocument() {
         const message =
           err instanceof PdfExtractionError
             ? err.message
-            : "Couldn't process this PDF. Try a different file.";
+            : `Couldn't process this PDF (${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}). Try a different file.`;
         toast.error(message);
         setStatus("error");
       } finally {
         setProgress(null);
+        void markPdfExtractionFinished();
       }
     },
     [user],
   );
 
   return { upload, status, progress };
+}
+
+/** Checks, once, for a stale PDF-extraction breadcrumb left over from a
+ * previous session (see pdf-crash-breadcrumb.ts) — consistent with, but
+ * not proof of, the process having crashed mid-extraction last time.
+ * Consumed (deleted) the moment it's read, so this only ever surfaces
+ * once, same pattern as useStaleAiOperationWarning (use-ai-chat.ts). */
+export function useStalePdfExtractionWarning(): StalePdfBreadcrumb | null {
+  const [breadcrumb, setBreadcrumb] = useState<StalePdfBreadcrumb | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void checkAndConsumeStalePdfBreadcrumb().then((b) => {
+      if (!cancelled) setBreadcrumb(b);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return breadcrumb;
 }
 
 export function useDeletePersonalDocument() {

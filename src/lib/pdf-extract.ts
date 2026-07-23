@@ -614,7 +614,16 @@ export async function extractPdfText(
     if (name === "InvalidPDFException") {
       throw new PdfExtractionError("This file doesn't look like a valid PDF.", "invalid");
     }
-    throw new PdfExtractionError("Couldn't open this PDF.", "unknown");
+    // Anything else here (a worker script failing to load, an out-of-
+    // memory kill on a constrained device, a network hiccup fetching the
+    // worker asset) used to be discarded behind a fixed, generic message
+    // — exactly the "no way to diagnose a mobile-only failure without a
+    // remote debugger" gap this was found blocking. Folding the real
+    // name/message in means whatever actually went wrong shows up as
+    // readable text in the upload toast itself, on the device it happened
+    // on, not just in a console nobody on a phone can see.
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    throw new PdfExtractionError(`Couldn't open this PDF (${detail}).`, "unknown");
   }
 
   const pageLines: RawLine[][] = [];

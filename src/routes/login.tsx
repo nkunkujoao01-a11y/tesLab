@@ -114,7 +114,7 @@ function Login() {
               type="text"
               required
               autoComplete="username"
-              placeholder="you@example.com or 223068209"
+              placeholder="you@example.com or 12345678"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="h-11 rounded-lg"
