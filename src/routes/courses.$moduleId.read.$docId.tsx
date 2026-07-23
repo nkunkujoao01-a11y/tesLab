@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -29,24 +29,10 @@ import {
 } from "@/hooks/use-activity";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  useFlashcardSet,
-  useGenerateFlashcards,
-  useQuiz,
-  useGenerateQuiz,
-  useQuizAttempts,
-  useRecordQuizAttempt,
-} from "@/hooks/use-quiz";
-import { buildQuizExportText, buildFlashcardsExportText } from "@/lib/quiz-gen";
+import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
-import {
-  AiContentTabStrip,
-  FlashcardDeck,
-  QuizPanel,
-  type AiContentTabKey,
-} from "@/components/QuizFlashcards";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
@@ -150,14 +136,7 @@ function Reader() {
   const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
   const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
-  const quizAttempts = useQuizAttempts(key);
-  const recordQuizAttempt = useRecordQuizAttempt();
-
-  // Summary/flashcards/quiz used to all render stacked below the article
-  // at once — this switches to showing exactly one at a time. Defaults to
-  // whichever already has content so returning to a page you've already
-  // generated something for doesn't require re-selecting a tab.
-  const [activeTab, setActiveTab] = useState<AiContentTabKey>("summary");
+  const navigate = useNavigate();
 
   const [copied, setCopied] = useState(false);
   const copyToNotes = () => {
@@ -176,23 +155,6 @@ function Reader() {
     const html = buildStructuredExportHtml(`${doc.title} — Summary`, text);
     downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Summary.html`);
   };
-  const downloadFlashcards = () => {
-    if (!flashcardSet) return;
-    const html = buildStructuredExportHtml(
-      `${doc.title} — Flashcards`,
-      buildFlashcardsExportText(flashcardSet.cards),
-    );
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Flashcards.html`);
-  };
-  const downloadQuiz = () => {
-    if (!quiz) return;
-    const html = buildStructuredExportHtml(
-      `${doc.title} — Quiz`,
-      buildQuizExportText(quiz.questions),
-    );
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Quiz.html`);
-  };
-
   if (authLoading) {
     return <div className="min-h-screen bg-background" />;
   }
@@ -325,17 +287,7 @@ function Reader() {
           <p className="text-sm text-muted-foreground">Loading downloaded content…</p>
         )}
 
-        <AiContentTabStrip
-          active={activeTab}
-          onChange={setActiveTab}
-          tabs={[
-            { key: "summary", label: "Summary", available: !!summary || isSummarizing },
-            { key: "flashcards", label: "Flashcards", available: !!flashcardSet },
-            { key: "quiz", label: "Quiz", available: !!quiz || isGeneratingQuiz },
-          ]}
-        />
-
-        {activeTab === "summary" && (summary || isSummarizing) && (
+        {(summary || isSummarizing) && (
           <div className="relative mt-6">
             <div className="pointer-events-none absolute -inset-1 rounded-2xl border-t border-l border-prestige-gold/40" />
             <div className="relative rounded-2xl bg-prestige-deep p-6 text-prestige-cream">
@@ -396,41 +348,7 @@ function Reader() {
           </div>
         )}
 
-        {activeTab === "flashcards" && flashcardSet && flashcardSet.cards.length > 0 && (
-          <>
-            <FlashcardDeck cards={flashcardSet.cards} />
-            <button
-              type="button"
-              onClick={downloadFlashcards}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
-            >
-              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Download
-            </button>
-          </>
-        )}
-
-        {activeTab === "quiz" && quiz && quiz.questions.length > 0 && (
-          <>
-            <QuizPanel
-              questions={quiz.questions}
-              attempts={quizAttempts}
-              onSubmit={(score, total, answers) =>
-                void recordQuizAttempt(key, score, total, answers)
-              }
-            />
-            <button
-              type="button"
-              onClick={downloadQuiz}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
-            >
-              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Download
-            </button>
-          </>
-        )}
-
-        {activeTab === "quiz" && isGeneratingQuiz && (
+        {isGeneratingQuiz && (
           <p className="mt-6 text-center text-[11px] text-muted-foreground">
             Writing a quiz question by question can take a few minutes on this device — this is
             genuinely working, not stuck.
@@ -446,8 +364,19 @@ function Reader() {
               type="button"
               disabled={isGeneratingFlashcards || !content}
               onClick={() => {
-                setActiveTab("flashcards");
-                void generateFlashcardsFor(key, flashcardSourceText);
+                if (flashcardSet) {
+                  void navigate({
+                    to: "/courses/$moduleId/flashcards/$docId",
+                    params: { moduleId: module.id, docId: doc.id },
+                  });
+                  return;
+                }
+                void generateFlashcardsFor(key, flashcardSourceText).then(() => {
+                  void navigate({
+                    to: "/courses/$moduleId/flashcards/$docId",
+                    params: { moduleId: module.id, docId: doc.id },
+                  });
+                });
               }}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
             >
@@ -456,7 +385,7 @@ function Reader() {
               ) : (
                 <Layers className="h-3.5 w-3.5" strokeWidth={2} />
               )}
-              {flashcardSet ? "Regenerate" : "Cards"}
+              {flashcardSet ? "View cards" : "Cards"}
             </button>
             <button
               type="button"
@@ -467,8 +396,19 @@ function Reader() {
                   : undefined
               }
               onClick={() => {
-                setActiveTab("quiz");
-                void generateQuizFor(key, pageSourceText);
+                if (quiz) {
+                  void navigate({
+                    to: "/courses/$moduleId/quiz/$docId",
+                    params: { moduleId: module.id, docId: doc.id },
+                  });
+                  return;
+                }
+                void generateQuizFor(key, pageSourceText).then(() => {
+                  void navigate({
+                    to: "/courses/$moduleId/quiz/$docId",
+                    params: { moduleId: module.id, docId: doc.id },
+                  });
+                });
               }}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
             >
@@ -482,14 +422,13 @@ function Reader() {
                   ? `Q${quizQuestionProgress.current}/${quizQuestionProgress.total}…`
                   : "Starting…"
                 : quiz
-                  ? "Regenerate"
+                  ? "View quiz"
                   : "Quiz"}
             </button>
             <button
               type="button"
               disabled={isSummarizing || !content}
               onClick={() => {
-                setActiveTab("summary");
                 void generateSummary(
                   doc.id,
                   module.id,

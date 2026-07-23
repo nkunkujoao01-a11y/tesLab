@@ -32,6 +32,13 @@ type NavItem = {
 // from Library now instead (see courses.index.tsx's own link card, same
 // pattern "My documents" already used), since a summary is always
 // generated from something opened in Library anyway.
+//
+// Settings is on this same shared list for the desktop sidebar (plenty of
+// room there) but deliberately dropped for the mobile/tablet bottom nav
+// below (see MOBILE_NAV) — it's already one tap away from Profile (see
+// profile.tsx's own "AI settings" row), and the bottom nav is exactly the
+// cramped-on-small-screens surface this file's own history already
+// flagged once for Summaries, above.
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: Home },
   {
@@ -45,6 +52,8 @@ const NAV: NavItem[] = [
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "Profile", icon: User },
 ];
+
+const MOBILE_NAV: NavItem[] = NAV.filter((item) => item.to !== "/settings");
 
 export function MobileShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -113,16 +122,11 @@ export function MobileShell({ children }: { children: ReactNode }) {
                     )}
                   >
                     <item.icon
-                      className={cn(
-                        "h-4 w-4 shrink-0",
-                        active ? "text-prestige-gold" : "",
-                      )}
+                      className={cn("h-4 w-4 shrink-0", active ? "text-prestige-gold" : "")}
                       strokeWidth={1.75}
                     />
                     <span>{item.label}</span>
-                    {active && (
-                      <span className="ml-auto h-1 w-1 rounded-full bg-prestige-gold" />
-                    )}
+                    {active && <span className="ml-auto h-1 w-1 rounded-full bg-prestige-gold" />}
                   </Link>
                 </li>
               );
@@ -170,7 +174,8 @@ export function MobileShell({ children }: { children: ReactNode }) {
             className="flex items-center justify-center gap-2 bg-destructive px-4 py-2 text-[11px] font-medium uppercase tracking-widest text-destructive-foreground"
           >
             <TriangleAlert className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Low on device storage — {formatMb(storageQuota.availableMb)} left. Tap to review downloads.
+            Low on device storage — {formatMb(storageQuota.availableMb)} left. Tap to review
+            downloads.
           </Link>
         )}
         <main className="flex-1">{children}</main>
@@ -185,17 +190,17 @@ export function MobileShell({ children }: { children: ReactNode }) {
        * bottom navs) rather than shrinking text further, which would hurt
        * legibility instead of fixing the crowding. `aria-label` keeps the
        * icon-only rows accessible even though the visible text is hidden.
-       * grid-cols-6 must match NAV.length — a real bug found when Summaries
-       * was dropped from 6 items to 5 without updating this: the grid kept
-       * reserving an empty extra column, so the real buttons stayed
-       * squeezed into part of the row instead of actually spreading across
-       * the full width, which is exactly what read as "too close together"
-       * on a real device even after the item count changed. (Settings was
-       * added back to 6 items — this comment's own history is the
-       * reminder to check this again next time NAV's length changes.) */}
+       * grid-cols-5 must match MOBILE_NAV.length — a real bug found when
+       * Summaries was dropped from 6 items to 5 without updating this: the
+       * grid kept reserving an empty extra column, so the real buttons
+       * stayed squeezed into part of the row instead of actually spreading
+       * across the full width, which is exactly what read as "too close
+       * together" on a real device even after the item count changed.
+       * (Settings itself was later dropped from this specific list too —
+       * see MOBILE_NAV's own comment above — so this is 5 again, not 6.) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/85 backdrop-blur-md lg:hidden">
-        <ul className="mx-auto grid max-w-[440px] grid-cols-6 gap-x-2 px-3 py-3 min-[380px]:gap-x-3 min-[380px]:px-5">
-          {NAV.map((item) => {
+        <ul className="mx-auto grid max-w-[440px] grid-cols-5 gap-x-2 px-3 py-3 min-[380px]:gap-x-3 min-[380px]:px-5">
+          {MOBILE_NAV.map((item) => {
             const active = item.match ? item.match(path) : path === item.to;
             return (
               <li key={item.to} className="flex justify-center">
@@ -265,18 +270,10 @@ export function PageHeader({
   );
 }
 
-export function SectionHeader({
-  title,
-  action,
-}: {
-  title: string;
-  action?: ReactNode;
-}) {
+export function SectionHeader({ title, action }: { title: string; action?: ReactNode }) {
   return (
     <div className="mb-4 flex items-end justify-between gap-4">
-      <h2 className="font-display text-sm font-semibold text-prestige-deep">
-        {title}
-      </h2>
+      <h2 className="font-display text-sm font-semibold text-prestige-deep">{title}</h2>
       {action}
     </div>
   );
