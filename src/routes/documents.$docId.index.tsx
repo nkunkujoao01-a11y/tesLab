@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -15,17 +15,10 @@ import {
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { StructuredText } from "@/components/StructuredText";
-import {
-  AiContentTabStrip,
-  FlashcardDeck,
-  QuizPanel,
-  type AiContentTabKey,
-} from "@/components/QuizFlashcards";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { formatMb } from "@/lib/mock-data";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { buildSummaryExportText } from "@/lib/summarize-structured";
-import { buildQuizExportText, buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { deriveDocumentLead } from "@/lib/document-lead";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
 import {
@@ -35,14 +28,7 @@ import {
   useDocumentCollection,
   updateDocumentReadProgress,
 } from "@/hooks/use-documents";
-import {
-  useFlashcardSet,
-  useGenerateFlashcards,
-  useQuiz,
-  useGenerateQuiz,
-  useQuizAttempts,
-  useRecordQuizAttempt,
-} from "@/hooks/use-quiz";
+import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -116,12 +102,7 @@ function DocumentDetail() {
   const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
   const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
-  const quizAttempts = useQuizAttempts(docId);
-  const recordQuizAttempt = useRecordQuizAttempt();
-
-  // See courses.$moduleId.read.$docId.tsx's identical comment — summary/
-  // flashcards/quiz used to all render stacked at once below the article.
-  const [activeTab, setActiveTab] = useState<AiContentTabKey>("summary");
+  const navigate = useNavigate();
 
   const copyToNotes = () => {
     if (!doc?.summary) return;
@@ -149,22 +130,6 @@ function DocumentDetail() {
       : doc.summary;
     const html = buildStructuredExportHtml(`${doc.title} — Summary`, text);
     downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Summary.html`);
-  };
-  const downloadFlashcards = () => {
-    if (!doc || !flashcardSet) return;
-    const html = buildStructuredExportHtml(
-      `${doc.title} — Flashcards`,
-      buildFlashcardsExportText(flashcardSet.cards),
-    );
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Flashcards.html`);
-  };
-  const downloadQuiz = () => {
-    if (!doc || !quiz) return;
-    const html = buildStructuredExportHtml(
-      `${doc.title} — Quiz`,
-      buildQuizExportText(quiz.questions),
-    );
-    downloadBlob(new Blob([html], { type: "text/html" }), `${doc.title} — Quiz.html`);
   };
 
   // A liveQuery-backed hook starts as `undefined` for a real document that
@@ -263,17 +228,7 @@ function DocumentDetail() {
           className="mt-8 space-y-5 whitespace-pre-line text-[15px] leading-[1.75] text-foreground/85"
         />
 
-        <AiContentTabStrip
-          active={activeTab}
-          onChange={setActiveTab}
-          tabs={[
-            { key: "summary", label: "Summary", available: !!doc.summary || isSummarizing },
-            { key: "flashcards", label: "Flashcards", available: !!flashcardSet },
-            { key: "quiz", label: "Quiz", available: !!quiz || isGeneratingQuiz },
-          ]}
-        />
-
-        {activeTab === "summary" && (doc.summary || isSummarizing) && (
+        {(doc.summary || isSummarizing) && (
           <div className="relative mt-6">
             <div className="pointer-events-none absolute -inset-1 rounded-2xl border-t border-l border-prestige-gold/40" />
             <div className="relative rounded-2xl bg-prestige-deep p-6 text-prestige-cream">
@@ -335,48 +290,14 @@ function DocumentDetail() {
           </div>
         )}
 
-        {activeTab === "flashcards" && flashcardSet && flashcardSet.cards.length > 0 && (
-          <>
-            <FlashcardDeck cards={flashcardSet.cards} />
-            <button
-              type="button"
-              onClick={downloadFlashcards}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
-            >
-              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Download
-            </button>
-          </>
-        )}
-
-        {activeTab === "quiz" && quiz && quiz.questions.length > 0 && (
-          <>
-            <QuizPanel
-              questions={quiz.questions}
-              attempts={quizAttempts}
-              onSubmit={(score, total, answers) =>
-                void recordQuizAttempt(docId, score, total, answers)
-              }
-            />
-            <button
-              type="button"
-              onClick={downloadQuiz}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97]"
-            >
-              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Download
-            </button>
-          </>
-        )}
-
-        {activeTab === "quiz" && isGeneratingQuiz && (
+        {isGeneratingQuiz && (
           <p className="mt-6 text-center text-[11px] text-muted-foreground">
             Writing a quiz question by question can take a few minutes on this device — this is
             genuinely working, not stuck.
           </p>
         )}
 
-        {activeTab === "quiz" && quizUnavailable && !quiz && !isGeneratingQuiz && (
+        {quizUnavailable && !quiz && !isGeneratingQuiz && (
           <p className="mt-6 text-[11px] text-muted-foreground">
             Quizzes need either a connected{" "}
             <Link to="/settings" className="gold-underline font-medium text-prestige-deep">
@@ -424,8 +345,13 @@ function DocumentDetail() {
             type="button"
             disabled={isGeneratingFlashcards}
             onClick={() => {
-              setActiveTab("flashcards");
-              void generateFlashcardsFor(docId, doc.text);
+              if (flashcardSet) {
+                void navigate({ to: "/documents/$docId/flashcards", params: { docId } });
+                return;
+              }
+              void generateFlashcardsFor(docId, doc.text).then(() => {
+                void navigate({ to: "/documents/$docId/flashcards", params: { docId } });
+              });
             }}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
           >
@@ -434,7 +360,7 @@ function DocumentDetail() {
             ) : (
               <Layers className="h-3.5 w-3.5" strokeWidth={2} />
             )}
-            {flashcardSet ? "Regenerate" : "Flashcards"}
+            {flashcardSet ? "View cards" : "Flashcards"}
           </button>
           <button
             type="button"
@@ -445,8 +371,13 @@ function DocumentDetail() {
                 : undefined
             }
             onClick={() => {
-              setActiveTab("quiz");
-              void generateQuizFor(docId, doc.text);
+              if (quiz) {
+                void navigate({ to: "/documents/$docId/quiz", params: { docId } });
+                return;
+              }
+              void generateQuizFor(docId, doc.text).then(() => {
+                void navigate({ to: "/documents/$docId/quiz", params: { docId } });
+              });
             }}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
           >
@@ -460,14 +391,13 @@ function DocumentDetail() {
                 ? `Q${quizQuestionProgress.current}/${quizQuestionProgress.total}…`
                 : "Starting…"
               : quiz
-                ? "Regenerate"
+                ? "View quiz"
                 : "Quiz"}
           </button>
           <button
             type="button"
             disabled={isSummarizing}
             onClick={() => {
-              setActiveTab("summary");
               void generateSummary(docId, doc.text);
             }}
             className="inline-flex shrink-0 items-center gap-2 rounded-full bg-prestige-gold px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-prestige-deep transition-transform active:scale-[0.97] disabled:opacity-60"
