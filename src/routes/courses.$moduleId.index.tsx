@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Bot,
   FileText,
   Download,
   CheckCircle2,
@@ -223,26 +224,36 @@ function ModuleDetail() {
               <span className="h-1 w-1 rounded-full bg-prestige-gold" />
               <span>{module.lecturer}</span>
             </div>
-            {!enrollmentLoading && (
-              <button
-                type="button"
-                disabled={toggling}
-                onClick={() => void toggleEnrollment()}
-                className={cn(
-                  "mt-4 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all active:scale-[0.97] disabled:opacity-50",
-                  enrolled
-                    ? "bg-prestige-deep/5 text-prestige-mid ring-1 ring-prestige-deep/20"
-                    : "bg-prestige-deep text-prestige-cream",
-                )}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {!enrollmentLoading && (
+                <button
+                  type="button"
+                  disabled={toggling}
+                  onClick={() => void toggleEnrollment()}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all active:scale-[0.97] disabled:opacity-50",
+                    enrolled
+                      ? "bg-prestige-deep/5 text-prestige-mid ring-1 ring-prestige-deep/20"
+                      : "bg-prestige-deep text-prestige-cream",
+                  )}
+                >
+                  {enrolled ? (
+                    <UserCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  ) : (
+                    <UserPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  )}
+                  {toggling ? "Updating…" : enrolled ? "Enrolled" : "Enrol in this module"}
+                </button>
+              )}
+              <Link
+                to="/courses/$moduleId/chat"
+                params={{ moduleId: module.id }}
+                className="inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97]"
               >
-                {enrolled ? (
-                  <UserCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
-                ) : (
-                  <UserPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                )}
-                {toggling ? "Updating…" : enrolled ? "Enrolled" : "Enrol in this module"}
-              </button>
-            )}
+                <Bot className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Ask AI about this module
+              </Link>
+            </div>
             <div className="mt-6 h-px w-16 bg-prestige-gold" />
           </header>
 

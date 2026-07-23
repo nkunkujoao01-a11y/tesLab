@@ -43,6 +43,7 @@ import { Route as CoursesMoodleCourseIdRouteImport } from './routes/courses.mood
 import { Route as AdminModulesNewRouteImport } from './routes/admin.modules.new'
 import { Route as AdminModulesModuleIdRouteImport } from './routes/admin.modules.$moduleId'
 import { Route as DocumentsCollectionsCollectionIdIndexRouteImport } from './routes/documents.collections.$collectionId.index'
+import { Route as CoursesModuleIdChatIndexRouteImport } from './routes/courses.$moduleId.chat.index'
 import { Route as DocumentsCollectionsCollectionIdQuizRouteImport } from './routes/documents.collections.$collectionId.quiz'
 import { Route as DocumentsCollectionsCollectionIdFlashcardsRouteImport } from './routes/documents.collections.$collectionId.flashcards'
 import { Route as DocumentsCollectionsCollectionIdChatRouteImport } from './routes/documents.collections.$collectionId.chat'
@@ -225,6 +226,12 @@ const DocumentsCollectionsCollectionIdIndexRoute =
     path: '/',
     getParentRoute: () => DocumentsCollectionsCollectionIdRoute,
   } as any)
+const CoursesModuleIdChatIndexRoute =
+  CoursesModuleIdChatIndexRouteImport.update({
+    id: '/chat/',
+    path: '/chat/',
+    getParentRoute: () => CoursesModuleIdRoute,
+  } as any)
 const DocumentsCollectionsCollectionIdQuizRoute =
   DocumentsCollectionsCollectionIdQuizRouteImport.update({
     id: '/quiz',
@@ -316,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/documents/collections/$collectionId/chat': typeof DocumentsCollectionsCollectionIdChatRoute
   '/documents/collections/$collectionId/flashcards': typeof DocumentsCollectionsCollectionIdFlashcardsRoute
   '/documents/collections/$collectionId/quiz': typeof DocumentsCollectionsCollectionIdQuizRoute
+  '/courses/$moduleId/chat/': typeof CoursesModuleIdChatIndexRoute
   '/documents/collections/$collectionId/': typeof DocumentsCollectionsCollectionIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -354,6 +362,7 @@ export interface FileRoutesByTo {
   '/documents/collections/$collectionId/chat': typeof DocumentsCollectionsCollectionIdChatRoute
   '/documents/collections/$collectionId/flashcards': typeof DocumentsCollectionsCollectionIdFlashcardsRoute
   '/documents/collections/$collectionId/quiz': typeof DocumentsCollectionsCollectionIdQuizRoute
+  '/courses/$moduleId/chat': typeof CoursesModuleIdChatIndexRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdIndexRoute
 }
 export interface FileRoutesById {
@@ -399,6 +408,7 @@ export interface FileRoutesById {
   '/documents/collections/$collectionId/chat': typeof DocumentsCollectionsCollectionIdChatRoute
   '/documents/collections/$collectionId/flashcards': typeof DocumentsCollectionsCollectionIdFlashcardsRoute
   '/documents/collections/$collectionId/quiz': typeof DocumentsCollectionsCollectionIdQuizRoute
+  '/courses/$moduleId/chat/': typeof CoursesModuleIdChatIndexRoute
   '/documents/collections/$collectionId/': typeof DocumentsCollectionsCollectionIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -445,6 +455,7 @@ export interface FileRouteTypes {
     | '/documents/collections/$collectionId/chat'
     | '/documents/collections/$collectionId/flashcards'
     | '/documents/collections/$collectionId/quiz'
+    | '/courses/$moduleId/chat/'
     | '/documents/collections/$collectionId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -483,6 +494,7 @@ export interface FileRouteTypes {
     | '/documents/collections/$collectionId/chat'
     | '/documents/collections/$collectionId/flashcards'
     | '/documents/collections/$collectionId/quiz'
+    | '/courses/$moduleId/chat'
     | '/documents/collections/$collectionId'
   id:
     | '__root__'
@@ -527,6 +539,7 @@ export interface FileRouteTypes {
     | '/documents/collections/$collectionId/chat'
     | '/documents/collections/$collectionId/flashcards'
     | '/documents/collections/$collectionId/quiz'
+    | '/courses/$moduleId/chat/'
     | '/documents/collections/$collectionId/'
   fileRoutesById: FileRoutesById
 }
@@ -786,6 +799,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocumentsCollectionsCollectionIdIndexRouteImport
       parentRoute: typeof DocumentsCollectionsCollectionIdRoute
     }
+    '/courses/$moduleId/chat/': {
+      id: '/courses/$moduleId/chat/'
+      path: '/chat'
+      fullPath: '/courses/$moduleId/chat/'
+      preLoaderRoute: typeof CoursesModuleIdChatIndexRouteImport
+      parentRoute: typeof CoursesModuleIdRoute
+    }
     '/documents/collections/$collectionId/quiz': {
       id: '/documents/collections/$collectionId/quiz'
       path: '/quiz'
@@ -870,6 +890,7 @@ interface CoursesModuleIdRouteChildren {
   CoursesModuleIdQuizDocIdRoute: typeof CoursesModuleIdQuizDocIdRoute
   CoursesModuleIdReadDocIdRoute: typeof CoursesModuleIdReadDocIdRoute
   CoursesModuleIdSummaryDocIdRoute: typeof CoursesModuleIdSummaryDocIdRoute
+  CoursesModuleIdChatIndexRoute: typeof CoursesModuleIdChatIndexRoute
 }
 
 const CoursesModuleIdRouteChildren: CoursesModuleIdRouteChildren = {
@@ -879,6 +900,7 @@ const CoursesModuleIdRouteChildren: CoursesModuleIdRouteChildren = {
   CoursesModuleIdQuizDocIdRoute: CoursesModuleIdQuizDocIdRoute,
   CoursesModuleIdReadDocIdRoute: CoursesModuleIdReadDocIdRoute,
   CoursesModuleIdSummaryDocIdRoute: CoursesModuleIdSummaryDocIdRoute,
+  CoursesModuleIdChatIndexRoute: CoursesModuleIdChatIndexRoute,
 }
 
 const CoursesModuleIdRouteWithChildren = CoursesModuleIdRoute._addFileChildren(

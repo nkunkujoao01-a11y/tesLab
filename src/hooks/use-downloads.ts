@@ -93,6 +93,44 @@ export function useDownloadedMaterialContent(
   return content;
 }
 
+/** Every downloaded material's cached content for one module, keyed by
+ * materialId — the "ask AI about this whole module" chat (courses.
+ * $moduleId.chat.index.tsx) needs all of a module's downloaded content at
+ * once, not one material at a time the way useDownloadedMaterialContent
+ * above reads. Same "read straight from IndexedDB, not Supabase" offline-
+ * first reasoning — a material the student hasn't downloaded yet simply
+ * isn't included, same as it wouldn't be available to read offline
+ * either. */
+export function useDownloadedModuleMaterials(moduleId: string): Map<string, MaterialContent> {
+  const { user } = useAuth();
+  const [contentByMaterialId, setContentByMaterialId] = useState<Map<string, MaterialContent>>(
+    () => new Map(),
+  );
+
+  useEffect(() => {
+    if (!user) {
+      setContentByMaterialId(new Map());
+      return;
+    }
+    const db = getUserDb(user.id);
+    const sub = liveQuery(() =>
+      db.downloadedMaterials.where("moduleId").equals(moduleId).toArray(),
+    ).subscribe({
+      next: (rows) => {
+        const next = new Map<string, MaterialContent>();
+        for (const row of rows) {
+          if (row.content) next.set(row.materialId, row.content);
+        }
+        setContentByMaterialId(next);
+      },
+      error: (err) => console.error("Failed to read downloaded module materials", err),
+    });
+    return () => sub.unsubscribe();
+  }, [user, moduleId]);
+
+  return contentByMaterialId;
+}
+
 export function useDownloadModule() {
   const { user } = useAuth();
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
