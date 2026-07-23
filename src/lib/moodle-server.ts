@@ -123,38 +123,48 @@ async function moodleGetSiteInfo(token: string): Promise<MoodleSiteInfo> {
   return moodleCallFunction<MoodleSiteInfo>(token, "core_webservice_get_site_info");
 }
 
-/** Best-effort: nudges the same cron-triggered sync endpoint
- * (moodle-cron-handler.ts) right after a successful connect, instead of
- * making the student wait up to SYNC_STALE_HOURS for their first real
- * course to show up — a brand-new (or just-reconnected) connection's
- * last_sync_at is null, which already always counts as "due," so this is
- * just pulling that forward in time, not new sync logic. Passing
- * `user_id` scopes this call to *just* this one connection (see
- * handleMoodleCronSync's own comment) — real-device testing found that
- * without it, this call synced *every* connection due at that moment, in
- * one request, and reliably blew past its own timeout with more than a
- * couple of real connections in play, silently never reaching (or
- * finishing) the one connection this call actually exists for. A plain
- * HTTP self-call (not a direct import of moodle-cron-handler.ts)
- * deliberately keeps this client-reachable file's import graph as small
- * as moodle-sync-server.ts's own header comment already establishes for
- * the cron-only side. Still bounded with a timeout so a slow/busy sync
- * can never hang the connect/login response itself — on timeout or any
- * failure, the next scheduled cron run still covers this connection
- * regardless. */
+/** Nudges the same cron-triggered sync endpoint (moodle-cron-handler.ts)
+ * right after a successful connect/login, instead of making the student
+ * wait up to SYNC_STALE_HOURS for their first real course to show up — a
+ * brand-new (or just-reconnected) connection's last_sync_at is null,
+ * which already always counts as "due," so this is just pulling that
+ * forward in time, not new sync logic. Passing `user_id` scopes this call
+ * to *just* this one connection (see handleMoodleCronSync's own comment)
+ * — real-device testing found that without it, this call synced *every*
+ * connection due at that moment, in one request, and reliably blew past
+ * its own timeout with more than a couple of real connections in play,
+ * silently never reaching (or finishing) the one connection this call
+ * actually exists for.
+ *
+ * Deliberately awaited to completion, not fire-and-forget: a student
+ * explicitly preferred a slightly slower connect/login over a "probably
+ * worked, check back later" state that (per the same real-device testing)
+ * could otherwise leave them looking at an empty course list with no
+ * clear signal anything was ever going to change. Still has an outer
+ * bound — generous now that it's one connection's work, not everyone's —
+ * so a genuinely stuck request can't hang the response forever; on that
+ * timeout or any other failure, the next scheduled cron run still covers
+ * this connection regardless. A plain HTTP self-call (not a direct import
+ * of moodle-cron-handler.ts) deliberately keeps this client-reachable
+ * file's import graph as small as moodle-sync-server.ts's own header
+ * comment already establishes for the cron-only side. */
 async function triggerImmediateMoodleSync(userId: string): Promise<void> {
   const cronSecret = process.env.MOODLE_CRON_SECRET;
   const vercelUrl = process.env.VERCEL_URL;
   if (!cronSecret || !vercelUrl) return;
   try {
-    await fetch(`https://${vercelUrl}/api/moodle/cron-sync`, {
+    const response = await fetch(`https://${vercelUrl}/api/moodle/cron-sync`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-cron-secret": cronSecret },
       body: JSON.stringify({ user_id: userId }),
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(60000),
     });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || (result && result.failed > 0)) {
+      console.error("Immediate Moodle sync did not fully succeed", response.status, result);
+    }
   } catch (err) {
-    console.error("Best-effort immediate Moodle sync failed to trigger", err);
+    console.error("Immediate Moodle sync failed to complete", err);
   }
 }
 
