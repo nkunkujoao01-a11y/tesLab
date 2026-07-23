@@ -6,7 +6,7 @@
 // receives the Moodle token back — only a connected/fullName/reason result.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { connectMoodleAccount } from "@/lib/moodle-server";
+import { connectMoodleAccount, loginWithNustCredentials } from "@/lib/moodle-server";
 
 // Typed locally rather than added to supabase.ts's shared Database type —
 // see ai-cloud.ts's identical comment for why.
@@ -103,4 +103,33 @@ export async function connectMoodle(
 export async function disconnectMoodle(): Promise<void> {
   const { error } = await rpc.rpc("clear_moodle_connection");
   if (error) throw error;
+}
+
+export type NustLoginResult =
+  | { signedIn: true; fullName: string }
+  | { signedIn: false; reason: "invalid_credentials" | "unexpected" };
+
+/** Logs in with a NUST student number + password instead of an eLearn
+ * email — see loginWithNustCredentials (moodle-server.ts) for the full
+ * server-side design. That server function verifies against Moodle and
+ * returns a one-time `token_hash`; redeeming it here via `verifyOtp` is
+ * what actually establishes this browser's real Supabase session — the
+ * server itself never holds or returns a session token directly. */
+export async function loginWithNust(
+  studentNumber: string,
+  password: string,
+): Promise<NustLoginResult> {
+  const result = await loginWithNustCredentials({ data: { studentNumber, password } });
+  if (!result.ok) {
+    return { signedIn: false, reason: result.reason };
+  }
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: result.tokenHash,
+    type: "magiclink",
+  });
+  if (error) {
+    console.error("Failed to redeem NUST login session", error);
+    return { signedIn: false, reason: "unexpected" };
+  }
+  return { signedIn: true, fullName: result.fullName };
 }

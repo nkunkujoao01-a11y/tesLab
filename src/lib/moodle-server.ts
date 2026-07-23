@@ -215,6 +215,121 @@ export const connectMoodleAccount = createServerFn({ method: "POST" })
     return { connected: true, fullName: siteInfo.fullname };
   });
 
+type AdminSaveMoodleConnectionFn = {
+  admin_save_moodle_connection: {
+    Args: {
+      p_user_id: string;
+      p_moodle_user_id: number;
+      p_token: string;
+      p_full_name: string;
+      p_available_functions: string[];
+    };
+    Returns: void;
+  };
+};
+
+// .invalid is IANA-reserved (RFC 2606) specifically for non-resolvable
+// placeholder use like this — a deterministic, collision-safe mapping
+// from a real NUST student number to a synthetic auth.users email, so no
+// real student's own separate Gmail/other signup could ever land on the
+// same address by coincidence.
+const NUST_LOGIN_EMAIL_DOMAIN = "nust-student.invalid";
+
+function studentNumberToEmail(studentNumber: string): string {
+  return `${studentNumber.trim().toLowerCase()}@${NUST_LOGIN_EMAIL_DOMAIN}`;
+}
+
+type NustLoginInput = { studentNumber: string; password: string };
+type NustLoginResult =
+  | { ok: true; tokenHash: string; fullName: string }
+  | { ok: false; reason: "invalid_credentials" | "unexpected" };
+
+/** Logs a student in with only their real NUST student number + password —
+ * no separate eLearn signup, no separate "connect Moodle" step in
+ * Settings afterward. Moodle's own login/token.php is the actual identity
+ * check here (same one-hop-only password handling as connectMoodleAccount
+ * above — this student's NUST password still never touches anything but
+ * that one outbound call). studentNumberToEmail deterministically maps
+ * that verified identity onto a real Supabase auth user: `generateLink`
+ * with `type: "magiclink"` creates the user on first login and just mints
+ * a fresh token for one that already exists on every login after (see
+ * the installed @supabase/auth-js types — "generateLink() handles the
+ * creation of the user for signup, invite and magiclink"). Returns a
+ * `hashed_token` for the browser to redeem via
+ * `supabase.auth.verifyOtp({ token_hash, type: "magiclink" })` — the
+ * standard, supported way to hand a browser a real session from a
+ * server-side identity check, without this student ever having (or
+ * needing) an actual Supabase password of their own.
+ *
+ * A student who separately signs up with a real email/password *and*
+ * also uses this NUST-login path ends up with two distinct accounts (one
+ * keyed by their student number, one by their real email) — no automatic
+ * merge; a real, known limitation, not an oversight, and out of scope for
+ * this pass. */
+export const loginWithNustCredentials = createServerFn({ method: "POST" })
+  .validator((data: NustLoginInput) => data)
+  .handler(async ({ data }): Promise<NustLoginResult> => {
+    const { studentNumber, password } = data;
+
+    let token: string;
+    let siteInfo: MoodleSiteInfo;
+    try {
+      token = await moodleLoginToken(studentNumber, password);
+      siteInfo = await moodleGetSiteInfo(token);
+    } catch (err) {
+      if (err instanceof MoodleAuthError) {
+        console.error("NUST login failed:", err.message);
+        return { ok: false, reason: "invalid_credentials" };
+      }
+      console.error("Unexpected error during NUST login", err);
+      return { ok: false, reason: "unexpected" };
+    }
+
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceRoleKey) {
+      console.error("Missing VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY for NUST login");
+      return { ok: false, reason: "unexpected" };
+    }
+    const admin = createClient(url, serviceRoleKey) as unknown as SupabaseClient<{
+      public: {
+        Tables: Record<string, never>;
+        Views: Record<string, never>;
+        Functions: AdminSaveMoodleConnectionFn;
+      };
+    }>;
+
+    const email = studentNumberToEmail(studentNumber);
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+      options: { data: { full_name: siteInfo.fullname } },
+    });
+    if (linkError || !linkData?.properties?.hashed_token || !linkData.user) {
+      console.error("Failed to generate a session for NUST login", linkError);
+      return { ok: false, reason: "unexpected" };
+    }
+
+    const { error: saveError } = await admin.rpc("admin_save_moodle_connection", {
+      p_user_id: linkData.user.id,
+      p_moodle_user_id: siteInfo.userid,
+      p_token: token,
+      p_full_name: siteInfo.fullname,
+      p_available_functions: siteInfo.functions.map((f) => f.name),
+    });
+    if (saveError) {
+      console.error("Failed to save Moodle connection for NUST login", saveError);
+      // The session itself still works even if this one save fails — a
+      // student can still sign in; they'd just need to connect Moodle
+      // from Settings afterward instead of it having happened
+      // automatically, same degrade-gracefully discipline as the rest of
+      // this file.
+    }
+
+    await triggerImmediateMoodleSync();
+    return { ok: true, tokenHash: linkData.properties.hashed_token, fullName: siteInfo.fullname };
+  });
+
 type GetOwnMoodleFileTokenFn = {
   get_own_moodle_file_token: { Args: Record<string, never>; Returns: string };
 };

@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { GoogleGlyph } from "@/components/GoogleGlyph";
 import { supabase } from "@/lib/supabase";
+import { loginWithNust } from "@/lib/moodle-cloud";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -15,9 +16,19 @@ export const Route = createFileRoute("/login")({
   component: Login,
 });
 
+// A plain "@" check is enough here — it only decides which of the two
+// real login paths to try, not whether the value is a well-formed email;
+// each path's own backend (Supabase auth / Moodle's login/token.php)
+// already validates the actual credential, and a false-positive either
+// way just surfaces as that path's own normal "invalid credentials"
+// error rather than silently doing the wrong thing.
+function looksLikeEmail(identifier: string): boolean {
+  return identifier.includes("@");
+}
+
 function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -27,10 +38,32 @@ function Login() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    const trimmed = identifier.trim();
+    if (looksLikeEmail(trimmed)) {
+      const { error } = await supabase.auth.signInWithPassword({ email: trimmed, password });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      void navigate({ to: "/dashboard" });
+      return;
+    }
+
+    // Anything without an "@" is treated as a NUST student number — see
+    // loginWithNust (moodle-cloud.ts) for the full flow: it verifies
+    // against Moodle itself, then signs this browser into a matching
+    // eLearn account (created automatically on first login) with the
+    // real NUST courses already linked, no separate Settings step.
+    const result = await loginWithNust(trimmed, password);
     setLoading(false);
-    if (error) {
-      setError(error.message);
+    if (!result.signedIn) {
+      setError(
+        result.reason === "invalid_credentials"
+          ? "Those NUST eLearning credentials weren't accepted. Check your student number and password."
+          : "Couldn't sign in right now. Try again in a moment.",
+      );
       return;
     }
     void navigate({ to: "/dashboard" });
@@ -73,16 +106,17 @@ function Login() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="email" className="text-xs font-medium text-prestige-mid">
-              Email
+            <label htmlFor="identifier" className="text-xs font-medium text-prestige-mid">
+              Email or NUST student number
             </label>
             <Input
-              id="email"
-              type="email"
+              id="identifier"
+              type="text"
               required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              placeholder="you@example.com or 223068209"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="h-11 rounded-lg"
             />
           </div>
