@@ -81,7 +81,7 @@ type SyncTables = {
     feedback: string | null;
   }>;
 };
-type AdminClient = SupabaseClient<{
+export type AdminClient = SupabaseClient<{
   public: { Tables: SyncTables; Views: Record<string, never>; Functions: SyncFunctions };
 }>;
 
@@ -132,7 +132,14 @@ async function upsertOrThrow(
   if (error) throw new Error(`${what}: ${error.message}`);
 }
 
-async function syncOneConnection(admin: AdminClient, userId: string): Promise<void> {
+/** Exported for moodle-server.ts's own immediate-sync trigger — see that
+ * file's comment on why it now calls this directly, in-process, instead
+ * of the HTTP self-call this used to be reached through exclusively. Both
+ * remain valid callers: the scheduled cron job (via
+ * handleMoodleCronSync, an actual separate top-level request) and now
+ * also a connect/login handler's own request (a plain function call
+ * within that same single invocation, no nested request involved). */
+export async function syncOneConnection(admin: AdminClient, userId: string): Promise<void> {
   const { data: tokenRows, error: tokenError } = await admin.rpc("admin_get_moodle_token", {
     p_user_id: userId,
   });

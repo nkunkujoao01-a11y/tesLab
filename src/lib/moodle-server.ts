@@ -10,6 +10,7 @@
 // own header comment for the full reasoning.
 import { createServerFn } from "@tanstack/react-start";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { syncOneConnection, type AdminClient } from "@/lib/moodle-cron-handler";
 
 // Typed locally rather than added to supabase.ts's shared Database type —
 // see ai-cloud.ts's identical comment for why: populating the shared type
@@ -123,48 +124,40 @@ async function moodleGetSiteInfo(token: string): Promise<MoodleSiteInfo> {
   return moodleCallFunction<MoodleSiteInfo>(token, "core_webservice_get_site_info");
 }
 
-/** Nudges the same cron-triggered sync endpoint (moodle-cron-handler.ts)
- * right after a successful connect/login, instead of making the student
- * wait up to SYNC_STALE_HOURS for their first real course to show up — a
- * brand-new (or just-reconnected) connection's last_sync_at is null,
- * which already always counts as "due," so this is just pulling that
- * forward in time, not new sync logic. Passing `user_id` scopes this call
- * to *just* this one connection (see handleMoodleCronSync's own comment)
- * — real-device testing found that without it, this call synced *every*
- * connection due at that moment, in one request, and reliably blew past
- * its own timeout with more than a couple of real connections in play,
- * silently never reaching (or finishing) the one connection this call
- * actually exists for.
+/** Runs the exact same per-connection sync the scheduled cron job uses
+ * (syncOneConnection, moodle-cron-handler.ts) right after a successful
+ * connect/login, instead of making the student wait up to
+ * SYNC_STALE_HOURS for their first real course to show up — a brand-new
+ * (or just-reconnected) connection's last_sync_at is null, which already
+ * always counts as "due," so this is just pulling that forward in time,
+ * not new sync logic.
  *
- * Deliberately awaited to completion, not fire-and-forget: a student
- * explicitly preferred a slightly slower connect/login over a "probably
- * worked, check back later" state that (per the same real-device testing)
- * could otherwise leave them looking at an empty course list with no
- * clear signal anything was ever going to change. Still has an outer
- * bound — generous now that it's one connection's work, not everyone's —
- * so a genuinely stuck request can't hang the response forever; on that
- * timeout or any other failure, the next scheduled cron run still covers
- * this connection regardless. A plain HTTP self-call (not a direct import
- * of moodle-cron-handler.ts) deliberately keeps this client-reachable
- * file's import graph as small as moodle-sync-server.ts's own header
- * comment already establishes for the cron-only side. */
-async function triggerImmediateMoodleSync(userId: string): Promise<void> {
-  const cronSecret = process.env.MOODLE_CRON_SECRET;
-  const vercelUrl = process.env.VERCEL_URL;
-  if (!cronSecret || !vercelUrl) return;
+ * This used to go through an HTTP self-call to /api/moodle/cron-sync
+ * instead of a direct function call — real-device testing found that
+ * *nested* inside this handler's own request, that self-call stacked a
+ * second serverless invocation's duration budget on top of the first,
+ * and Vercel silently killed the outer request once its own budget ran
+ * out, regardless of any timeout value set on the inner fetch itself (no
+ * error ever reached this file's own try/catch to even log). Calling
+ * syncOneConnection directly, in-process, means this work runs inside
+ * *this* request's own single budget, no nesting — the only bound that
+ * still applies is this whole handler's own configured `maxDuration`. A
+ * student explicitly preferred a slower, reliable connect/login over a
+ * fast one that silently might not have actually synced anything. */
+async function runImmediateMoodleSync(userId: string): Promise<void> {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    console.error("Missing VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY for immediate sync");
+    return;
+  }
   try {
-    const response = await fetch(`https://${vercelUrl}/api/moodle/cron-sync`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-cron-secret": cronSecret },
-      body: JSON.stringify({ user_id: userId }),
-      signal: AbortSignal.timeout(60000),
-    });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || (result && result.failed > 0)) {
-      console.error("Immediate Moodle sync did not fully succeed", response.status, result);
-    }
+    const admin = createClient(url, serviceRoleKey) as AdminClient;
+    await syncOneConnection(admin, userId);
   } catch (err) {
     console.error("Immediate Moodle sync failed to complete", err);
+    // The next scheduled cron run still covers this connection regardless
+    // — same degrade-gracefully discipline as the rest of this file.
   }
 }
 
@@ -236,7 +229,7 @@ export const connectMoodleAccount = createServerFn({ method: "POST" })
       data: { user: callerUser },
     } = await userScopedClient.auth.getUser(accessToken);
     if (callerUser) {
-      await triggerImmediateMoodleSync(callerUser.id);
+      await runImmediateMoodleSync(callerUser.id);
     }
     return { connected: true, fullName: siteInfo.fullname };
   });
@@ -375,7 +368,7 @@ export const loginWithNustCredentials = createServerFn({ method: "POST" })
       // this file.
     }
 
-    await triggerImmediateMoodleSync(linkData.user.id);
+    await runImmediateMoodleSync(linkData.user.id);
     return { ok: true, email, loginPassword, fullName: siteInfo.fullname };
   });
 
