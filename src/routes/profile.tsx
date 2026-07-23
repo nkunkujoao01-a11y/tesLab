@@ -78,9 +78,25 @@ function Profile() {
   const downloadedMaterialCount = useDownloadedMaterialIds().size;
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const fullName = profile?.full_name || user?.email || "Student";
+  // The synthetic email a NUST-number login creates (moodle-server.ts's
+  // studentNumberToEmail) is an internal implementation detail — a real
+  // student never sees or chooses it, so it must never surface as their
+  // displayed name. profile.full_name is already set from their real
+  // Moodle name for that login path (see loginWithNustCredentials's own
+  // metadata), so this fallback should rarely even trigger for it, but
+  // guarding here too costs nothing and covers any edge case where the
+  // profile row hasn't caught up yet.
+  const isSyntheticNustEmail = (email: string | undefined) =>
+    !!email && email.endsWith("@nust-student.invalid");
+  const fullName =
+    profile?.full_name ||
+    (!isSyntheticNustEmail(user?.email) ? user?.email : undefined) ||
+    "Student";
   const university = profile?.university || "Namibia University of Science and Technology";
-  const program = profile?.program || user?.email || "";
+  // No email fallback here at all — an email address was never a sensible
+  // stand-in for "program," synthetic or real; simply nothing shows
+  // instead of a confusing raw email under the student's name.
+  const program = profile?.program || "";
   const [signingOut, setSigningOut] = useState(false);
   const lastSyncedAt = useLastSyncedAt();
   const { sync, syncing } = useManualSync();
@@ -149,9 +165,7 @@ function Profile() {
               {fullName.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="eyebrow">
-                {university}
-              </p>
+              <p className="eyebrow">{university}</p>
               <p className="mt-1 truncate font-display text-xl font-medium text-prestige-deep">
                 {fullName}
               </p>
@@ -427,10 +441,7 @@ function Profile() {
                   <p className="text-sm font-medium text-prestige-deep">
                     {signingOut ? "Signing out…" : "Sign out"}
                   </p>
-                  <ChevronRight
-                    className="h-4 w-4 text-prestige-gold"
-                    strokeWidth={2}
-                  />
+                  <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
                 </button>
               </li>
             </ul>
@@ -442,9 +453,7 @@ function Profile() {
           <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prestige-gold">
             Offline storage
           </p>
-          <p className="mt-4 font-display text-4xl">
-            {formatMb(usedMb)}
-          </p>
+          <p className="mt-4 font-display text-4xl">{formatMb(usedMb)}</p>
           <p className="text-xs text-prestige-cream/50">
             of {storageQuota.supported ? formatMb(storageQuota.quotaMb) : "device space"} used
           </p>
@@ -472,25 +481,17 @@ function Profile() {
           <div className="mt-6 grid grid-cols-2 gap-4 text-[11px]">
             {Object.entries(KIND_LABELS).map(([kind, label]) => (
               <div key={kind}>
-                <p className="uppercase tracking-widest text-prestige-cream/50">
-                  {label}
-                </p>
-                <p className="mt-1 font-display text-base">
-                  {formatMb(byKind[kind] ?? 0)}
-                </p>
+                <p className="uppercase tracking-widest text-prestige-cream/50">{label}</p>
+                <p className="mt-1 font-display text-base">{formatMb(byKind[kind] ?? 0)}</p>
               </div>
             ))}
             <div>
-              <p className="uppercase tracking-widest text-prestige-cream/50">
-                Summaries
-              </p>
+              <p className="uppercase tracking-widest text-prestige-cream/50">Summaries</p>
               <p className="mt-1 font-display text-base">{formatMb(summariesMb)}</p>
             </div>
             {otherMb > 0 && (
               <div>
-                <p className="uppercase tracking-widest text-prestige-cream/50">
-                  Other
-                </p>
+                <p className="uppercase tracking-widest text-prestige-cream/50">Other</p>
                 <p className="mt-1 font-display text-base">{formatMb(otherMb)}</p>
               </div>
             )}

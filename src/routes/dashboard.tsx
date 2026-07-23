@@ -39,8 +39,13 @@ export const Route = createFileRoute("/dashboard")({
 function Dashboard() {
   const modules = Route.useLoaderData();
   const { profile, user } = useAuth();
-  const displayName = profile?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
-  const initials = (profile?.full_name || user?.email || "?").slice(0, 2).toUpperCase();
+  // See profile.tsx's identical guard — a NUST-number login's synthetic
+  // email (moodle-server.ts's studentNumberToEmail) must never surface in
+  // the UI; profile.full_name is already set from the real Moodle name
+  // for that path, so this fallback should rarely trigger for it anyway.
+  const fallbackName = user?.email?.endsWith("@nust-student.invalid") ? undefined : user?.email;
+  const displayName = profile?.full_name?.split(" ")[0] || fallbackName?.split("@")[0] || "there";
+  const initials = (profile?.full_name || fallbackName || "?").slice(0, 2).toUpperCase();
   const downloadedIds = useDownloadedModuleIds();
   const { downloadModule, pendingIds } = useDownloadModule();
   const readMaterialIds = useReadMaterialIds();
@@ -75,9 +80,7 @@ function Dashboard() {
               className="hidden h-10 w-10 items-center justify-center rounded-full border border-border/70 text-prestige-mid transition-colors hover:text-prestige-deep lg:inline-flex"
             />
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-prestige-deep text-prestige-cream ring-2 ring-prestige-gold/25">
-              <span className="font-display text-xs font-semibold">
-                {initials}
-              </span>
+              <span className="font-display text-xs font-semibold">{initials}</span>
             </div>
           </div>
         }
@@ -222,11 +225,7 @@ function Dashboard() {
                 const completion = moduleCompletion(m.materials, m.id, readMaterialIds);
                 return (
                   <li key={m.id}>
-                    <Link
-                      to="/courses/$moduleId"
-                      params={{ moduleId: m.id }}
-                      className="block"
-                    >
+                    <Link to="/courses/$moduleId" params={{ moduleId: m.id }} className="block">
                       <p className="text-xs uppercase tracking-widest text-prestige-deep/85">
                         {m.code}
                       </p>
@@ -277,9 +276,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
       <span className="text-[10px] font-semibold uppercase tracking-widest text-prestige-mid">
         {label}
       </span>
-      <span className="font-display text-xl font-medium text-prestige-deep">
-        {value}
-      </span>
+      <span className="font-display text-xl font-medium text-prestige-deep">{value}</span>
     </div>
   );
 }

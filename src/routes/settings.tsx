@@ -195,22 +195,34 @@ function Settings() {
                 </a>
                 <details className="group text-[11px] text-muted-foreground">
                   <summary className="cursor-pointer select-none font-medium text-prestige-deep/70 hover:text-prestige-deep">
-                    What happens on that page?
+                    Exactly what you'll see on that page
                   </summary>
-                  <ol className="mt-1.5 list-decimal space-y-1 pl-4">
-                    <li>Sign in with your Google account if asked.</li>
+                  <ol className="mt-1.5 list-decimal space-y-2 pl-4">
                     <li>
-                      Click <span className="font-medium text-foreground">Create API key</span>.
+                      <span className="font-medium text-foreground">"Welcome to AI Studio"</span> —
+                      tick the agreement checkbox (you're a developer using the free API — this is
+                      normal, not a paid signup) and click{" "}
+                      <span className="font-medium text-foreground">Continue</span>. The email
+                      updates checkbox is optional, skip it if you want.
                     </li>
                     <li>
-                      Give it any name and pick a project —{" "}
-                      <span className="font-medium text-foreground">Default Gemini Project</span> is
-                      fine if you don&apos;t have one.
+                      Top right of the page, click{" "}
+                      <span className="font-medium text-foreground">+ Create API key</span>.
                     </li>
                     <li>
-                      Copy the key shown (starts with{" "}
+                      A "Create a new key" popup appears — type any name (e.g.{" "}
+                      <span className="font-medium text-foreground">Gemini API Key</span>), leave
+                      the project as{" "}
+                      <span className="font-medium text-foreground">Default Gemini Project</span>{" "}
+                      unless you already have one, then click{" "}
+                      <span className="font-medium text-foreground">Create key</span>.
+                    </li>
+                    <li>
+                      A second popup shows your new key. Click the small copy icon next to it (or
+                      select and copy the text starting with{" "}
                       <span className="font-medium text-foreground">AQ.</span> or{" "}
-                      <span className="font-medium text-foreground">AIza</span>) and paste it below.
+                      <span className="font-medium text-foreground">AIza</span>) — then come back to
+                      this page and paste it below.
                     </li>
                   </ol>
                 </details>
