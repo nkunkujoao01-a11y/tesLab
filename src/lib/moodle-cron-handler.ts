@@ -344,16 +344,47 @@ export async function handleMoodleCronSync(request: Request, env: unknown): Prom
   }
   const admin = createClient(url, serviceRoleKey) as AdminClient;
 
-  const staleBefore = new Date(Date.now() - SYNC_STALE_HOURS * 60 * 60 * 1000).toISOString();
-  const { data: due, error: dueError } = await admin.rpc(
-    "admin_list_moodle_connections_due_for_sync",
-    {
-      p_stale_before: staleBefore,
-    },
-  );
-  if (dueError) {
-    console.error("Failed to list Moodle connections due for sync", dueError);
-    return new Response("Failed to list connections", { status: 500 });
+  // An optional single-connection target (see moodle-server.ts's
+  // triggerImmediateMoodleSync) — without this, a student's own
+  // just-connected/just-logged-in sync had to wait behind *every other*
+  // student's connection that happened to also be due at that same
+  // moment, in the same request, before this endpoint even got to theirs.
+  // With enough real connections that reliably blew past the 15s bound
+  // that call sets on itself, so it silently never actually reached (or
+  // finished) that one new connection at all — this real-device testing
+  // finding is what surfaced it. The regular scheduled cron run (0018)
+  // never sends this field, so it keeps syncing everyone due, unchanged.
+  let targetUserId: string | undefined;
+  try {
+    const body: unknown = await request.json();
+    if (
+      body &&
+      typeof body === "object" &&
+      typeof (body as { user_id?: unknown }).user_id === "string"
+    ) {
+      targetUserId = (body as { user_id: string }).user_id;
+    }
+  } catch {
+    // No body, or not JSON — falls through to the normal "sync everyone
+    // due" path below, same as before this field existed.
+  }
+
+  let due: { user_id: string }[] | null;
+  if (targetUserId) {
+    due = [{ user_id: targetUserId }];
+  } else {
+    const staleBefore = new Date(Date.now() - SYNC_STALE_HOURS * 60 * 60 * 1000).toISOString();
+    const { data, error: dueError } = await admin.rpc(
+      "admin_list_moodle_connections_due_for_sync",
+      {
+        p_stale_before: staleBefore,
+      },
+    );
+    if (dueError) {
+      console.error("Failed to list Moodle connections due for sync", dueError);
+      return new Response("Failed to list connections", { status: 500 });
+    }
+    due = data;
   }
 
   let synced = 0;

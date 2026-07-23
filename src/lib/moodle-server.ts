@@ -128,14 +128,21 @@ async function moodleGetSiteInfo(token: string): Promise<MoodleSiteInfo> {
  * making the student wait up to SYNC_STALE_HOURS for their first real
  * course to show up — a brand-new (or just-reconnected) connection's
  * last_sync_at is null, which already always counts as "due," so this is
- * just pulling that forward in time, not new sync logic. A plain HTTP
- * self-call (not a direct import of moodle-cron-handler.ts) deliberately
- * keeps this client-reachable file's import graph as small as
- * moodle-sync-server.ts's own header comment already establishes for the
- * cron-only side. Bounded with a timeout so a slow/busy sync run can never
- * hang the connect response itself — on timeout or any failure, the next
- * scheduled cron run still covers this connection regardless. */
-async function triggerImmediateMoodleSync(): Promise<void> {
+ * just pulling that forward in time, not new sync logic. Passing
+ * `user_id` scopes this call to *just* this one connection (see
+ * handleMoodleCronSync's own comment) — real-device testing found that
+ * without it, this call synced *every* connection due at that moment, in
+ * one request, and reliably blew past its own timeout with more than a
+ * couple of real connections in play, silently never reaching (or
+ * finishing) the one connection this call actually exists for. A plain
+ * HTTP self-call (not a direct import of moodle-cron-handler.ts)
+ * deliberately keeps this client-reachable file's import graph as small
+ * as moodle-sync-server.ts's own header comment already establishes for
+ * the cron-only side. Still bounded with a timeout so a slow/busy sync
+ * can never hang the connect/login response itself — on timeout or any
+ * failure, the next scheduled cron run still covers this connection
+ * regardless. */
+async function triggerImmediateMoodleSync(userId: string): Promise<void> {
   const cronSecret = process.env.MOODLE_CRON_SECRET;
   const vercelUrl = process.env.VERCEL_URL;
   if (!cronSecret || !vercelUrl) return;
@@ -143,8 +150,8 @@ async function triggerImmediateMoodleSync(): Promise<void> {
     await fetch(`https://${vercelUrl}/api/moodle/cron-sync`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-cron-secret": cronSecret },
-      body: "{}",
-      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ user_id: userId }),
+      signal: AbortSignal.timeout(25000),
     });
   } catch (err) {
     console.error("Best-effort immediate Moodle sync failed to trigger", err);
@@ -211,7 +218,16 @@ export const connectMoodleAccount = createServerFn({ method: "POST" })
       return { connected: false, reason: "unexpected" };
     }
 
-    await triggerImmediateMoodleSync();
+    // getUser(jwt) validates/introspects the caller's own token directly —
+    // no local session needed on this server-side client, just the id it
+    // already asserts via that same token save_moodle_connection above
+    // ran under.
+    const {
+      data: { user: callerUser },
+    } = await userScopedClient.auth.getUser(accessToken);
+    if (callerUser) {
+      await triggerImmediateMoodleSync(callerUser.id);
+    }
     return { connected: true, fullName: siteInfo.fullname };
   });
 
@@ -349,7 +365,7 @@ export const loginWithNustCredentials = createServerFn({ method: "POST" })
       // this file.
     }
 
-    await triggerImmediateMoodleSync();
+    await triggerImmediateMoodleSync(linkData.user.id);
     return { ok: true, email, loginPassword, fullName: siteInfo.fullname };
   });
 
