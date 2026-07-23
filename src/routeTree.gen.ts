@@ -33,6 +33,7 @@ import { Route as CoursesMoodleIndexRouteImport } from './routes/courses.moodle.
 import { Route as CoursesModuleIdIndexRouteImport } from './routes/courses.$moduleId.index'
 import { Route as AdminModulesIndexRouteImport } from './routes/admin.modules.index'
 import { Route as DocumentsCollectionsCollectionIdRouteImport } from './routes/documents.collections.$collectionId'
+import { Route as DocumentsDocIdViewRouteImport } from './routes/documents.$docId.view'
 import { Route as DocumentsDocIdSummaryRouteImport } from './routes/documents.$docId.summary'
 import { Route as DocumentsDocIdQuizRouteImport } from './routes/documents.$docId.quiz'
 import { Route as DocumentsDocIdNotesRouteImport } from './routes/documents.$docId.notes'
@@ -172,6 +173,11 @@ const DocumentsCollectionsCollectionIdRoute =
     path: '/collections/$collectionId',
     getParentRoute: () => DocumentsRoute,
   } as any)
+const DocumentsDocIdViewRoute = DocumentsDocIdViewRouteImport.update({
+  id: '/view',
+  path: '/view',
+  getParentRoute: () => DocumentsDocIdRoute,
+} as any)
 const DocumentsDocIdSummaryRoute = DocumentsDocIdSummaryRouteImport.update({
   id: '/summary',
   path: '/summary',
@@ -296,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/quiz': typeof DocumentsDocIdQuizRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
+  '/documents/$docId/view': typeof DocumentsDocIdViewRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
@@ -334,6 +341,7 @@ export interface FileRoutesByTo {
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/quiz': typeof DocumentsDocIdQuizRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
+  '/documents/$docId/view': typeof DocumentsDocIdViewRoute
   '/admin/modules': typeof AdminModulesIndexRoute
   '/courses/$moduleId': typeof CoursesModuleIdIndexRoute
   '/courses/moodle': typeof CoursesMoodleIndexRoute
@@ -377,6 +385,7 @@ export interface FileRoutesById {
   '/documents/$docId/notes': typeof DocumentsDocIdNotesRoute
   '/documents/$docId/quiz': typeof DocumentsDocIdQuizRoute
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
+  '/documents/$docId/view': typeof DocumentsDocIdViewRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
@@ -422,6 +431,7 @@ export interface FileRouteTypes {
     | '/documents/$docId/notes'
     | '/documents/$docId/quiz'
     | '/documents/$docId/summary'
+    | '/documents/$docId/view'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
     | '/courses/$moduleId/'
@@ -460,6 +470,7 @@ export interface FileRouteTypes {
     | '/documents/$docId/notes'
     | '/documents/$docId/quiz'
     | '/documents/$docId/summary'
+    | '/documents/$docId/view'
     | '/admin/modules'
     | '/courses/$moduleId'
     | '/courses/moodle'
@@ -502,6 +513,7 @@ export interface FileRouteTypes {
     | '/documents/$docId/notes'
     | '/documents/$docId/quiz'
     | '/documents/$docId/summary'
+    | '/documents/$docId/view'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
     | '/courses/$moduleId/'
@@ -704,6 +716,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocumentsCollectionsCollectionIdRouteImport
       parentRoute: typeof DocumentsRoute
     }
+    '/documents/$docId/view': {
+      id: '/documents/$docId/view'
+      path: '/view'
+      fullPath: '/documents/$docId/view'
+      preLoaderRoute: typeof DocumentsDocIdViewRouteImport
+      parentRoute: typeof DocumentsDocIdRoute
+    }
     '/documents/$docId/summary': {
       id: '/documents/$docId/summary'
       path: '/summary'
@@ -889,6 +908,7 @@ interface DocumentsDocIdRouteChildren {
   DocumentsDocIdNotesRoute: typeof DocumentsDocIdNotesRoute
   DocumentsDocIdQuizRoute: typeof DocumentsDocIdQuizRoute
   DocumentsDocIdSummaryRoute: typeof DocumentsDocIdSummaryRoute
+  DocumentsDocIdViewRoute: typeof DocumentsDocIdViewRoute
   DocumentsDocIdIndexRoute: typeof DocumentsDocIdIndexRoute
 }
 
@@ -898,6 +918,7 @@ const DocumentsDocIdRouteChildren: DocumentsDocIdRouteChildren = {
   DocumentsDocIdNotesRoute: DocumentsDocIdNotesRoute,
   DocumentsDocIdQuizRoute: DocumentsDocIdQuizRoute,
   DocumentsDocIdSummaryRoute: DocumentsDocIdSummaryRoute,
+  DocumentsDocIdViewRoute: DocumentsDocIdViewRoute,
   DocumentsDocIdIndexRoute: DocumentsDocIdIndexRoute,
 }
 

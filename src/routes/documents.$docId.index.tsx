@@ -7,6 +7,7 @@ import {
   Copy,
   Download,
   FileDown,
+  FileText,
   Folder,
   Layers,
   ListChecks,
@@ -190,14 +191,24 @@ function DocumentDetail() {
         )}
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {originalFile && (
-            <button
-              type="button"
-              onClick={downloadOriginal}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium text-prestige-mid ring-1 ring-border/70 transition-colors hover:bg-secondary hover:text-prestige-deep"
-            >
-              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Download original PDF
-            </button>
+            <>
+              <Link
+                to="/documents/$docId/view"
+                params={{ docId }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-prestige-deep px-3 py-1.5 text-[11px] font-semibold text-prestige-cream transition-transform active:scale-[0.97]"
+              >
+                <FileText className="h-3.5 w-3.5" strokeWidth={1.75} />
+                View PDF
+              </Link>
+              <button
+                type="button"
+                onClick={downloadOriginal}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium text-prestige-mid ring-1 ring-border/70 transition-colors hover:bg-secondary hover:text-prestige-deep"
+              >
+                <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Download original PDF
+              </button>
+            </>
           )}
           <button
             type="button"
