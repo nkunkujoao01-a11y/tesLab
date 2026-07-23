@@ -227,9 +227,24 @@ export function useDownloadMaterial() {
   return { downloadMaterial, pendingIds };
 }
 
+// This hook runs inside MobileShell, which every route's own component
+// wraps itself in (not a persistent layout route) — so it fully remounts,
+// and this liveQuery fully re-subscribes, on *every single navigation*
+// anywhere in the app. Two things made that genuinely felt slow on real
+// devices: (1) starting from a hardcoded 0 every time meant a visible
+// "0 → real number" flash on every page, which (2) also made
+// useStorageQuota (MobileShell's own caller, keyed off this value) refire
+// navigator.storage.estimate() an extra, redundant time per navigation —
+// a real browser API call, not free. Caching the last real value per user
+// (module-level, not component state, so it survives the remount) means a
+// navigation that hasn't actually changed storage usage renders the exact
+// same number immediately and never re-triggers that second estimate()
+// call at all.
+const lastUsedMbByUser = new Map<string, number>();
+
 export function useStorageUsageMb(): number {
   const { user } = useAuth();
-  const [usedMb, setUsedMb] = useState(0);
+  const [usedMb, setUsedMb] = useState(() => (user ? (lastUsedMbByUser.get(user.id) ?? 0) : 0));
 
   useEffect(() => {
     if (!user) {
@@ -238,10 +253,21 @@ export function useStorageUsageMb(): number {
     }
     const db = getUserDb(user.id);
     const sub = liveQuery(async () => {
-      const [modules, materials, documentFiles] = await Promise.all([
+      const [modules, materials, documents] = await Promise.all([
         db.downloadedModules.toArray(),
         db.downloadedMaterials.toArray(),
-        db.personalDocumentFiles.toArray(),
+        // Personal documents' own row (id, sizeMb, text, …), not
+        // personalDocumentFiles — same sizeMb value was already recorded
+        // on both at upload time (see useUploadDocument), but this table
+        // never carries the original file's raw Blob, so a full scan here
+        // is real IndexedDB rows without ever touching blob-backed ones.
+        // The one accuracy tradeoff: if a document's original file failed
+        // to save (a storage-quota edge case — see PersonalDocumentFile's
+        // own comment), this still counts its declared size even though
+        // that blob was never actually stored — a small overestimate in a
+        // rare case, traded for never scanning blob rows on every single
+        // page navigation.
+        db.personalDocuments.toArray(),
       ]);
       const downloadedModuleIds = new Set(modules.map((m) => m.moduleId));
       const modulesMb = modules.reduce((sum, m) => sum + m.sizeMb, 0);
@@ -251,13 +277,13 @@ export function useStorageUsageMb(): number {
       const standaloneMaterialsMb = materials
         .filter((m) => !downloadedModuleIds.has(m.moduleId))
         .reduce((sum, m) => sum + m.sizeMb, 0);
-      // The original files behind uploaded personal documents — a real
-      // extra footprint on top of their already-counted extracted text
-      // (which is small enough to not matter), see PersonalDocumentFile.
-      const documentFilesMb = documentFiles.reduce((sum, f) => sum + f.sizeMb, 0);
-      return modulesMb + standaloneMaterialsMb + documentFilesMb;
+      const documentsMb = documents.reduce((sum, d) => sum + d.sizeMb, 0);
+      return modulesMb + standaloneMaterialsMb + documentsMb;
     }).subscribe({
-      next: setUsedMb,
+      next: (value) => {
+        lastUsedMbByUser.set(user.id, value);
+        setUsedMb(value);
+      },
       error: (err) => console.error("Failed to compute storage usage", err),
     });
     return () => sub.unsubscribe();
