@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -62,7 +62,17 @@ export function AiContentTabStrip({
  * fine without them" precedent as QuizPanel's own `attempts`/`onSubmit`)
  * — before this, a flashcard deck was pure flip-through with no learning
  * signal captured at all; rating a card after seeing its answer is what
- * lets a real "known" count exist anywhere in this app. */
+ * lets a real "known" count exist anywhere in this app.
+ *
+ * A light spaced-repetition ordering, not a full date-scheduled system:
+ * cards never rated come first, "Still learning" cards next, "I knew
+ * this" cards last — so opening the same deck again naturally surfaces
+ * whatever needs practice before what's already solid. The priority order
+ * is snapshotted once per mount (`initialReviews`), not recomputed live
+ * off every rating — reordering the deck under a student's feet mid-
+ * session, right as they rate a card, would be disorienting; freezing it
+ * to "how things stood when I opened this deck" means the reordering
+ * only ever happens between sessions, which is exactly when it should. */
 export function FlashcardDeck({
   cards,
   reviews,
@@ -73,16 +83,28 @@ export function FlashcardDeck({
   reviews?: Record<number, boolean>;
   onReview?: (cardIndex: number, knew: boolean) => void;
 }) {
-  const [index, setIndex] = useState(0);
+  const [initialReviews] = useState(reviews);
+  const displayOrder = useMemo(() => {
+    const priority = (cardIndex: number): number => {
+      const rating = initialReviews?.[cardIndex];
+      if (rating === undefined) return 0;
+      return rating ? 2 : 1;
+    };
+    return cards.map((_, i) => i).sort((a, b) => priority(a) - priority(b));
+  }, [cards, initialReviews]);
+  const wasReordered = initialReviews && Object.keys(initialReviews).length > 0;
+
+  const [position, setPosition] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const card = cards[index];
-  const cardRating = reviews?.[index];
+  const cardIndex = displayOrder[position];
+  const card = cards[cardIndex];
+  const cardRating = reviews?.[cardIndex];
   const knownCount = reviews ? Object.values(reviews).filter(Boolean).length : 0;
   const reviewedCount = reviews ? Object.keys(reviews).length : 0;
 
   const goTo = (next: number) => {
     setFlipped(false);
-    setIndex(Math.max(0, Math.min(cards.length - 1, next)));
+    setPosition(Math.max(0, Math.min(cards.length - 1, next)));
   };
 
   return (
@@ -93,9 +115,14 @@ export function FlashcardDeck({
         </p>
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
           {reviews && reviewedCount > 0 && `${knownCount}/${cards.length} known · `}
-          {index + 1} / {cards.length}
+          {position + 1} / {cards.length}
         </p>
       </div>
+      {wasReordered && position === 0 && (
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
+          Showing cards you're still learning first.
+        </p>
+      )}
       <button
         type="button"
         onClick={() => setFlipped((f) => !f)}
@@ -123,7 +150,7 @@ export function FlashcardDeck({
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => onReview(index, false)}
+            onClick={() => onReview(cardIndex, false)}
             className={cn(
               "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-semibold ring-1 transition-all active:scale-[0.97]",
               cardRating === false
@@ -136,7 +163,7 @@ export function FlashcardDeck({
           </button>
           <button
             type="button"
-            onClick={() => onReview(index, true)}
+            onClick={() => onReview(cardIndex, true)}
             className={cn(
               "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-semibold ring-1 transition-all active:scale-[0.97]",
               cardRating === true
@@ -153,8 +180,8 @@ export function FlashcardDeck({
       <div className="mt-3 flex items-center justify-between gap-3">
         <button
           type="button"
-          disabled={index === 0}
-          onClick={() => goTo(index - 1)}
+          disabled={position === 0}
+          onClick={() => goTo(position - 1)}
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97] disabled:opacity-40"
         >
           <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -162,8 +189,8 @@ export function FlashcardDeck({
         </button>
         <button
           type="button"
-          disabled={index === cards.length - 1}
-          onClick={() => goTo(index + 1)}
+          disabled={position === cards.length - 1}
+          onClick={() => goTo(position + 1)}
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-prestige-deep ring-1 ring-border/60 transition-all hover:bg-secondary active:scale-[0.97] disabled:opacity-40"
         >
           Next
