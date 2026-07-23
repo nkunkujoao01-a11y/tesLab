@@ -1,10 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Bot, FileText, Loader2, Send, Sparkles, Trash2, User } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  FileText,
+  Loader2,
+  Send,
+  Sparkles,
+  Trash2,
+  TriangleAlert,
+  User,
+} from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
-import { useChatModelStatus } from "@/hooks/use-ai-chat";
+import {
+  useChatModelStatus,
+  useThinkingLabel,
+  useStaleAiOperationWarning,
+} from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import {
@@ -45,6 +59,8 @@ function CollectionChat() {
   const modelStatus = useChatModelStatus();
   const messages = useCollectionMessages(collectionId);
   const { sendMessage, sending, streamingText } = useSendCollectionMessage(collectionId, members);
+  const thinkingLabel = useThinkingLabel(sending);
+  const staleAiOperation = useStaleAiOperationWarning();
   const { clearConversation } = useClearCollectionConversation(collectionId);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -146,6 +162,17 @@ function CollectionChat() {
       ) : (
         <>
           <div className="space-y-4 px-6 pb-28 lg:px-10">
+            {staleAiOperation && (
+              <div className="animate-rise flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+                <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                <p>
+                  The AI didn't finish {staleAiOperation.op === "load" ? "loading" : "generating"}{" "}
+                  {staleAiOperation.modelLabel} last time — this can happen if the app closed or
+                  crashed. If that keeps happening, try a smaller model in Profile &gt; AI Settings,
+                  or connect a free cloud AI key so answers don't rely on this device at all.
+                </p>
+              </div>
+            )}
             {cloudChatReady && modelStatus !== "ready" && (
               <div className="animate-rise flex items-start gap-2.5 rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">
                 <Sparkles
@@ -205,7 +232,7 @@ function CollectionChat() {
                   {streamingText || (
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
-                      Thinking…
+                      {thinkingLabel}
                     </span>
                   )}
                 </div>

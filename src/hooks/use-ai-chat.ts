@@ -319,6 +319,50 @@ export function useStaleAiOperationWarning(): StaleAiBreadcrumb | null {
   return breadcrumb;
 }
 
+// Staged "still working" copy for a chat send in flight — see
+// useThinkingLabel below. Times are deliberately well under
+// DEFAULT_TIMEOUT_MS (ai-worker-client.ts, 180s): the goal is to keep a
+// genuinely slow-but-working on-device generation from *reading* as
+// frozen long before it would ever hit that real timeout, not to predict
+// when it'll actually finish.
+const THINKING_STAGES: { afterMs: number; label: string }[] = [
+  { afterMs: 0, label: "Thinking…" },
+  { afterMs: 12_000, label: "Still thinking — this can take a while on some phones…" },
+  {
+    afterMs: 40_000,
+    label: "Still working — the on-device model is slow on older/budget phones. Almost there…",
+  },
+];
+
+/** Staged copy for a "Thinking…" indicator that escalates the longer
+ * `active` stays true, instead of one static label for the model's whole
+ * (potentially minutes-long) on-device generation time. Found to matter
+ * from real user reports: a flat, unchanging "Thinking…" for a long
+ * on-device generation reads as the app having frozen or crashed, even
+ * when it's still genuinely working — see DEFAULT_TIMEOUT_MS's own
+ * comment on why on-device generation time is real but currently
+ * unbounded-feeling. Resets to the first stage every time `active` toggles
+ * back on, so a second, later send starts the escalation over rather than
+ * picking up wherever the first one left off. */
+export function useThinkingLabel(active: boolean): string {
+  const [label, setLabel] = useState(THINKING_STAGES[0].label);
+
+  useEffect(() => {
+    if (!active) {
+      setLabel(THINKING_STAGES[0].label);
+      return;
+    }
+    const timers = THINKING_STAGES.slice(1).map((stage) =>
+      setTimeout(() => setLabel(stage.label), stage.afterMs),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [active]);
+
+  return label;
+}
+
 export function useClearAssistantConversation() {
   const { user } = useAuth();
 

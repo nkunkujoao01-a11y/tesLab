@@ -80,7 +80,18 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
     id: "onnx-community/SmolLM2-360M-Instruct-ONNX",
     dtype: "fp32",
     label: "SmolLM2 (360M)",
-    description: "Small and fast — the default. Good for quick answers and quiz generation.",
+    // Honest despite being the default: the fp32 requirement above (the
+    // one dtype that avoids the GatherBlockQuantized crash — see that
+    // comment) makes this the *larger* download of the two options and,
+    // being full-precision, genuinely slower to run than a quantized model
+    // this size would be. "Small and fast" described the model's parameter
+    // count, not its real on-device footprint — real user reports of slow,
+    // freezing, or crashing generation are consistent with asking a
+    // budget/older phone to run 1.45GB of full-precision math. If that's
+    // happening, a connected free cloud AI key (Settings) skips on-device
+    // generation entirely.
+    description:
+      "The default — chosen for reliability, not speed. Runs at full precision to avoid a real crash bug in smaller, quantized exports, which makes it a genuinely large, slow download on older or budget phones. If it's freezing or crashing, connect a free cloud AI key in Settings instead of relying on this device.",
     approxSizeMb: 1450,
   },
   // Real-device testing also reported the device crashing during this
@@ -98,8 +109,13 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
     id: "onnx-community/gemma-3-1b-it-ONNX",
     dtype: "q4",
     label: "Gemma 3 (1B)",
+    // "Larger and more capable" is still true (nearly 3x the parameters),
+    // but the old "more than double the download size" line is no longer
+    // accurate now that SmolLM2 was forced to fp32 (1450MB) — this q4
+    // export is actually the *smaller* download of the two. Corrected
+    // rather than left stale.
     description:
-      "Larger and more capable, at more than double the download size. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
+      "More capable (nearly 3x the parameters), and actually a smaller download than the default thanks to quantization. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
     approxSizeMb: 859,
   },
 };
