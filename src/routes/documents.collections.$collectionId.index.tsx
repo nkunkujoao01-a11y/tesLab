@@ -290,10 +290,12 @@ function CollectionDetail() {
         <div className="mt-6 h-px w-full bg-prestige-deep/10" />
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
+          {/* See documents.index.tsx's identical comment — no `accept`
+           * filter, since it can hide/block genuine PDFs from the native
+           * picker entirely on some Android devices/storage providers. */}
           <input
             id="collection-pdf-upload"
             type="file"
-            accept="application/pdf,.pdf"
             className="sr-only"
             onChange={handleFileChange}
             disabled={status === "extracting"}

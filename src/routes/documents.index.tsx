@@ -132,10 +132,16 @@ function DocumentsIndex() {
         title="Your own PDFs, extracted on-device"
         action={
           <div>
+            {/* No `accept` filter — real Android testing found it can hide
+             * or block genuine PDFs from the native picker entirely
+             * (some storage providers don't report a MIME type the
+             * filter recognizes), which reads as "the app doesn't accept
+             * PDFs" even though a real PDF was picked. Any non-PDF that
+             * slips through already gets a clear, specific error from
+             * extractPdfText (pdf-extract.ts) instead. */}
             <input
               id="documents-pdf-upload"
               type="file"
-              accept="application/pdf,.pdf"
               className="sr-only"
               onChange={handleFileChange}
               disabled={status === "extracting"}
