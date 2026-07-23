@@ -10,6 +10,8 @@ import {
   useSendAssistantMessage,
   useClearAssistantConversation,
 } from "@/hooks/use-ai-chat";
+import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +30,8 @@ export const Route = createFileRoute("/assistant")({
       { title: "Ask AI — eLearn" },
       {
         name: "description",
-        content: "A study assistant that runs entirely on your device — works offline.",
+        content:
+          "A study assistant that answers via your connected cloud AI, or on-device offline.",
       },
     ],
   }),
@@ -43,6 +46,18 @@ function Assistant() {
   const { clearConversation } = useClearAssistantConversation();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // A connected, enabled cloud key with real internet can serve every chat
+  // turn without the on-device model ever being downloaded — see
+  // courses.$moduleId.read.$docId.tsx's identical comment for why quiz
+  // generation used to wrongly gate on chatModelReady alone; this page had
+  // the same gap, but worse: it blocked the whole chat UI behind a forced
+  // download prompt instead of just one disabled button.
+  const { connected: cloudConnected } = useCloudAiKey();
+  const [cloudEnabled] = useCloudAiEnabled();
+  const isOnline = useOnlineStatus();
+  const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
+  const chatReady = modelStatus === "ready" || cloudChatReady;
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -93,12 +108,24 @@ function Assistant() {
         }
       />
 
-      {modelStatus !== "ready" ? (
+      {!chatReady ? (
         <ChatModelDownloadPrompt />
       ) : (
         <>
           <div className="space-y-4 px-6 pb-28 lg:px-10">
-            {!offlineCapable && (
+            {cloudChatReady && modelStatus !== "ready" && (
+              <div className="animate-rise flex items-start gap-2.5 rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">
+                <Sparkles
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-prestige-gold"
+                  strokeWidth={1.75}
+                />
+                <p>
+                  Answering with your connected cloud AI — going offline will need the on-device
+                  model instead.
+                </p>
+              </div>
+            )}
+            {modelStatus === "ready" && !offlineCapable && (
               <div className="animate-rise flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 <p>
@@ -111,8 +138,8 @@ function Assistant() {
               <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
                 <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about your coursework, or anything else — this runs entirely on your device,
-                  online or offline.
+                  Ask about your coursework, or anything else — answered by your connected cloud AI
+                  when you're online, or on-device when you're not.
                 </p>
               </div>
             )}

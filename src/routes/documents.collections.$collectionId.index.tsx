@@ -294,8 +294,8 @@ function CollectionDetail() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf"
-            className="hidden"
+            accept="application/pdf,.pdf"
+            className="sr-only"
             onChange={handleFileChange}
           />
           <button

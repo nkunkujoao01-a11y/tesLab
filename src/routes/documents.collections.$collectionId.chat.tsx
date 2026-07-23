@@ -5,6 +5,8 @@ import { MobileShell } from "@/components/MobileShell";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
 import { useChatModelStatus } from "@/hooks/use-ai-chat";
+import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import {
   useCollectionMessages,
   useSendCollectionMessage,
@@ -46,6 +48,15 @@ function CollectionChat() {
   const { clearConversation } = useClearCollectionConversation(collectionId);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // See assistant.tsx's identical comment — a connected, enabled cloud key
+  // with real internet can serve this chat too, without the on-device
+  // model ever being downloaded.
+  const { connected: cloudConnected } = useCloudAiKey();
+  const [cloudEnabled] = useCloudAiEnabled();
+  const isOnline = useOnlineStatus();
+  const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
+  const chatReady = modelStatus === "ready" || cloudChatReady;
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -130,18 +141,29 @@ function CollectionChat() {
             </Link>
           </div>
         </div>
-      ) : modelStatus !== "ready" ? (
+      ) : !chatReady ? (
         <ChatModelDownloadPrompt />
       ) : (
         <>
           <div className="space-y-4 px-6 pb-28 lg:px-10">
+            {cloudChatReady && modelStatus !== "ready" && (
+              <div className="animate-rise flex items-start gap-2.5 rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">
+                <Sparkles
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-prestige-gold"
+                  strokeWidth={1.75}
+                />
+                <p>
+                  Answering with your connected cloud AI — going offline will need the on-device
+                  model instead.
+                </p>
+              </div>
+            )}
             {messages.length === 0 && !streamingText && (
               <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
                 <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
                 <p className="mt-3 text-sm text-muted-foreground">
                   Ask about {members.length === 1 ? "this document" : "these documents"} — answers
-                  are grounded in {members.length === 1 ? "its" : "their"} actual text, running
-                  entirely on your device.
+                  are grounded in {members.length === 1 ? "its" : "their"} actual text.
                 </p>
               </div>
             )}

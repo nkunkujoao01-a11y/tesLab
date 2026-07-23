@@ -19,6 +19,7 @@ import {
   checkAndConsumeStaleAiBreadcrumb,
   type StaleAiBreadcrumb,
 } from "@/lib/ai-crash-breadcrumb";
+import { callGeminiWithPrompt, CloudUnavailableError } from "@/lib/ai-cloud";
 
 const SETTING_KEY = "ai_chat_model_downloaded";
 // Separate from SETTING_KEY: whether the download actually persisted for
@@ -219,6 +220,19 @@ const SYSTEM_PROMPT =
 // each turn rather than sending the whole conversation forever.
 const MAX_HISTORY_MESSAGES = 10;
 
+// Gemini's generateContent (called via callGeminiWithPrompt) takes one
+// prompt string, not a native multi-turn `contents` array — this app's own
+// system prompt + a plain transcript does the same job without adding a
+// second, chat-specific call shape to ai-cloud.ts just for this one caller.
+function buildCloudChatPrompt(turns: ChatTurn[]): string {
+  const system = turns.find((t) => t.role === "system")?.content ?? "";
+  const transcript = turns
+    .filter((t) => t.role !== "system")
+    .map((t) => `${t.role === "user" ? "Student" : "Assistant"}: ${t.content}`)
+    .join("\n\n");
+  return `${system}\n\n${transcript}\n\nAssistant:`;
+}
+
 export function useSendAssistantMessage() {
   const { user } = useAuth();
   const [sending, setSending] = useState(false);
@@ -246,9 +260,24 @@ export function useSendAssistantMessage() {
           { role: "system", content: SYSTEM_PROMPT },
           ...recent.map((m) => ({ role: m.role, content: m.content }) as ChatTurn),
         ];
-        const response = await askChatModel(turns, (piece) =>
-          setStreamingText((prev) => prev + piece),
-        );
+
+        // Cloud-first, same discipline as summaries/quiz/flashcards
+        // (use-quiz.ts, summarize-structured.ts) — try the student's own
+        // connected Gemini key first, fall straight through to the
+        // on-device model on any failure (offline, no key, disabled,
+        // rate-limited, network error all surface as CloudUnavailableError).
+        let response: string | undefined;
+        try {
+          response = await callGeminiWithPrompt(buildCloudChatPrompt(turns), user.id);
+          setStreamingText(response);
+        } catch (err) {
+          if (!(err instanceof CloudUnavailableError)) {
+            console.error("Unexpected error calling cloud AI for chat", err);
+          }
+        }
+        if (response === undefined) {
+          response = await askChatModel(turns, (piece) => setStreamingText((prev) => prev + piece));
+        }
         await db.assistantMessages.put({
           id: crypto.randomUUID(),
           role: "assistant",

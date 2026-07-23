@@ -5,6 +5,7 @@ import { getUserDb, type CollectionMessage } from "@/lib/db";
 import { askChatModel, type ChatTurn } from "@/lib/ai-chat";
 import { retrieveRelevantChunks, type RetrievableDocument } from "@/lib/retrieval";
 import { useAuth } from "@/hooks/use-auth";
+import { callGeminiWithPrompt, CloudUnavailableError } from "@/lib/ai-cloud";
 
 function collectionMessageKey(collectionId: string, id: string): string {
   return `${collectionId}::${id}`;
@@ -42,6 +43,18 @@ const BASE_INSTRUCTIONS =
 // a limited practical context window and gets slower with every extra
 // token sent.
 const MAX_HISTORY_MESSAGES = 10;
+
+// Same reasoning as use-ai-chat.ts's identical helper — Gemini's
+// generateContent takes one prompt string, not a native multi-turn
+// `contents` array.
+function buildCloudChatPrompt(turns: ChatTurn[]): string {
+  const system = turns.find((t) => t.role === "system")?.content ?? "";
+  const transcript = turns
+    .filter((t) => t.role !== "system")
+    .map((t) => `${t.role === "user" ? "Student" : "Assistant"}: ${t.content}`)
+    .join("\n\n");
+  return `${system}\n\n${transcript}\n\nAssistant:`;
+}
 
 // See isConfident below — a chunk scoring 1 shares only a single word with
 // the question, easy to hit by coincidence (a name, a stray noun) rather
@@ -123,7 +136,20 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
             { role: "system", content: systemContent },
             ...recent.map((m) => ({ role: m.role, content: m.content }) as ChatTurn),
           ];
-          response = await askChatModel(turns, (piece) => setStreamingText((prev) => prev + piece));
+
+          // Cloud-first — see use-ai-chat.ts's identical comment.
+          let cloudResponse: string | undefined;
+          try {
+            cloudResponse = await callGeminiWithPrompt(buildCloudChatPrompt(turns), user.id);
+            setStreamingText(cloudResponse);
+          } catch (err) {
+            if (!(err instanceof CloudUnavailableError)) {
+              console.error("Unexpected error calling cloud AI for collection chat", err);
+            }
+          }
+          response =
+            cloudResponse ??
+            (await askChatModel(turns, (piece) => setStreamingText((prev) => prev + piece)));
         }
 
         const assistantMessageId = crypto.randomUUID();
