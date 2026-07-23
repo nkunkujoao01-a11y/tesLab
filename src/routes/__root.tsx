@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
 import { useAutoSync } from "@/hooks/use-sync";
 import { usePrecacheRoutes } from "@/hooks/use-precache-routes";
+import { useDeadlineReminders, useStreakReminder } from "@/hooks/use-reminder-notifications";
 import { Toaster } from "@/components/ui/sonner";
 import { WelcomeTour } from "@/components/WelcomeTour";
 import { ByokPrompt } from "@/components/ByokPrompt";
@@ -157,6 +158,16 @@ function PrecacheRoutes() {
   return null;
 }
 
+// Same shape again — see use-reminder-notifications.ts. Two separate
+// hooks (deadlines, streak) rather than one combined hook, since they
+// read from unrelated data sources (assignments vs. activity events) and
+// have nothing to share.
+function ReminderNotifications() {
+  useDeadlineReminders();
+  useStreakReminder();
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -173,6 +184,7 @@ function RootComponent() {
       <AuthProvider>
         <AutoSync />
         <PrecacheRoutes />
+        <ReminderNotifications />
         <Outlet />
         <WelcomeTour />
         <ByokPrompt />
