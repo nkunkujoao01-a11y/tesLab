@@ -15,11 +15,15 @@ type ReadingWidthControlProps = {
 /** A small segmented control for the reading column's width (see
  * use-reading-width.ts) — shared between the personal-document and
  * catalog-material reading pages, which otherwise duplicate the same
- * `<article>` width styling. */
+ * `<article>` width styling. Desktop-only (`hidden lg:inline-flex`): a
+ * fixed reading column already fills the screen edge-to-edge on mobile/
+ * tablet, so narrow/medium/wide has nothing real to change there — it
+ * only does something once the column has spare horizontal room to grow
+ * into, which starts at the `lg:` breakpoint. */
 export function ReadingWidthControl({ width, onChange, className }: ReadingWidthControlProps) {
   return (
     <div
-      className={`inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-secondary p-0.5 ${className ?? ""}`}
+      className={`hidden shrink-0 items-center gap-0.5 rounded-lg bg-secondary p-0.5 lg:inline-flex ${className ?? ""}`}
     >
       {OPTIONS.map((opt) => (
         <button

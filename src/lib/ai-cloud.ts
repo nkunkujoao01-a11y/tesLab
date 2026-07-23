@@ -151,14 +151,19 @@ async function getDecryptedKey(): Promise<string | null> {
 
 export type CloudGenerationKind = "quiz" | "flashcards" | "notes" | "summary";
 
-const PROMPTS: Record<CloudGenerationKind, (sourceText: string) => string> = {
-  quiz: (sourceText) =>
-    `Write 3 multiple-choice questions testing understanding of the study notes below. ` +
+const PROMPTS: Record<CloudGenerationKind, (sourceText: string, count?: number) => string> = {
+  // `count` (from quiz-gen.ts's pickQuizQuestionCount/pickFlashcardCount)
+  // varies the deck/quiz size per generation run rather than a fixed
+  // number every time — a student-requested change. Defaults (3, 10) only
+  // matter if a future caller ever omits it; every real call site passes
+  // one explicitly.
+  quiz: (sourceText, count = 3) =>
+    `Write exactly ${count} multiple-choice questions testing understanding of the study notes below. ` +
     `Respond with ONLY a JSON array, no other text, matching this shape exactly: ` +
     `[{"question": string, "options": [string, string, string, string], "correctIndex": number}]. ` +
     `Study notes:\n${sourceText}`,
-  flashcards: (sourceText) =>
-    `Write up to 10 flashcards (front/back pairs) covering the key concepts in the study notes below. ` +
+  flashcards: (sourceText, count = 10) =>
+    `Write exactly ${count} flashcards (front/back pairs) covering the key concepts in the study notes below. ` +
     `Respond with ONLY a JSON array, no other text, matching this shape exactly: ` +
     `[{"front": string, "back": string}]. ` +
     `Study notes:\n${sourceText}`,
@@ -243,8 +248,9 @@ export function generateViaCloud(
   kind: CloudGenerationKind,
   sourceText: string,
   userId: string,
+  count?: number,
 ): Promise<string> {
-  return callGeminiWithPrompt(PROMPTS[kind](sourceText), userId);
+  return callGeminiWithPrompt(PROMPTS[kind](sourceText, count), userId);
 }
 
 /** Strips a ```json fenced code block if Gemini wrapped its response in

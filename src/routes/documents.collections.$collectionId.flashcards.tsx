@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download, Layers } from "lucide-react";
-import { useDocumentCollection } from "@/hooks/use-documents";
-import { useFlashcardSet } from "@/hooks/use-quiz";
+import { ArrowLeft, ArrowUpRight, Download, Layers, Loader2, RefreshCw } from "lucide-react";
+import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
+import { useFlashcardSet, useGenerateFlashcards } from "@/hooks/use-quiz";
 import { buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { FlashcardDeck } from "@/components/QuizFlashcards";
@@ -25,6 +25,14 @@ function CollectionFlashcardsPage() {
   const { collectionId } = Route.useParams();
   const collection = useDocumentCollection(collectionId);
   const flashcardSet = useFlashcardSet(collectionId);
+  const allDocs = usePersonalDocuments();
+  const members = allDocs.filter((doc) => doc.collectionId === collectionId);
+  // Same construction as documents.collections.$collectionId.index.tsx's
+  // own flashcardSourceText — kept in sync so "New set" here regenerates
+  // from the exact same source the collection page's own button would.
+  const flashcardSourceText = members.map((doc) => `# ${doc.title}\n\n${doc.text}`).join("\n\n");
+  const { generate: generateFlashcardsFor, pendingIds } = useGenerateFlashcards();
+  const isGenerating = pendingIds.has(collectionId);
 
   if (collection === undefined) {
     return <div className="min-h-screen bg-background" />;
@@ -96,6 +104,19 @@ function CollectionFlashcardsPage() {
               >
                 <Download className="h-3.5 w-3.5" strokeWidth={2} />
                 Download
+              </button>
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={() => void generateFlashcardsFor(collectionId, flashcardSourceText)}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+                )}
+                {isGenerating ? "Generating…" : "New set"}
               </button>
               <Link
                 to="/documents/collections/$collectionId"

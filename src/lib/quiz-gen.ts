@@ -49,7 +49,29 @@ function parseBlocks(text: string): Block[] {
     });
 }
 
-const MAX_CARDS = 12;
+const MAX_CARDS = 15;
+
+// A student asked for a varied deck size rather than the same fixed count
+// every time — 5 is the smallest that still feels like a real study deck,
+// 15 the largest before a single generation run starts feeling like a
+// chore rather than a quick review. Only meaningful for the *generative*
+// (cloud) path, which can be steered toward a specific count; the
+// extractive path below returns however many real heading/answer pairs
+// the document actually has (up to MAX_CARDS), never padded to hit this
+// floor — see generateFlashcards' own comment on why faking cards to pad
+// a deck isn't acceptable here.
+export function pickFlashcardCount(): number {
+  return 5 + Math.floor(Math.random() * 11); // 5..15 inclusive
+}
+
+// Same reasoning as pickFlashcardCount, for quiz length — 3 stays quick on
+// slower on-device hardware, 10 is a real, substantial quiz for a student
+// who wants more practice. Picked once per generation run (not per
+// question) so the whole run — and its "Q current/total" progress — agree
+// on a single total throughout.
+export function pickQuizQuestionCount(): number {
+  return 3 + Math.floor(Math.random() * 8); // 3..10 inclusive
+}
 
 // Real, reported bug: a heading like "Download" — a short navigational/
 // structural label, not a real concept — mechanically became "What does
@@ -135,7 +157,6 @@ export type QuizQuestion = {
   correctIndex: number;
 };
 
-export const QUIZ_QUESTION_COUNT = 3;
 // A small on-device model's practical context window doesn't need (and
 // gets slower/less coherent with) a whole document's worth of text — same
 // truncation-for-focus tradeoff retrieval.ts makes per-chunk, just applied
@@ -181,6 +202,7 @@ export function buildSingleQuestionPrompt(
   text: string,
   questionNumber: number,
   alreadyAsked: string[],
+  totalQuestions: number,
 ): string {
   const source = buildQuestionSource(text);
   const avoid =
@@ -188,7 +210,7 @@ export function buildSingleQuestionPrompt(
       ? `Do not repeat these already-asked questions: ${alreadyAsked.join(" | ")}\n`
       : "";
   return (
-    `Write exactly 1 multiple-choice question (question ${questionNumber} of ${QUIZ_QUESTION_COUNT}) testing understanding of the study notes below. ` +
+    `Write exactly 1 multiple-choice question (question ${questionNumber} of ${totalQuestions}) testing understanding of the study notes below. ` +
     `Use only information in the notes. ${avoid}` +
     `Follow this exact format, with nothing else before, after, or in between:\n\n` +
     `Q: <question>\nA) <option>\nB) <option>\nC) <option>\nD) <option>\nCorrect: <letter>\n\n` +

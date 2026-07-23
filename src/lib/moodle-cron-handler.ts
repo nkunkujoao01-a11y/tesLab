@@ -165,6 +165,29 @@ async function syncOneConnection(admin: AdminClient, userId: string): Promise<vo
       },
     );
 
+    // Rows here are keyed by (this app's own user_id, Moodle course id) —
+    // correctly scoped per eLearn account, but a student can reconnect the
+    // *same* eLearn account to a *different* real NUST Moodle identity
+    // (their own credentials, then a friend's, or back again). Without
+    // this, every course from a previously-connected identity just sits
+    // here forever alongside the new one — nothing ever removed it — so
+    // the student ends up seeing a mix of their own and a previously
+    // connected account's courses/modules. Deleting anything no longer in
+    // the just-fetched enrollment list (cascades to sections/modules/
+    // grades via their FKs) makes this sync a real replace, not just an
+    // upsert — also correctly drops a course the student simply left.
+    const currentCourseIds = courses.map((c) => c.id);
+    await upsertOrThrow(
+      currentCourseIds.length > 0
+        ? admin
+            .from("moodle_courses")
+            .delete()
+            .eq("user_id", userId)
+            .not("id", "in", `(${currentCourseIds.join(",")})`)
+        : admin.from("moodle_courses").delete().eq("user_id", userId),
+      "Removing courses no longer enrolled in",
+    );
+
     for (const course of courses) {
       let lecturerName: string | null = null;
       if (has("core_enrol_get_enrolled_users")) {

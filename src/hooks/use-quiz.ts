@@ -15,7 +15,8 @@ import {
   parseCloudQuizJson,
   parseCloudFlashcardsJson,
   matchAnswerToOption,
-  QUIZ_QUESTION_COUNT,
+  pickQuizQuestionCount,
+  pickFlashcardCount,
   type QuizQuestion,
 } from "@/lib/quiz-gen";
 import { askChatModel } from "@/lib/ai-chat";
@@ -121,6 +122,7 @@ export function useGenerateFlashcards() {
             "flashcards",
             sourceText.slice(0, CLOUD_SOURCE_CHARS),
             user.id,
+            pickFlashcardCount(),
           );
           const cloudCards = parseCloudFlashcardsJson(raw);
           if (cloudCards.length > 0) {
@@ -284,12 +286,17 @@ export function useGenerateQuiz() {
 
       const questions: QuizQuestion[] = [];
       let method: "cloud" | "on-device" = "on-device";
+      // Picked once per run, not per question — the on-device loop below
+      // and the cloud prompt both need to agree on the same total (see
+      // pickQuizQuestionCount's own comment).
+      const questionCount = pickQuizQuestionCount();
       try {
         try {
           const raw = await generateViaCloud(
             "quiz",
             sourceText.slice(0, CLOUD_SOURCE_CHARS),
             user.id,
+            questionCount,
           );
           const cloudQuestions = parseCloudQuizJson(raw);
           if (cloudQuestions.length > 0) {
@@ -310,12 +317,13 @@ export function useGenerateQuiz() {
         // questions.length each iteration, since that grows as this same
         // loop pushes its own on-device questions into it.
         const usedCloud = method === "cloud";
-        for (let i = 1; !usedCloud && i <= QUIZ_QUESTION_COUNT; i++) {
-          setProgress((prev) => ({ ...prev, [docId]: { current: i, total: QUIZ_QUESTION_COUNT } }));
+        for (let i = 1; !usedCloud && i <= questionCount; i++) {
+          setProgress((prev) => ({ ...prev, [docId]: { current: i, total: questionCount } }));
           const prompt = buildSingleQuestionPrompt(
             sourceText,
             i,
             questions.map((q) => q.question),
+            questionCount,
           );
           try {
             let raw: string;

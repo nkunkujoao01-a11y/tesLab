@@ -1,8 +1,9 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download, Layers } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Download, Layers, Loader2, RefreshCw } from "lucide-react";
 import { fetchModule } from "@/lib/modules-api";
 import { materialKey } from "@/lib/db";
-import { useFlashcardSet } from "@/hooks/use-quiz";
+import { useDownloadedMaterialContent } from "@/hooks/use-downloads";
+import { useFlashcardSet, useGenerateFlashcards } from "@/hooks/use-quiz";
 import { buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { FlashcardDeck } from "@/components/QuizFlashcards";
@@ -33,6 +34,14 @@ function MaterialFlashcardsPage() {
   const { module, doc } = Route.useLoaderData();
   const key = materialKey(module.id, doc.id);
   const flashcardSet = useFlashcardSet(key);
+  const content = useDownloadedMaterialContent(module.id, doc.id);
+  // Same synthetic single-heading document generateFlashcards() needs —
+  // see courses.$moduleId.read.$docId.tsx's identical comment.
+  const flashcardSourceText = content
+    ? `# ${content.heading}\n\n${content.lead}\n\n${content.body.join("\n\n")}`
+    : "";
+  const { generate: generateFlashcardsFor, pendingIds } = useGenerateFlashcards();
+  const isGenerating = pendingIds.has(key);
 
   const download = () => {
     if (!flashcardSet) return;
@@ -100,6 +109,19 @@ function MaterialFlashcardsPage() {
               >
                 <Download className="h-3.5 w-3.5" strokeWidth={2} />
                 Download
+              </button>
+              <button
+                type="button"
+                disabled={isGenerating || !content}
+                onClick={() => void generateFlashcardsFor(key, flashcardSourceText)}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+                )}
+                {isGenerating ? "Generating…" : "New set"}
               </button>
               <Link
                 to="/courses/$moduleId/read/$docId"

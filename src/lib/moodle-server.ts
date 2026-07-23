@@ -123,6 +123,34 @@ async function moodleGetSiteInfo(token: string): Promise<MoodleSiteInfo> {
   return moodleCallFunction<MoodleSiteInfo>(token, "core_webservice_get_site_info");
 }
 
+/** Best-effort: nudges the same cron-triggered sync endpoint
+ * (moodle-cron-handler.ts) right after a successful connect, instead of
+ * making the student wait up to SYNC_STALE_HOURS for their first real
+ * course to show up — a brand-new (or just-reconnected) connection's
+ * last_sync_at is null, which already always counts as "due," so this is
+ * just pulling that forward in time, not new sync logic. A plain HTTP
+ * self-call (not a direct import of moodle-cron-handler.ts) deliberately
+ * keeps this client-reachable file's import graph as small as
+ * moodle-sync-server.ts's own header comment already establishes for the
+ * cron-only side. Bounded with a timeout so a slow/busy sync run can never
+ * hang the connect response itself — on timeout or any failure, the next
+ * scheduled cron run still covers this connection regardless. */
+async function triggerImmediateMoodleSync(): Promise<void> {
+  const cronSecret = process.env.MOODLE_CRON_SECRET;
+  const vercelUrl = process.env.VERCEL_URL;
+  if (!cronSecret || !vercelUrl) return;
+  try {
+    await fetch(`https://${vercelUrl}/api/moodle/cron-sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-cron-secret": cronSecret },
+      body: "{}",
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (err) {
+    console.error("Best-effort immediate Moodle sync failed to trigger", err);
+  }
+}
+
 type ConnectInput = { studentNumber: string; password: string; accessToken: string };
 type ConnectResult =
   | { connected: true; fullName: string }
@@ -183,6 +211,7 @@ export const connectMoodleAccount = createServerFn({ method: "POST" })
       return { connected: false, reason: "unexpected" };
     }
 
+    await triggerImmediateMoodleSync();
     return { connected: true, fullName: siteInfo.fullname };
   });
 

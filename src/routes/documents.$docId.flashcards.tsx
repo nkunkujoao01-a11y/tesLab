@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download, Layers } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Download, Layers, Loader2, RefreshCw } from "lucide-react";
 import { usePersonalDocument } from "@/hooks/use-documents";
-import { useFlashcardSet } from "@/hooks/use-quiz";
+import { useFlashcardSet, useGenerateFlashcards } from "@/hooks/use-quiz";
 import { buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { FlashcardDeck } from "@/components/QuizFlashcards";
@@ -23,6 +23,8 @@ function DocumentFlashcardsPage() {
   const { docId } = Route.useParams();
   const doc = usePersonalDocument(docId);
   const flashcardSet = useFlashcardSet(docId);
+  const { generate: generateFlashcardsFor, pendingIds } = useGenerateFlashcards();
+  const isGenerating = pendingIds.has(docId);
 
   if (doc === undefined) {
     return <div className="min-h-screen bg-background" />;
@@ -92,6 +94,19 @@ function DocumentFlashcardsPage() {
               >
                 <Download className="h-3.5 w-3.5" strokeWidth={2} />
                 Download
+              </button>
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={() => void generateFlashcardsFor(docId, doc.text)}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+                )}
+                {isGenerating ? "Generating…" : "New set"}
               </button>
               <Link
                 to="/documents/$docId"

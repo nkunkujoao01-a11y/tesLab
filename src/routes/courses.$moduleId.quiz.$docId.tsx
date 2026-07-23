@@ -1,8 +1,12 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download, ListChecks } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Download, ListChecks, Loader2, RefreshCw } from "lucide-react";
 import { fetchModule } from "@/lib/modules-api";
 import { materialKey } from "@/lib/db";
-import { useQuiz, useQuizAttempts, useRecordQuizAttempt } from "@/hooks/use-quiz";
+import { useDownloadedMaterialContent } from "@/hooks/use-downloads";
+import { useQuiz, useQuizAttempts, useRecordQuizAttempt, useGenerateQuiz } from "@/hooks/use-quiz";
+import { useChatModelStatus } from "@/hooks/use-ai-chat";
+import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import { buildQuizExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { QuizPanel } from "@/components/QuizFlashcards";
@@ -35,6 +39,17 @@ function MaterialQuizPage() {
   const quiz = useQuiz(key);
   const attempts = useQuizAttempts(key);
   const recordAttempt = useRecordQuizAttempt();
+  const content = useDownloadedMaterialContent(module.id, doc.id);
+  const pageSourceText = content ? [content.lead, ...content.body].join(" ") : "";
+  const { generate: generateQuizFor, pendingIds, progress: quizProgress } = useGenerateQuiz();
+  const isGenerating = pendingIds.has(key);
+  const questionProgress = quizProgress[key];
+  const chatModelReady = useChatModelStatus() === "ready";
+  const { connected: cloudConnected } = useCloudAiKey();
+  const [cloudEnabled] = useCloudAiEnabled();
+  const isOnline = useOnlineStatus();
+  const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
+  const quizUnavailable = !chatModelReady && !cloudQuizReady;
 
   const download = () => {
     if (!quiz) return;
@@ -106,6 +121,28 @@ function MaterialQuizPage() {
               >
                 <Download className="h-3.5 w-3.5" strokeWidth={2} />
                 Download
+              </button>
+              <button
+                type="button"
+                disabled={isGenerating || !content || quizUnavailable}
+                title={
+                  quizUnavailable
+                    ? "Connect a free cloud AI key (Settings) or download the on-device assistant from Ask AI"
+                    : undefined
+                }
+                onClick={() => void generateQuizFor(key, pageSourceText)}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+                )}
+                {isGenerating
+                  ? questionProgress
+                    ? `Q${questionProgress.current}/${questionProgress.total}…`
+                    : "Starting…"
+                  : "New quiz"}
               </button>
               <Link
                 to="/courses/$moduleId/read/$docId"
