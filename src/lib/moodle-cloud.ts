@@ -111,10 +111,11 @@ export type NustLoginResult =
 
 /** Logs in with a NUST student number + password instead of an eLearn
  * email — see loginWithNustCredentials (moodle-server.ts) for the full
- * server-side design. That server function verifies against Moodle and
- * returns a one-time `token_hash`; redeeming it here via `verifyOtp` is
- * what actually establishes this browser's real Supabase session — the
- * server itself never holds or returns a session token directly. */
+ * server-side design. That server function verifies against Moodle, then
+ * hands back a synthetic email + a fresh single-use password for this
+ * student's matching eLearn account; signing in with it here via the
+ * exact same signInWithPassword the regular email login already uses is
+ * what actually establishes this browser's real Supabase session. */
 export async function loginWithNust(
   studentNumber: string,
   password: string,
@@ -123,12 +124,12 @@ export async function loginWithNust(
   if (!result.ok) {
     return { signedIn: false, reason: result.reason };
   }
-  const { error } = await supabase.auth.verifyOtp({
-    token_hash: result.tokenHash,
-    type: "magiclink",
+  const { error } = await supabase.auth.signInWithPassword({
+    email: result.email,
+    password: result.loginPassword,
   });
   if (error) {
-    console.error("Failed to redeem NUST login session", error);
+    console.error("Failed to sign in after NUST login", error);
     return { signedIn: false, reason: "unexpected" };
   }
   return { signedIn: true, fullName: result.fullName };

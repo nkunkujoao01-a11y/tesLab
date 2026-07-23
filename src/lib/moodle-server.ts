@@ -241,7 +241,7 @@ function studentNumberToEmail(studentNumber: string): string {
 
 type NustLoginInput = { studentNumber: string; password: string };
 type NustLoginResult =
-  | { ok: true; tokenHash: string; fullName: string }
+  | { ok: true; email: string; loginPassword: string; fullName: string }
   | { ok: false; reason: "invalid_credentials" | "unexpected" };
 
 /** Logs a student in with only their real NUST student number + password —
@@ -251,15 +251,19 @@ type NustLoginResult =
  * above — this student's NUST password still never touches anything but
  * that one outbound call). studentNumberToEmail deterministically maps
  * that verified identity onto a real Supabase auth user: `generateLink`
- * with `type: "magiclink"` creates the user on first login and just mints
- * a fresh token for one that already exists on every login after (see
- * the installed @supabase/auth-js types — "generateLink() handles the
- * creation of the user for signup, invite and magiclink"). Returns a
- * `hashed_token` for the browser to redeem via
- * `supabase.auth.verifyOtp({ token_hash, type: "magiclink" })` — the
- * standard, supported way to hand a browser a real session from a
- * server-side identity check, without this student ever having (or
- * needing) an actual Supabase password of their own.
+ * with `type: "magiclink"` finds-or-creates that user (see the installed
+ * @supabase/auth-js types — "generateLink() handles the creation of the
+ * user for signup, invite and magiclink") purely to get a reliable user
+ * id back, not to use its token — redeeming that token via
+ * `verifyOtp({ type: "magiclink" })` turned out to fail in practice
+ * ("Email link is invalid or has expired") for reasons not worth chasing
+ * further, given `updateUserById` + the browser's own already-proven
+ * `signInWithPassword` do the exact same job through a fully standard,
+ * already-working path elsewhere in this app: this handler sets a fresh,
+ * random, single-use password on that account, hands it to the browser
+ * once over this same server-authenticated response, and the browser
+ * signs in with it immediately — this student never sees or needs to
+ * remember it, and it's overwritten by a new random one on every login.
  *
  * A student who separately signs up with a real email/password *and*
  * also uses this NUST-login path ends up with two distinct accounts (one
@@ -305,8 +309,27 @@ export const loginWithNustCredentials = createServerFn({ method: "POST" })
       email,
       options: { data: { full_name: siteInfo.fullname } },
     });
-    if (linkError || !linkData?.properties?.hashed_token || !linkData.user) {
-      console.error("Failed to generate a session for NUST login", linkError);
+    if (linkError || !linkData?.user) {
+      console.error("Failed to find or create a Supabase account for NUST login", linkError);
+      return { ok: false, reason: "unexpected" };
+    }
+
+    // A fresh, random, single-use password — this student never sees or
+    // needs it, and the next login overwrites it again. See this
+    // function's own comment for why this replaces the OTP/magiclink
+    // redemption path that was here before.
+    const loginPassword = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+    const { error: passwordError } = await admin.auth.admin.updateUserById(linkData.user.id, {
+      password: loginPassword,
+      // Explicit regardless of this project's own "Confirm email" auth
+      // setting — a signInWithPassword call for an unconfirmed address
+      // would otherwise fail here specifically for a student's very
+      // first NUST login (the moment generateLink just created them),
+      // which no real signup flow exists to ever confirm on their behalf.
+      email_confirm: true,
+    });
+    if (passwordError) {
+      console.error("Failed to set a login password for NUST login", passwordError);
       return { ok: false, reason: "unexpected" };
     }
 
@@ -327,7 +350,7 @@ export const loginWithNustCredentials = createServerFn({ method: "POST" })
     }
 
     await triggerImmediateMoodleSync();
-    return { ok: true, tokenHash: linkData.properties.hashed_token, fullName: siteInfo.fullname };
+    return { ok: true, email, loginPassword, fullName: siteInfo.fullname };
   });
 
 type GetOwnMoodleFileTokenFn = {
