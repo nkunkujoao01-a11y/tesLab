@@ -80,6 +80,14 @@ type SyncTables = {
     weight: number | null;
     feedback: string | null;
   }>;
+  moodle_assignments: Row<{
+    course_id: number;
+    user_id: string;
+    assignment_id: number;
+    name: string;
+    due_date: string | null;
+    allow_submissions_from: string | null;
+  }>;
 };
 export type AdminClient = SupabaseClient<{
   public: { Tables: SyncTables; Views: Record<string, never>; Functions: SyncFunctions };
@@ -115,6 +123,20 @@ type MoodleGradeItem = {
   weightraw?: number;
   feedback?: string;
 };
+type MoodleAssignmentApi = {
+  id: number;
+  name: string;
+  // Unix seconds; Moodle's own convention for "not set" is 0, not null/
+  // absent — every reader of this field must treat 0 the same as absent.
+  duedate?: number;
+  allowsubmissionsfromdate?: number;
+};
+
+// Moodle's own "not set" sentinel for a date field, not a real timestamp
+// — see MoodleAssignmentApi's own comment.
+function moodleTimestampToIso(unixSeconds: number | undefined): string | null {
+  return unixSeconds && unixSeconds > 0 ? new Date(unixSeconds * 1000).toISOString() : null;
+}
 
 /** `.upsert()` resolves with `{ error }` rather than rejecting — without
  * checking it, a real failure (RLS, a bad column, a missing table) here
@@ -305,6 +327,51 @@ export async function syncOneConnection(admin: AdminClient, userId: string): Pro
           }
         } catch (err) {
           console.error(`Couldn't fetch grades for course ${course.id}`, err);
+        }
+      }
+
+      if (has("mod_assign_get_assignments")) {
+        try {
+          const assignResp = await moodleCall<{
+            courses: { id: number; assignments: MoodleAssignmentApi[] }[];
+          }>(siteUrl, token, "mod_assign_get_assignments", {
+            "courseids[0]": String(course.id),
+          });
+          const assignments = assignResp.courses?.[0]?.assignments ?? [];
+          const currentAssignmentIds = assignments.map((a) => a.id);
+          // Same "delete what's no longer there" reasoning as the top-level
+          // moodle_courses cleanup above — an assignment removed or a
+          // course re-fetched with a shrunk list must not linger forever.
+          await upsertOrThrow(
+            currentAssignmentIds.length > 0
+              ? admin
+                  .from("moodle_assignments")
+                  .delete()
+                  .eq("user_id", userId)
+                  .eq("course_id", course.id)
+                  .not("assignment_id", "in", `(${currentAssignmentIds.join(",")})`)
+              : admin
+                  .from("moodle_assignments")
+                  .delete()
+                  .eq("user_id", userId)
+                  .eq("course_id", course.id),
+            `Removing assignments no longer in course ${course.id}`,
+          );
+          for (const assignment of assignments) {
+            await upsertOrThrow(
+              admin.from("moodle_assignments").upsert({
+                course_id: course.id,
+                user_id: userId,
+                assignment_id: assignment.id,
+                name: assignment.name,
+                due_date: moodleTimestampToIso(assignment.duedate),
+                allow_submissions_from: moodleTimestampToIso(assignment.allowsubmissionsfromdate),
+              }),
+              `Saving assignment ${assignment.id} of course ${course.id}`,
+            );
+          }
+        } catch (err) {
+          console.error(`Couldn't fetch assignments for course ${course.id}`, err);
         }
       }
     }

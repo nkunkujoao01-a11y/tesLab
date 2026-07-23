@@ -3,6 +3,14 @@ import { liveQuery } from "dexie";
 import { getUserDb, type MoodleCourse, type MoodleCourseModule, type MoodleGrade } from "@/lib/db";
 import { useAuth } from "@/hooks/use-auth";
 
+export type UpcomingAssignment = {
+  key: string;
+  courseId: number;
+  courseName: string;
+  assignmentName: string;
+  dueDate: number;
+};
+
 /** Every synced NUST eLearning course for the signed-in student — offline-
  * first, same liveQuery-over-Dexie pattern as every other list page in
  * this app. Populated by pullMoodleContent (sync.ts), triggered by the
@@ -118,4 +126,55 @@ export function useMoodleGrades(courseId: number): MoodleGrade[] {
   }, [user, courseId]);
 
   return grades;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Real assignment due dates from NUST eLearning, due within `daysAhead`
+ * from now and not already past — populated by pullMoodleContent
+ * (sync.ts), filled server-side by moodle-cron-handler.ts's
+ * mod_assign_get_assignments call. Sorted soonest-first, since that's the
+ * one order a "what's coming up" list actually needs. */
+export function useUpcomingDeadlines(daysAhead = 14): UpcomingAssignment[] {
+  const { user } = useAuth();
+  const [deadlines, setDeadlines] = useState<UpcomingAssignment[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      setDeadlines([]);
+      return;
+    }
+    const db = getUserDb(user.id);
+    const sub = liveQuery(async () => {
+      const [assignments, courses] = await Promise.all([
+        db.moodleAssignments.toArray(),
+        db.moodleCourses.toArray(),
+      ]);
+      const courseById = new Map(courses.map((c) => [c.id, c]));
+      const now = Date.now();
+      const cutoff = now + daysAhead * DAY_MS;
+      return assignments
+        .filter(
+          (a): a is typeof a & { dueDate: number } =>
+            a.dueDate !== undefined && a.dueDate >= now && a.dueDate <= cutoff,
+        )
+        .map((a) => {
+          const course = courseById.get(a.courseId);
+          return {
+            key: a.key,
+            courseId: a.courseId,
+            courseName: course?.shortName ?? course?.fullName ?? "Course",
+            assignmentName: a.name,
+            dueDate: a.dueDate,
+          };
+        })
+        .sort((x, y) => x.dueDate - y.dueDate);
+    }).subscribe({
+      next: setDeadlines,
+      error: (err) => console.error("Failed to compute upcoming deadlines", err),
+    });
+    return () => sub.unsubscribe();
+  }, [user, daysAhead]);
+
+  return deadlines;
 }

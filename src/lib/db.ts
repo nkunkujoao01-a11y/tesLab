@@ -356,6 +356,22 @@ export type MoodleGrade = {
   feedback?: string;
 };
 
+/** A real assignment due date from NUST eLearning — pulled down from the
+ * moodle_assignments Supabase table (written server-side by
+ * moodle-cron-handler.ts via mod_assign_get_assignments), same read-only
+ * offline-cache role every other synced Moodle table here plays. */
+export type MoodleAssignment = {
+  key: string;
+  courseId: number;
+  assignmentId: number;
+  name: string;
+  // Both undefined, not 0/null-ish sentinels — see moodle-cron-handler.ts's
+  // own comment on Moodle's "not set" convention, already resolved to a
+  // real absence before this ever reaches IndexedDB.
+  dueDate?: number;
+  allowSubmissionsFrom?: number;
+};
+
 /** A Moodle resource file, fetched through fetchMoodleFile (moodle-server.ts,
  * proxied server-side so the wstoken never touches a client-visible URL)
  * and cached here so re-opening the same material doesn't refetch —
@@ -464,6 +480,7 @@ class UserDB extends Dexie {
   moodleCourseSections!: EntityTable<MoodleCourseSection, "key">;
   moodleCourseModules!: EntityTable<MoodleCourseModule, "key">;
   moodleGrades!: EntityTable<MoodleGrade, "key">;
+  moodleAssignments!: EntityTable<MoodleAssignment, "key">;
   moodleFiles!: EntityTable<MoodleFile, "moduleKey">;
 
   constructor(userId: string) {
@@ -551,6 +568,11 @@ class UserDB extends Dexie {
     // comment) — also purely additive.
     this.version(14).stores({
       flashcardReviews: "key, docId, reviewedAt",
+    });
+    // Real Moodle assignment due dates (see MoodleAssignment's own
+    // comment) — also purely additive.
+    this.version(15).stores({
+      moodleAssignments: "key, courseId, dueDate",
     });
   }
 }

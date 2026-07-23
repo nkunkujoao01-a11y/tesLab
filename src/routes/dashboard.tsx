@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Play, Download, CheckCircle2, Loader2 } from "lucide-react";
+import { Play, Download, CheckCircle2, Loader2, CalendarClock } from "lucide-react";
 import { MobileShell, PageHeader, SectionHeader } from "@/components/MobileShell";
 import { LibrarySearchButton } from "@/components/LibrarySearch";
 import { formatMb } from "@/lib/mock-data";
@@ -18,8 +18,11 @@ import {
   currentStreakDays,
   moduleCompletion,
 } from "@/hooks/use-activity";
+import { useUpcomingDeadlines } from "@/hooks/use-moodle-courses";
 import { useAuth } from "@/hooks/use-auth";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const Route = createFileRoute("/dashboard")({
   loader: () => fetchModules(),
@@ -67,6 +70,7 @@ function Dashboard() {
   const summariesGeneratedCount = useSummariesGeneratedCount();
   const streakGrid = useStreakGrid();
   const streakDays = currentStreakDays(streakGrid);
+  const upcomingDeadlines = useUpcomingDeadlines();
 
   return (
     <MobileShell>
@@ -138,6 +142,41 @@ function Dashboard() {
               </div>
             </div>
           </section>
+
+          {/* Upcoming deadlines — real Moodle assignment due dates (see
+           * useUpcomingDeadlines, moodle-cron-handler.ts's own
+           * mod_assign_get_assignments call), not a guessed or manually
+           * entered date. Only renders once there's something real to
+           * show. */}
+          {upcomingDeadlines.length > 0 && (
+            <section className="animate-rise">
+              <SectionHeader title="Upcoming deadlines" />
+              <ul className="space-y-3">
+                {upcomingDeadlines.slice(0, 4).map((item) => {
+                  const daysLeft = Math.ceil((item.dueDate - Date.now()) / DAY_MS);
+                  return (
+                    <li
+                      key={item.key}
+                      className="flex items-center gap-4 rounded-xl bg-card/60 p-3 ring-1 ring-border/60"
+                    >
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
+                        <CalendarClock className="h-4 w-4" strokeWidth={1.75} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-prestige-deep">
+                          {item.assignmentName}
+                        </p>
+                        <p className="text-[11px] text-prestige-mid">{item.courseName}</p>
+                      </div>
+                      <p className="shrink-0 text-[11px] font-semibold uppercase tracking-widest text-destructive">
+                        {daysLeft <= 0 ? "Due today" : daysLeft === 1 ? "Tomorrow" : `${daysLeft}d`}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           {/* Available offline */}
           <section className="animate-rise">

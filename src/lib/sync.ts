@@ -22,6 +22,7 @@ import {
   type MoodleCourseSection,
   type MoodleCourseModule,
   type MoodleGrade,
+  type MoodleAssignment,
 } from "@/lib/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -464,6 +465,14 @@ type MoodleContentTables = {
     weight: number | null;
     feedback: string | null;
   }>;
+  moodle_assignments: Row<{
+    course_id: number;
+    user_id: string;
+    assignment_id: number;
+    name: string;
+    due_date: string | null;
+    allow_submissions_from: string | null;
+  }>;
 };
 const moodleContentClient = supabase as unknown as SupabaseClient<{
   public: {
@@ -483,16 +492,18 @@ const moodleContentClient = supabase as unknown as SupabaseClient<{
  * handful of progress rows. */
 async function pullMoodleContent(userId: string): Promise<void> {
   const db = getUserDb(userId);
-  const [courses, sections, modules, grades] = await Promise.all([
+  const [courses, sections, modules, grades, assignments] = await Promise.all([
     moodleContentClient.from("moodle_courses").select("*").eq("user_id", userId),
     moodleContentClient.from("moodle_course_sections").select("*").eq("user_id", userId),
     moodleContentClient.from("moodle_course_modules").select("*").eq("user_id", userId),
     moodleContentClient.from("moodle_grades").select("*").eq("user_id", userId),
+    moodleContentClient.from("moodle_assignments").select("*").eq("user_id", userId),
   ]);
   if (courses.error) throw courses.error;
   if (sections.error) throw sections.error;
   if (modules.error) throw modules.error;
   if (grades.error) throw grades.error;
+  if (assignments.error) throw assignments.error;
 
   const localCourses: MoodleCourse[] = (courses.data ?? []).map((c) => ({
     id: c.id,
@@ -533,11 +544,21 @@ async function pullMoodleContent(userId: string): Promise<void> {
     feedback: g.feedback ?? undefined,
   }));
 
+  const localAssignments: MoodleAssignment[] = (assignments.data ?? []).map((a) => ({
+    key: `${a.course_id}::${a.assignment_id}`,
+    courseId: a.course_id,
+    assignmentId: a.assignment_id,
+    name: a.name,
+    dueDate: a.due_date ? toMs(a.due_date) : undefined,
+    allowSubmissionsFrom: a.allow_submissions_from ? toMs(a.allow_submissions_from) : undefined,
+  }));
+
   await Promise.all([
     db.moodleCourses.clear().then(() => db.moodleCourses.bulkPut(localCourses)),
     db.moodleCourseSections.clear().then(() => db.moodleCourseSections.bulkPut(localSections)),
     db.moodleCourseModules.clear().then(() => db.moodleCourseModules.bulkPut(localModules)),
     db.moodleGrades.clear().then(() => db.moodleGrades.bulkPut(localGrades)),
+    db.moodleAssignments.clear().then(() => db.moodleAssignments.bulkPut(localAssignments)),
   ]);
 }
 
