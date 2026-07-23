@@ -594,7 +594,7 @@ function formatOcrText(raw: string): string {
  * for. Classifies real failure modes (FR23) instead of a generic error:
  * password-protected, not a valid PDF, or a document where even OCR found
  * no readable text at all. */
-export async function extractPdfText(
+async function extractPdfTextViaPdfJs(
   file: File,
   onProgress?: (p: ExtractProgress) => void,
 ): Promise<ExtractResult> {
@@ -908,4 +908,90 @@ export async function extractPdfText(
     );
   }
   return { text, pageCount: doc.numPages };
+}
+
+/** A second, independent PDF engine (PDFium — the same one Chrome's own
+ * built-in PDF viewer and Android's WebView use, compiled to WASM),
+ * tried only when the pdf.js path above fails for an unclassified
+ * reason — never a replacement for it. pdf.js's own pure-JavaScript
+ * Worker/parsing pipeline is what real-device mobile testing kept
+ * pointing at as the actual failure point (a real error being thrown or
+ * a genuine hard crash, both specific to how pdf.js itself runs), so a
+ * completely different, natively-compiled engine is a genuine second
+ * chance rather than just retrying the same code path. The tradeoff:
+ * @hyzyla/pdfium's getText() returns a single flat string per page with
+ * no position/font metadata at all, so none of this file's own heading/
+ * bullet/table structure reconstruction is possible here — a page of
+ * honest plain paragraphs, not the richer structured read pdf.js
+ * produces when it works. Same "@hyzyla/pdfium/pdfium.wasm?url" bundler
+ * asset pattern already used for pdf.js's own worker above — the WASM
+ * binary is bundled and self-hosted, never fetched from a CDN, keeping
+ * this app's offline/nothing-sent-anywhere story intact. */
+async function extractPdfTextViaPdfium(file: File): Promise<ExtractResult> {
+  const { PDFiumLibrary } = await import("@hyzyla/pdfium");
+  const wasmUrl = (await import("@hyzyla/pdfium/pdfium.wasm?url")).default;
+  const library = await PDFiumLibrary.init({ wasmUrl });
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let document;
+  try {
+    document = await library.loadDocument(bytes);
+  } catch (err) {
+    library.destroy();
+    throw err;
+  }
+
+  try {
+    const pageTexts: string[] = [];
+    for (const page of document.pages()) {
+      const text = page.getText().trim();
+      if (text) pageTexts.push(text);
+    }
+    const text = pageTexts.join("\n\n").trim();
+    const pageCount = document.getPageCount();
+    if (!text) {
+      throw new PdfExtractionError(
+        "No text could be extracted, even with the fallback reader — this PDF may be scanned images rather than real text.",
+        "empty",
+      );
+    }
+    return { text, pageCount };
+  } finally {
+    document.destroy();
+    library.destroy();
+  }
+}
+
+/** Tries pdf.js first (richer structure — see extractPdfTextViaPdfJs's own
+ * comment), falling back to PDFium only when pdf.js fails for a reason a
+ * different engine could plausibly not share (i.e., not a legitimate
+ * password/invalid-file classification, which no engine swap fixes).
+ * Whichever attempt genuinely produced no text (an "empty" classification
+ * from either engine) still counts as a real, final answer — that's not
+ * an engine bug, it's an honest "this PDF has nothing readable in it."
+ * If PDFium also fails, the original pdf.js error is what's surfaced —
+ * it's the richer, more familiar failure mode for this app's existing
+ * error messages, and PDFium's own error was already logged for whoever
+ * does have real device console access. */
+export async function extractPdfText(
+  file: File,
+  onProgress?: (p: ExtractProgress) => void,
+): Promise<ExtractResult> {
+  try {
+    return await extractPdfTextViaPdfJs(file, onProgress);
+  } catch (err) {
+    if (
+      err instanceof PdfExtractionError &&
+      (err.reason === "password" || err.reason === "invalid")
+    ) {
+      throw err;
+    }
+    console.error("pdf.js extraction failed, trying the PDFium fallback", err);
+    try {
+      return await extractPdfTextViaPdfium(file);
+    } catch (fallbackErr) {
+      console.error("PDFium fallback also failed", fallbackErr);
+      throw err;
+    }
+  }
 }
