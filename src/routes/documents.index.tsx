@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { FileText, Folder, FolderPlus, Upload, Loader2, Trash2, ChevronRight } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { formatMb, formatRelative } from "@/lib/mock-data";
@@ -103,7 +103,6 @@ function DocumentsIndex() {
   const collections = useDocumentCollections();
   const { upload, status, progress } = useUploadDocument();
   const { deleteDocument } = useDeletePersonalDocument();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uncategorized = docs.filter((doc) => !doc.collectionId);
   const countInCollection = (collectionId: string) =>
@@ -123,17 +122,25 @@ function DocumentsIndex() {
         action={
           <div>
             <input
-              ref={fileInputRef}
+              id="documents-pdf-upload"
               type="file"
               accept="application/pdf,.pdf"
               className="sr-only"
               onChange={handleFileChange}
-            />
-            <button
-              type="button"
               disabled={status === "extracting"}
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-transform active:scale-[0.97] disabled:opacity-60"
+            />
+            {/* A <label htmlFor> associated with the input, not a separate
+             * button proxying a ref .click() — real Android testing found
+             * the button+ref pattern's file picker sometimes never fired
+             * its own change event afterward (a known Android PWA/Chrome
+             * quirk with JS-triggered file inputs specifically); a native
+             * label association is the standard, more broadly reliable
+             * fix, and needs no JS click handler at all. */}
+            <label
+              htmlFor="documents-pdf-upload"
+              className={`inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-transform active:scale-[0.97] ${
+                status === "extracting" ? "pointer-events-none opacity-60" : "cursor-pointer"
+              }`}
             >
               {status === "extracting" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
@@ -145,7 +152,7 @@ function DocumentsIndex() {
                   ? `Extracting ${progress.page}/${progress.totalPages}…`
                   : "Reading…"
                 : "Upload PDF"}
-            </button>
+            </label>
           </div>
         }
       />

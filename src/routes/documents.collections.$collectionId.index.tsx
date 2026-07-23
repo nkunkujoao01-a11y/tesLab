@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   Download,
@@ -179,7 +179,6 @@ function CollectionDetail() {
   const { upload, status, progress } = useUploadDocument();
   const { deleteCollection } = useDeleteCollection();
   const { setDocumentCollection } = useSetDocumentCollection();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   // Keyed by collectionId, not any one document's id — generateFlashcards/
@@ -292,17 +291,21 @@ function CollectionDetail() {
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <input
-            ref={fileInputRef}
+            id="collection-pdf-upload"
             type="file"
             accept="application/pdf,.pdf"
             className="sr-only"
             onChange={handleFileChange}
-          />
-          <button
-            type="button"
             disabled={status === "extracting"}
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-60"
+          />
+          {/* See documents.index.tsx's identical comment — a native label
+           * association instead of a button+ref .click() proxy, found
+           * more reliable on real Android devices. */}
+          <label
+            htmlFor="collection-pdf-upload"
+            className={`inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] ${
+              status === "extracting" ? "pointer-events-none opacity-60" : "cursor-pointer"
+            }`}
           >
             {status === "extracting" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
@@ -314,7 +317,7 @@ function CollectionDetail() {
                 ? `Extracting ${progress.page}/${progress.totalPages}…`
                 : "Reading…"
               : "Upload PDF here"}
-          </button>
+          </label>
           <AddDocumentsDialog collectionId={collectionId} />
           {members.length > 0 && (
             <Link
