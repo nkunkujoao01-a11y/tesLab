@@ -193,39 +193,63 @@ function Settings() {
                   <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
                   1. Get a free key from Google AI Studio
                 </a>
-                <details className="group text-[11px] text-muted-foreground">
-                  <summary className="cursor-pointer select-none font-medium text-prestige-deep/70 hover:text-prestige-deep">
+                <div className="rounded-xl bg-secondary/60 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-prestige-mid">
                     Exactly what you'll see on that page
-                  </summary>
-                  <ol className="mt-1.5 list-decimal space-y-2 pl-4">
-                    <li>
-                      <span className="font-medium text-foreground">"Welcome to AI Studio"</span> —
-                      tick the agreement checkbox (you're a developer using the free API — this is
-                      normal, not a paid signup) and click{" "}
-                      <span className="font-medium text-foreground">Continue</span>. The email
-                      updates checkbox is optional, skip it if you want.
+                  </p>
+                  <ol className="mt-3 space-y-3">
+                    <li className="flex items-start gap-3">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
+                        1
+                      </span>
+                      <p className="text-[12px] leading-relaxed text-foreground/85">
+                        <span className="font-semibold text-prestige-deep">
+                          "Welcome to AI Studio"
+                        </span>{" "}
+                        — tick the agreement checkbox (you're a developer using the free API — this
+                        is normal, not a paid signup) and click{" "}
+                        <span className="font-semibold text-prestige-deep">Continue</span>. The
+                        email updates checkbox is optional, skip it if you want.
+                      </p>
                     </li>
-                    <li>
-                      Top right of the page, click{" "}
-                      <span className="font-medium text-foreground">+ Create API key</span>.
+                    <li className="flex items-start gap-3">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
+                        2
+                      </span>
+                      <p className="text-[12px] leading-relaxed text-foreground/85">
+                        Top right of the page, click{" "}
+                        <span className="font-semibold text-prestige-deep">+ Create API key</span>.
+                      </p>
                     </li>
-                    <li>
-                      A "Create a new key" popup appears — type any name (e.g.{" "}
-                      <span className="font-medium text-foreground">Gemini API Key</span>), leave
-                      the project as{" "}
-                      <span className="font-medium text-foreground">Default Gemini Project</span>{" "}
-                      unless you already have one, then click{" "}
-                      <span className="font-medium text-foreground">Create key</span>.
+                    <li className="flex items-start gap-3">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
+                        3
+                      </span>
+                      <p className="text-[12px] leading-relaxed text-foreground/85">
+                        A "Create a new key" popup appears — type any name (e.g.{" "}
+                        <span className="font-semibold text-prestige-deep">Gemini API Key</span>),
+                        leave the project as{" "}
+                        <span className="font-semibold text-prestige-deep">
+                          Default Gemini Project
+                        </span>{" "}
+                        unless you already have one, then click{" "}
+                        <span className="font-semibold text-prestige-deep">Create key</span>.
+                      </p>
                     </li>
-                    <li>
-                      A second popup shows your new key. Click the small copy icon next to it (or
-                      select and copy the text starting with{" "}
-                      <span className="font-medium text-foreground">AQ.</span> or{" "}
-                      <span className="font-medium text-foreground">AIza</span>) — then come back to
-                      this page and paste it below.
+                    <li className="flex items-start gap-3">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
+                        4
+                      </span>
+                      <p className="text-[12px] leading-relaxed text-foreground/85">
+                        A second popup shows your new key. Click the small copy icon next to it (or
+                        select and copy the text starting with{" "}
+                        <span className="font-semibold text-prestige-deep">AQ.</span> or{" "}
+                        <span className="font-semibold text-prestige-deep">AIza</span>) — then come
+                        back to this page and paste it below.
+                      </p>
                     </li>
                   </ol>
-                </details>
+                </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="password"
