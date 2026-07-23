@@ -3,7 +3,12 @@ import { ArrowLeft, ArrowUpRight, Download, Layers, Loader2, RefreshCw } from "l
 import { fetchModule } from "@/lib/modules-api";
 import { materialKey } from "@/lib/db";
 import { useDownloadedMaterialContent } from "@/hooks/use-downloads";
-import { useFlashcardSet, useGenerateFlashcards } from "@/hooks/use-quiz";
+import {
+  useFlashcardSet,
+  useGenerateFlashcards,
+  useFlashcardReviews,
+  useRecordFlashcardReview,
+} from "@/hooks/use-quiz";
 import { buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { FlashcardDeck } from "@/components/QuizFlashcards";
@@ -42,6 +47,8 @@ function MaterialFlashcardsPage() {
     : "";
   const { generate: generateFlashcardsFor, pendingIds } = useGenerateFlashcards();
   const isGenerating = pendingIds.has(key);
+  const reviews = useFlashcardReviews(key);
+  const recordReview = useRecordFlashcardReview();
 
   const download = () => {
     if (!flashcardSet) return;
@@ -99,7 +106,11 @@ function MaterialFlashcardsPage() {
               {doc.title}
             </h1>
 
-            <FlashcardDeck cards={flashcardSet.cards} />
+            <FlashcardDeck
+              cards={flashcardSet.cards}
+              reviews={reviews}
+              onReview={(cardIndex, knew) => void recordReview(key, cardIndex, knew)}
+            />
 
             <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border/60 pt-6">
               <button

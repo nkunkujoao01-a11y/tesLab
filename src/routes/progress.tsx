@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Brain, ListChecks, TriangleAlert } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { fetchModules } from "@/lib/modules-api";
 import { cn } from "@/lib/utils";
 import { useStreakGrid, useReadMaterialIds, moduleCompletion } from "@/hooks/use-activity";
+import { useQuizInsights, useFlashcardInsights } from "@/hooks/use-progress-insights";
 
 export const Route = createFileRoute("/progress")({
   loader: () => fetchModules(),
@@ -23,6 +25,8 @@ function ProgressPage() {
   const modules = Route.useLoaderData();
   const streak = useStreakGrid();
   const readMaterialIds = useReadMaterialIds();
+  const quizInsights = useQuizInsights(modules);
+  const flashcardInsights = useFlashcardInsights(modules);
 
   const totalMaterials = modules.reduce((sum, m) => sum + m.materials.length, 0);
   const totalMaterialsOpened = modules.reduce(
@@ -33,6 +37,10 @@ function ProgressPage() {
   const pct = Math.round(overallPct * 100);
   const dash = 2 * Math.PI * 44;
   const offset = dash * (1 - overallPct);
+
+  const quizByModule = new Map(quizInsights.byModule.map((q) => [q.moduleId, q]));
+  const flashcardByModule = new Map(flashcardInsights.byModule.map((f) => [f.moduleId, f]));
+  const hasUnderstandingData = quizInsights.quizzesTaken > 0 || flashcardInsights.totalReviewed > 0;
 
   return (
     <MobileShell>
@@ -119,6 +127,73 @@ function ProgressPage() {
           </div>
         </section>
 
+        {/* How you're doing — real quiz/flashcard performance, not just
+         * whether a material was opened (see use-progress-insights.ts's
+         * own header comment on why this used to not exist at all). Only
+         * renders once there's real data to show — an empty state here
+         * would just be noise before a student has taken anything. */}
+        {hasUnderstandingData && (
+          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:col-span-3 lg:p-8">
+            <p className="eyebrow">How you're doing</p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl bg-secondary/60 p-4">
+                <div className="flex items-center gap-2 text-prestige-mid">
+                  <ListChecks className="h-4 w-4" strokeWidth={1.75} />
+                  <p className="text-[10px] font-semibold uppercase tracking-widest">
+                    Quiz average
+                  </p>
+                </div>
+                {quizInsights.overallAvgPct === null ? (
+                  <p className="mt-2 text-sm text-muted-foreground">No quizzes taken yet.</p>
+                ) : (
+                  <>
+                    <p className="mt-1 font-display text-3xl text-prestige-deep">
+                      {Math.round(quizInsights.overallAvgPct * 100)}%
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      across {quizInsights.quizzesTaken}{" "}
+                      {quizInsights.quizzesTaken === 1 ? "quiz" : "quizzes"} · best attempt each
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="rounded-xl bg-secondary/60 p-4">
+                <div className="flex items-center gap-2 text-prestige-mid">
+                  <Brain className="h-4 w-4" strokeWidth={1.75} />
+                  <p className="text-[10px] font-semibold uppercase tracking-widest">
+                    Flashcards known
+                  </p>
+                </div>
+                {flashcardInsights.overallKnownPct === null ? (
+                  <p className="mt-2 text-sm text-muted-foreground">No flashcards rated yet.</p>
+                ) : (
+                  <>
+                    <p className="mt-1 font-display text-3xl text-prestige-deep">
+                      {Math.round(flashcardInsights.overallKnownPct * 100)}%
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {flashcardInsights.totalKnown} of {flashcardInsights.totalReviewed} cards
+                      rated "I knew this"
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {quizInsights.weakestModule &&
+              quizInsights.weakestModule.avgPct < 0.6 &&
+              quizInsights.byModule.length > 1 && (
+                <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+                  <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                  <p>
+                    Lowest quiz average: <strong>{quizInsights.weakestModule.title}</strong> at{" "}
+                    {Math.round(quizInsights.weakestModule.avgPct * 100)}% — worth another pass.
+                  </p>
+                </div>
+              )}
+          </section>
+        )}
+
         {/* Per module bars */}
         <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:col-span-3 lg:p-8">
           <div className="flex items-end justify-between gap-4">
@@ -130,31 +205,47 @@ function ProgressPage() {
           <ul className="mt-6 divide-y divide-border/60">
             {modules.map((m) => {
               const completion = moduleCompletion(m.materials, m.id, readMaterialIds);
+              const quiz = quizByModule.get(m.id);
+              const flashcards = flashcardByModule.get(m.id);
               return (
-                <li
-                  key={m.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-4 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)_auto] lg:gap-6"
-                >
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-prestige-mid">
-                      {m.code}
-                    </p>
-                    <p className="truncate font-display text-sm text-prestige-deep">
-                      {m.title}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {completion.opened}/{completion.total} materials opened
+                <li key={m.id} className="py-4">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)_auto] lg:gap-6">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-prestige-mid">
+                        {m.code}
+                      </p>
+                      <p className="truncate font-display text-sm text-prestige-deep">{m.title}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {completion.opened}/{completion.total} materials opened
+                      </p>
+                    </div>
+                    <div className="col-span-2 h-1 w-full overflow-hidden rounded-full bg-prestige-deep/10 lg:col-auto lg:col-start-2">
+                      <div
+                        className="h-full bg-prestige-gold"
+                        style={{ width: `${completion.pct * 100}%` }}
+                      />
+                    </div>
+                    <p className="font-display text-sm text-prestige-deep lg:col-start-3">
+                      {Math.round(completion.pct * 100)}%
                     </p>
                   </div>
-                  <div className="col-span-2 h-1 w-full overflow-hidden rounded-full bg-prestige-deep/10 lg:col-auto lg:col-start-2">
-                    <div
-                      className="h-full bg-prestige-gold"
-                      style={{ width: `${completion.pct * 100}%` }}
-                    />
-                  </div>
-                  <p className="font-display text-sm text-prestige-deep lg:col-start-3">
-                    {Math.round(completion.pct * 100)}%
-                  </p>
+                  {(quiz || flashcards) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                      {quiz && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <ListChecks className="h-3 w-3" strokeWidth={1.75} />
+                          Quiz avg {Math.round(quiz.avgPct * 100)}% ({quiz.quizCount})
+                        </span>
+                      )}
+                      {flashcards && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Brain className="h-3 w-3" strokeWidth={1.75} />
+                          {Math.round(flashcards.knownPct * 100)}% of {flashcards.reviewedCount}{" "}
+                          cards known
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </li>
               );
             })}

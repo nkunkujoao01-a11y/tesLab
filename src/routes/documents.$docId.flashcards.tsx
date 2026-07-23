@@ -1,7 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowUpRight, Download, Layers, Loader2, RefreshCw } from "lucide-react";
 import { usePersonalDocument } from "@/hooks/use-documents";
-import { useFlashcardSet, useGenerateFlashcards } from "@/hooks/use-quiz";
+import {
+  useFlashcardSet,
+  useGenerateFlashcards,
+  useFlashcardReviews,
+  useRecordFlashcardReview,
+} from "@/hooks/use-quiz";
 import { buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { FlashcardDeck } from "@/components/QuizFlashcards";
@@ -25,6 +30,8 @@ function DocumentFlashcardsPage() {
   const flashcardSet = useFlashcardSet(docId);
   const { generate: generateFlashcardsFor, pendingIds } = useGenerateFlashcards();
   const isGenerating = pendingIds.has(docId);
+  const reviews = useFlashcardReviews(docId);
+  const recordReview = useRecordFlashcardReview();
 
   if (doc === undefined) {
     return <div className="min-h-screen bg-background" />;
@@ -84,7 +91,11 @@ function DocumentFlashcardsPage() {
               {doc.title}
             </h1>
 
-            <FlashcardDeck cards={flashcardSet.cards} />
+            <FlashcardDeck
+              cards={flashcardSet.cards}
+              reviews={reviews}
+              onReview={(cardIndex, knew) => void recordReview(docId, cardIndex, knew)}
+            />
 
             <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border/60 pt-6">
               <button

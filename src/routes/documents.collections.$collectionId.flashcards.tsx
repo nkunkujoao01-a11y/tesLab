@@ -1,7 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowUpRight, Download, Layers, Loader2, RefreshCw } from "lucide-react";
 import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
-import { useFlashcardSet, useGenerateFlashcards } from "@/hooks/use-quiz";
+import {
+  useFlashcardSet,
+  useGenerateFlashcards,
+  useFlashcardReviews,
+  useRecordFlashcardReview,
+} from "@/hooks/use-quiz";
 import { buildFlashcardsExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, downloadBlob } from "@/lib/structured-export";
 import { FlashcardDeck } from "@/components/QuizFlashcards";
@@ -33,6 +38,8 @@ function CollectionFlashcardsPage() {
   const flashcardSourceText = members.map((doc) => `# ${doc.title}\n\n${doc.text}`).join("\n\n");
   const { generate: generateFlashcardsFor, pendingIds } = useGenerateFlashcards();
   const isGenerating = pendingIds.has(collectionId);
+  const reviews = useFlashcardReviews(collectionId);
+  const recordReview = useRecordFlashcardReview();
 
   if (collection === undefined) {
     return <div className="min-h-screen bg-background" />;
@@ -94,7 +101,11 @@ function CollectionFlashcardsPage() {
               {title}
             </h1>
 
-            <FlashcardDeck cards={flashcardSet.cards} />
+            <FlashcardDeck
+              cards={flashcardSet.cards}
+              reviews={reviews}
+              onReview={(cardIndex, knew) => void recordReview(collectionId, cardIndex, knew)}
+            />
 
             <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border/60 pt-6">
               <button

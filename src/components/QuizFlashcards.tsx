@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, RotateCw, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  RotateCw,
+  XCircle,
+  Brain,
+  Check,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AiContentTabKey = "summary" | "flashcards" | "quiz";
@@ -48,11 +56,29 @@ export function AiContentTabStrip({
 /** Shared flashcard/quiz rendering for Phase J — originally written inline
  * in documents.$docId.tsx (personal documents), extracted here so the
  * reader (catalog materials) and collections can reuse the exact same
- * UI rather than a second copy that could drift out of sync. */
-export function FlashcardDeck({ cards }: { cards: { front: string; back: string }[] }) {
+ * UI rather than a second copy that could drift out of sync.
+ *
+ * `reviews`/`onReview` are optional (same "existing callers still render
+ * fine without them" precedent as QuizPanel's own `attempts`/`onSubmit`)
+ * — before this, a flashcard deck was pure flip-through with no learning
+ * signal captured at all; rating a card after seeing its answer is what
+ * lets a real "known" count exist anywhere in this app. */
+export function FlashcardDeck({
+  cards,
+  reviews,
+  onReview,
+}: {
+  cards: { front: string; back: string }[];
+  // cardIndex -> knew, from useFlashcardReviews(docId).
+  reviews?: Record<number, boolean>;
+  onReview?: (cardIndex: number, knew: boolean) => void;
+}) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const card = cards[index];
+  const cardRating = reviews?.[index];
+  const knownCount = reviews ? Object.values(reviews).filter(Boolean).length : 0;
+  const reviewedCount = reviews ? Object.keys(reviews).length : 0;
 
   const goTo = (next: number) => {
     setFlipped(false);
@@ -66,6 +92,7 @@ export function FlashcardDeck({ cards }: { cards: { front: string; back: string 
           Flashcards
         </p>
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          {reviews && reviewedCount > 0 && `${knownCount}/${cards.length} known · `}
           {index + 1} / {cards.length}
         </p>
       </div>
@@ -80,7 +107,49 @@ export function FlashcardDeck({ cards }: { cards: { front: string; back: string 
         <p className="mt-3 text-base leading-relaxed text-prestige-deep">
           {flipped ? card.back : card.front}
         </p>
+        {cardRating !== undefined && (
+          <p
+            className={cn(
+              "mt-3 text-[10px] font-semibold uppercase tracking-widest",
+              cardRating ? "text-prestige-mid" : "text-destructive",
+            )}
+          >
+            {cardRating ? "Marked known" : "Marked still learning"}
+          </p>
+        )}
       </button>
+
+      {flipped && onReview && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onReview(index, false)}
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-semibold ring-1 transition-all active:scale-[0.97]",
+              cardRating === false
+                ? "bg-destructive/10 text-destructive ring-destructive/40"
+                : "text-prestige-deep ring-border/60 hover:bg-secondary",
+            )}
+          >
+            <Brain className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Still learning
+          </button>
+          <button
+            type="button"
+            onClick={() => onReview(index, true)}
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-semibold ring-1 transition-all active:scale-[0.97]",
+              cardRating === true
+                ? "bg-prestige-mid/10 text-prestige-mid ring-prestige-mid/40"
+                : "text-prestige-deep ring-border/60 hover:bg-secondary",
+            )}
+          >
+            <Check className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <span>I knew this</span>
+          </button>
+        </div>
+      )}
+
       <div className="mt-3 flex items-center justify-between gap-3">
         <button
           type="button"

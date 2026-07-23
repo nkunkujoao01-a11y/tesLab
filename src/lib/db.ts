@@ -93,7 +93,12 @@ export type MaterialSummary = {
   sections?: SummarySection[];
 };
 
-export type ActivityType = "download" | "read" | "summary";
+// "quiz"/"flashcard" log real *practice* (a submitted quiz, a reviewed
+// card) — distinct from "summary", which every quiz/flashcard/summary
+// generation already logs as (see useGenerateQuiz/useGenerateFlashcards),
+// so the streak grid previously only ever reflected "you generated
+// something," never "you actually practiced with it."
+export type ActivityType = "download" | "read" | "summary" | "quiz" | "flashcard";
 
 export type ActivityEvent = {
   // A client-generated UUID, not an auto-increment counter — this is the
@@ -288,6 +293,23 @@ export type QuizAttempt = {
   submittedAt: number;
 };
 
+/** A student's own self-rating on one flashcard ("I knew this" / "Still
+ * learning") — same reasoning as QuizAttempt: flashcards previously had
+ * no learning signal captured at all, just a flip-through with no record
+ * of whether any of it actually stuck. `key` composites docId with the
+ * card's index in its *current* generation (same collision-avoidance
+ * pattern as CollectionMessage) — a regenerated deck is genuinely
+ * different content, so review history resetting with it is correct, not
+ * a bug. Latest rating per card wins (put, not add) — this tracks
+ * current mastery, not a full attempt history the way a quiz score does. */
+export type FlashcardReview = {
+  key: string;
+  docId: string;
+  cardIndex: number;
+  knew: boolean;
+  reviewedAt: number;
+};
+
 /** A student's real NUST eLearning (Moodle) course — pulled down from the
  * moodle_courses Supabase table (written server-side by the background
  * sync job, see moodle-cron-handler.ts), read-only offline cache, same
@@ -437,6 +459,7 @@ class UserDB extends Dexie {
   generatedQuizzes!: EntityTable<GeneratedQuiz, "docId">;
   pendingDeletions!: EntityTable<PendingDeletion, "key">;
   quizAttempts!: EntityTable<QuizAttempt, "id">;
+  flashcardReviews!: EntityTable<FlashcardReview, "key">;
   moodleCourses!: EntityTable<MoodleCourse, "id">;
   moodleCourseSections!: EntityTable<MoodleCourseSection, "key">;
   moodleCourseModules!: EntityTable<MoodleCourseModule, "key">;
@@ -523,6 +546,11 @@ class UserDB extends Dexie {
     // purely additive.
     this.version(13).stores({
       moodleFiles: "moduleKey",
+    });
+    // A student's per-card self-rating (see FlashcardReview's own
+    // comment) — also purely additive.
+    this.version(14).stores({
+      flashcardReviews: "key, docId, reviewedAt",
     });
   }
 }

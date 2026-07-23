@@ -231,9 +231,67 @@ export function useRecordQuizAttempt() {
         answers,
         submittedAt: Date.now(),
       });
+      // Real practice, not just generation — see ActivityType's own
+      // comment on why this used to only ever log as "summary" (at
+      // generation time), never reflecting that the quiz was actually
+      // taken.
+      void logActivity(user.id, "quiz");
     },
     [user],
   );
+}
+
+/** A student's own self-rating on one flashcard — see FlashcardReview's
+ * own comment. `put`, not `add`: this tracks current mastery per card,
+ * so re-rating a card (flip through the deck again, change your mind)
+ * overwrites its previous rating rather than accumulating a history the
+ * way a quiz attempt does. */
+export function useRecordFlashcardReview() {
+  const { user } = useAuth();
+
+  return useCallback(
+    async (docId: string, cardIndex: number, knew: boolean) => {
+      if (!user) return;
+      await getUserDb(user.id).flashcardReviews.put({
+        key: `${docId}::${cardIndex}`,
+        docId,
+        cardIndex,
+        knew,
+        reviewedAt: Date.now(),
+      });
+      void logActivity(user.id, "flashcard");
+    },
+    [user],
+  );
+}
+
+/** Every card review for one flashcard set (docId), keyed by cardIndex —
+ * the caller (FlashcardDeck) uses this to show each card's current
+ * rating and compute a real "known" count for the deck as a whole. */
+export function useFlashcardReviews(docId: string): Record<number, boolean> {
+  const { user } = useAuth();
+  const [reviews, setReviews] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    if (!user) {
+      setReviews({});
+      return;
+    }
+    const db = getUserDb(user.id);
+    const sub = liveQuery(() =>
+      db.flashcardReviews.where("docId").equals(docId).toArray(),
+    ).subscribe({
+      next: (rows) => {
+        const next: Record<number, boolean> = {};
+        for (const row of rows) next[row.cardIndex] = row.knew;
+        setReviews(next);
+      },
+      error: (err) => console.error("Failed to read flashcard reviews", err),
+    });
+    return () => sub.unsubscribe();
+  }, [user, docId]);
+
+  return reviews;
 }
 
 // One question per model call (see buildSingleQuestionPrompt's own
