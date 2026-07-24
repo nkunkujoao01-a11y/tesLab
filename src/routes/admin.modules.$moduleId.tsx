@@ -3,8 +3,10 @@ import { useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Award,
   Loader2,
   Plus,
+  Trash2,
   Upload,
   UserMinus,
   UserPlus,
@@ -20,6 +22,7 @@ import {
   useSearchStudents,
   useAdminManageEnrollment,
 } from "@/hooks/use-enrollment";
+import { useModuleGrades, useManageGrades } from "@/hooks/use-grades";
 import { extractMaterialFields } from "@/lib/admin-content-extract";
 import { PdfExtractionError } from "@/lib/pdf-extract";
 import { formatMb, formatRelative } from "@/lib/mock-data";
@@ -66,6 +69,36 @@ function AdminModuleDetailPage() {
     const ok = await removeStudent(userId);
     if (ok) refetchRoster();
   };
+
+  const { grades, loading: gradesLoading, refetch: refetchGrades } = useModuleGrades(moduleId);
+  const { recordGrade, deleteGrade, mutating: mutatingGrade } = useManageGrades();
+  const [gradeStudentId, setGradeStudentId] = useState("");
+  const [gradeLabel, setGradeLabel] = useState("");
+  const [gradeScore, setGradeScore] = useState("");
+  const [gradeMaxScore, setGradeMaxScore] = useState("100");
+
+  const handleRecordGrade = async () => {
+    if (!gradeStudentId || !gradeLabel.trim()) return;
+    const ok = await recordGrade({
+      moduleId,
+      userId: gradeStudentId,
+      label: gradeLabel,
+      score: Number(gradeScore),
+      maxScore: Number(gradeMaxScore),
+    });
+    if (ok) {
+      setGradeLabel("");
+      setGradeScore("");
+      refetchGrades();
+    }
+  };
+
+  const handleDeleteGrade = async (gradeId: string) => {
+    const ok = await deleteGrade(gradeId);
+    if (ok) refetchGrades();
+  };
+
+  const rosterNameById = new Map(roster.map((r) => [r.userId, r.fullName]));
 
   const [matTitle, setMatTitle] = useState("");
   const [matKind, setMatKind] = useState(KIND_OPTIONS[0]);
@@ -444,6 +477,107 @@ function AdminModuleDetailPage() {
               ))}
             </ul>
           )}
+        </div>
+      </section>
+
+      {/* Grades */}
+      <section className="animate-rise mt-5 rounded-2xl bg-card p-5 ring-1 ring-border/60">
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+            <Award className="h-4 w-4" strokeWidth={1.75} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-prestige-deep">Grades</p>
+            <p className="text-[11px] text-muted-foreground">
+              {grades.length} recorded — visible only to the student they belong to
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
+          {roster.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Assign a student above before recording a grade.
+            </p>
+          ) : (
+            <>
+              <select
+                value={gradeStudentId}
+                onChange={(e) => setGradeStudentId(e.target.value)}
+                className={FIELD_CLASS}
+              >
+                <option value="">Select a student…</option>
+                {roster.map((r) => (
+                  <option key={r.userId} value={r.userId}>
+                    {r.fullName}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={gradeLabel}
+                onChange={(e) => setGradeLabel(e.target.value)}
+                placeholder="e.g. Assignment 1, Midterm"
+                className={FIELD_CLASS}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  value={gradeScore}
+                  onChange={(e) => setGradeScore(e.target.value)}
+                  placeholder="Score"
+                  className={SELECT_CLASS}
+                />
+                <input
+                  type="number"
+                  value={gradeMaxScore}
+                  onChange={(e) => setGradeMaxScore(e.target.value)}
+                  placeholder="Out of"
+                  className={SELECT_CLASS}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={mutatingGrade || !gradeStudentId || !gradeLabel.trim()}
+                onClick={() => void handleRecordGrade()}
+                className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
+              >
+                {mutatingGrade ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+                )}
+                Record grade
+              </button>
+            </>
+          )}
+
+          {gradesLoading ? (
+            <p className="text-xs text-muted-foreground">Loading…</p>
+          ) : grades.length > 0 ? (
+            <ul className="divide-y divide-border/60 border-t border-border/60 pt-1">
+              {grades.map((g) => (
+                <li key={g.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span className="min-w-0">
+                    <span className="block truncate text-foreground/90">
+                      {rosterNameById.get(g.userId) ?? "Former student"} — {g.label}
+                    </span>
+                    <span className="text-[10.5px] text-muted-foreground">
+                      {g.score}/{g.maxScore} · {formatRelative(g.gradedAt)}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Delete grade: ${g.label}`}
+                    disabled={mutatingGrade}
+                    onClick={() => void handleDeleteGrade(g.id)}
+                    className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       </section>
 

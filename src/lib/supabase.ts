@@ -115,6 +115,20 @@ export type FeedbackRow = {
   created_at: string;
 };
 
+// 0027_module_grades.sql — one row per graded item per student (not a
+// single "final grade" column), so a module can carry a real breakdown
+// ("Assignment 1", "Midterm", ...) over a term.
+export type ModuleGradeRow = {
+  id: string;
+  module_id: string;
+  user_id: string;
+  label: string;
+  score: number;
+  max_score: number;
+  graded_at: string;
+  graded_by: string | null;
+};
+
 // 0025_research_study.sql — see research-study.ts for the full reasoning.
 // Deliberately no user_id/email on either row: `anonymous_id` is a random
 // per-device id, never derived from or joined back to the real account.
@@ -252,6 +266,12 @@ export type Database = {
       research_survey_responses: {
         Row: ResearchSurveyResponseRow;
         Insert: ResearchSurveyResponseRow;
+        Update: never;
+        Relationships: [];
+      };
+      module_grades: {
+        Row: ModuleGradeRow;
+        Insert: ModuleGradeRow;
         Update: never;
         Relationships: [];
       };

@@ -13,6 +13,7 @@ import {
   Loader2,
   UserCheck,
   UserPlus,
+  Award,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { QuizPanel } from "@/components/QuizFlashcards";
@@ -44,6 +45,7 @@ import {
   moduleCompletion,
 } from "@/hooks/use-activity";
 import { useModuleEnrollment } from "@/hooks/use-enrollment";
+import { useModuleGrades } from "@/hooks/use-grades";
 
 export const Route = createFileRoute("/courses/$moduleId/")({
   loader: async ({ params }) => {
@@ -195,6 +197,11 @@ function ModuleDetail() {
     toggling,
     toggle: toggleEnrollment,
   } = useModuleEnrollment(module.id);
+  // RLS scopes this to only the signed-in student's own rows (see
+  // 0027_module_grades.sql) — no separate "is this actually mine" check
+  // needed client-side, the same query just can never return anyone
+  // else's grades.
+  const { grades } = useModuleGrades(module.id);
 
   return (
     <MobileShell>
@@ -256,6 +263,32 @@ function ModuleDetail() {
             </div>
             <div className="mt-6 h-px w-16 bg-prestige-gold" />
           </header>
+
+          {/* Grades — only ever renders what RLS actually returned for
+              this signed-in student, so an unenrolled/ungraded student
+              simply sees nothing here. */}
+          {grades.length > 0 && (
+            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                  <Award className="h-4 w-4" strokeWidth={1.75} />
+                </div>
+                <h2 className="font-display text-sm font-semibold text-prestige-deep">
+                  Your grades
+                </h2>
+              </div>
+              <ul className="mt-4 divide-y divide-border/60">
+                {grades.map((g) => (
+                  <li key={g.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                    <span className="min-w-0 truncate text-foreground/90">{g.label}</span>
+                    <span className="shrink-0 font-display text-sm font-medium text-prestige-deep">
+                      {g.score}/{g.maxScore}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Materials */}
           <section className="animate-rise">
