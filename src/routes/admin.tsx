@@ -17,21 +17,23 @@ function AdminLayout() {
   const { profile, loading } = useAuth();
 
   if (loading) {
-    return <div className="min-h-screen bg-console-bg" />;
+    return <div className="min-h-screen bg-background" />;
   }
 
   if (!profile?.is_lecturer) {
     return (
-      <div className="grid min-h-screen place-items-center bg-console-bg px-6 font-console-sans text-console-text">
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
         <div className="max-w-[36ch] text-center">
-          <p className="font-console-mono text-lg text-console-text">Lecturer access only</p>
-          <p className="mt-2 text-sm text-console-text-dim">
+          <p className="font-display text-lg font-medium text-prestige-deep">
+            Lecturer access only
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
             Your account isn't set up to administer content. Ask whoever administers this project's
             database to enable it for you.
           </p>
           <Link
             to="/dashboard"
-            className="mt-6 inline-flex items-center gap-2 rounded-md bg-console-accent px-4 py-2.5 text-xs font-semibold text-console-bg transition-transform active:scale-[0.97]"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-transform active:scale-[0.97]"
           >
             Back to dashboard
           </Link>

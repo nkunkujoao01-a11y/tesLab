@@ -1,13 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Plus } from "lucide-react";
 import { useCreateModule } from "@/hooks/use-catalog-admin";
 
 export const Route = createFileRoute("/admin/modules/new")({
   component: NewModulePage,
 });
 
-function ConsoleField({
+function AdminField({
   label,
   value,
   onChange,
@@ -22,15 +22,13 @@ function ConsoleField({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="font-console-mono text-[11px] uppercase tracking-wide text-console-text-faint">
-        {label}
-      </label>
+      <label className="eyebrow">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+        className="w-full rounded-lg border border-border/70 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
       />
     </div>
   );
@@ -68,60 +66,59 @@ function NewModulePage() {
     <div className="mx-auto max-w-[560px]">
       <Link
         to="/admin/modules"
-        className="font-console-mono text-[11px] text-console-text-faint hover:text-console-text"
+        className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
       >
-        ← Modules
+        <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+        Modules
       </Link>
-      <h1 className="mt-3 font-console-mono text-[22px] font-semibold tracking-tight text-console-text">
+      <h1 className="mt-3 font-display text-2xl font-medium tracking-tight text-prestige-deep">
         New module
       </h1>
 
-      <div className="mt-6 space-y-3 rounded-lg border border-console-border bg-console-surface p-5">
-        <ConsoleField
+      <div className="animate-rise mt-6 space-y-3 rounded-2xl bg-card p-5 ring-1 ring-border/60">
+        <AdminField
           label="Module code"
           value={code}
           onChange={setCode}
           placeholder="e.g. CHE 205"
         />
-        <ConsoleField
+        <AdminField
           label="Faculty"
           value={faculty}
           onChange={setFaculty}
           placeholder="e.g. Sciences"
         />
-        <ConsoleField
+        <AdminField
           label="Title"
           value={title}
           onChange={setTitle}
           placeholder="e.g. Organic Chemistry I"
         />
-        <ConsoleField
+        <AdminField
           label="Chapter"
           value={chapter}
           onChange={setChapter}
           placeholder="e.g. Chapter 01 — Bonding"
         />
-        <ConsoleField
+        <AdminField
           label="Lecturer"
           value={lecturer}
           onChange={setLecturer}
           placeholder="e.g. Dr. J. Amutenya"
         />
-        <ConsoleField
+        <AdminField
           label="Total lessons"
           value={totalLessons}
           onChange={setTotalLessons}
           type="number"
         />
         <div className="space-y-1.5">
-          <label className="font-console-mono text-[11px] uppercase tracking-wide text-console-text-faint">
-            Summary
-          </label>
+          <label className="eyebrow">Summary</label>
           <textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             rows={3}
-            className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+            className="w-full resize-none rounded-lg border border-border/70 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
             placeholder="A short description students see on the module card."
           />
         </div>
@@ -131,7 +128,7 @@ function NewModulePage() {
         type="button"
         disabled={creating}
         onClick={() => void handleCreate()}
-        className="mt-5 inline-flex items-center gap-2 rounded-md bg-console-accent px-4 py-2.5 text-xs font-semibold text-console-bg transition-all active:scale-[0.97] disabled:opacity-40"
+        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
       >
         {creating ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />

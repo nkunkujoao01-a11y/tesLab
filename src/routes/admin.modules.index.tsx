@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { fetchAdminModules, type AdminModuleSummary } from "@/lib/admin-console-api";
 
 export const Route = createFileRoute("/admin/modules/")({
@@ -9,23 +10,23 @@ export const Route = createFileRoute("/admin/modules/")({
 function StatusPill({ module }: { module: AdminModuleSummary }) {
   if (module.materialCount === 0) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-console-text-faint/15 px-2 py-0.5 font-console-mono text-[10.5px] text-console-text-dim">
-        <span className="h-1.5 w-1.5 rounded-full bg-console-text-faint" />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground">
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
         Draft
       </span>
     );
   }
   if (module.quizQuestionCount === 0) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-console-warn/15 px-2 py-0.5 font-console-mono text-[10.5px] text-console-warn">
-        <span className="h-1.5 w-1.5 rounded-full bg-console-warn" />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-prestige-gold/15 px-2 py-0.5 text-[10.5px] font-medium text-prestige-gold">
+        <span className="h-1.5 w-1.5 rounded-full bg-prestige-gold" />
         No quiz yet
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-console-good/15 px-2 py-0.5 font-console-mono text-[10.5px] text-console-good">
-      <span className="h-1.5 w-1.5 rounded-full bg-console-good" />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-prestige-mid/15 px-2 py-0.5 text-[10.5px] font-medium text-prestige-mid">
+      <span className="h-1.5 w-1.5 rounded-full bg-prestige-mid" />
       Published
     </span>
   );
@@ -54,29 +55,28 @@ function AdminModulesPage() {
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <p className="font-console-mono text-[11px] uppercase tracking-widest text-console-text-faint">
-            Catalog
-          </p>
-          <h1 className="mt-1 font-console-mono text-[22px] font-semibold tracking-tight text-console-text">
+          <p className="eyebrow">Catalog</p>
+          <h1 className="mt-1 font-display text-2xl font-medium tracking-tight text-prestige-deep">
             Modules
           </h1>
         </div>
         <Link
           to="/admin/modules/new"
-          className="inline-flex items-center gap-2 rounded-md bg-console-accent px-3.5 py-2 text-[12.5px] font-semibold text-console-bg transition-transform active:scale-[0.97]"
+          className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-3.5 py-2 text-xs font-semibold text-prestige-cream transition-transform active:scale-[0.97]"
         >
-          + New module
+          <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+          New module
         </Link>
       </div>
 
       {error && (
-        <p className="rounded-lg border border-console-critical/40 bg-console-critical/10 p-4 text-sm text-console-critical">
+        <p className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive ring-1 ring-destructive/30">
           Couldn't load the modules list. Try refreshing.
         </p>
       )}
 
       {!error && (
-        <div className="overflow-hidden rounded-lg border border-console-border bg-console-surface">
+        <div className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
@@ -84,7 +84,7 @@ function AdminModulesPage() {
                   {["Module", "Materials", "Quiz", "Enrolled", "Status"].map((h) => (
                     <th
                       key={h}
-                      className="whitespace-nowrap border-b border-console-border px-4 py-2.5 text-left font-console-mono text-[10px] font-medium uppercase tracking-wider text-console-text-faint"
+                      className="eyebrow whitespace-nowrap border-b border-border/60 px-4 py-2.5 text-left"
                     >
                       {h}
                     </th>
@@ -94,40 +94,35 @@ function AdminModulesPage() {
               <tbody>
                 {modules?.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-4 py-8 text-center text-xs text-console-text-faint"
-                    >
+                    <td colSpan={5} className="px-4 py-8 text-center text-xs text-muted-foreground">
                       No modules yet — create one to get started.
                     </td>
                   </tr>
                 )}
                 {modules?.map((m) => (
-                  <tr key={m.id} className="hover:bg-console-surface-2">
-                    <td className="border-b border-console-border px-4 py-3">
+                  <tr key={m.id} className="transition-colors hover:bg-secondary/60">
+                    <td className="border-b border-border/60 px-4 py-3">
                       <Link
                         to="/admin/modules/$moduleId"
                         params={{ moduleId: m.id }}
                         className="block"
                       >
-                        <p className="text-[12.5px] font-medium text-console-text hover:text-console-accent">
+                        <p className="text-sm font-medium text-prestige-deep hover:text-prestige-mid">
                           {m.title}
                         </p>
-                        <p className="mt-0.5 font-console-mono text-[10.5px] text-console-text-faint">
-                          {m.code}
-                        </p>
+                        <p className="mt-0.5 text-[10.5px] text-muted-foreground">{m.code}</p>
                       </Link>
                     </td>
-                    <td className="border-b border-console-border px-4 py-3 text-right font-console-mono text-[12px] tabular-nums text-console-text">
+                    <td className="border-b border-border/60 px-4 py-3 text-right text-[12px] tabular-nums text-foreground/90">
                       {m.materialCount}
                     </td>
-                    <td className="border-b border-console-border px-4 py-3 text-right font-console-mono text-[12px] tabular-nums text-console-text">
+                    <td className="border-b border-border/60 px-4 py-3 text-right text-[12px] tabular-nums text-foreground/90">
                       {m.quizQuestionCount}
                     </td>
-                    <td className="border-b border-console-border px-4 py-3 text-right font-console-mono text-[12px] tabular-nums text-console-text">
+                    <td className="border-b border-border/60 px-4 py-3 text-right text-[12px] tabular-nums text-foreground/90">
                       {m.enrolledCount}
                     </td>
-                    <td className="border-b border-console-border px-4 py-3">
+                    <td className="border-b border-border/60 px-4 py-3">
                       <StatusPill module={m} />
                     </td>
                   </tr>

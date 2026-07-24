@@ -1,6 +1,15 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { Loader2, Plus, Upload, Users, FileText, ListChecks } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Loader2,
+  Plus,
+  Upload,
+  Users,
+  FileText,
+  ListChecks,
+} from "lucide-react";
 import { toast } from "sonner";
 import { fetchModule } from "@/lib/modules-api";
 import { useCreateMaterial, useCreateModuleQuizQuestion } from "@/hooks/use-catalog-admin";
@@ -19,6 +28,11 @@ export const Route = createFileRoute("/admin/modules/$moduleId")({
 });
 
 const KIND_OPTIONS = ["reading", "slides", "handout", "notes"];
+
+const FIELD_CLASS =
+  "w-full rounded-lg border border-border/70 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50";
+const SELECT_CLASS =
+  "rounded-lg border border-border/70 bg-background px-2 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50";
 
 function AdminModuleDetailPage() {
   const { module } = Route.useLoaderData();
@@ -122,40 +136,43 @@ function AdminModuleDetailPage() {
     <div className="mx-auto max-w-[760px]">
       <Link
         to="/admin/modules"
-        className="font-console-mono text-[11px] text-console-text-faint hover:text-console-text"
+        className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
       >
-        ← Modules
+        <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+        Modules
       </Link>
-      <h1 className="mt-3 font-console-mono text-[22px] font-semibold tracking-tight text-console-text">
+      <h1 className="mt-3 font-display text-2xl font-medium tracking-tight text-prestige-deep">
         {module.title}
       </h1>
-      <p className="mt-1 font-console-mono text-[11px] text-console-text-faint">
+      <p className="mt-1 text-xs text-muted-foreground">
         {module.code} · {module.faculty} · {module.chapter}
       </p>
 
       {/* Materials */}
-      <section className="mt-7 rounded-lg border border-console-border bg-console-surface p-5">
+      <section className="animate-rise mt-7 rounded-2xl bg-card p-5 ring-1 ring-border/60">
         <div className="flex items-center gap-2.5">
-          <FileText className="h-4 w-4 text-console-info" strokeWidth={1.75} />
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+            <FileText className="h-4 w-4" strokeWidth={1.75} />
+          </div>
           <div>
-            <p className="text-[13px] font-semibold text-console-text">Materials</p>
-            <p className="text-[11px] text-console-text-faint">
+            <p className="text-sm font-medium text-prestige-deep">Materials</p>
+            <p className="text-[11px] text-muted-foreground">
               {existingMaterials.length} in this module
             </p>
           </div>
         </div>
 
         {existingMaterials.length > 0 && (
-          <ul className="mt-3 space-y-1 border-t border-console-border pt-3">
+          <ul className="mt-3 space-y-1 border-t border-border/60 pt-3">
             {existingMaterials.map((t, i) => (
-              <li key={i} className="truncate text-xs text-console-text-dim">
+              <li key={i} className="truncate text-xs text-muted-foreground">
                 · {t}
               </li>
             ))}
           </ul>
         )}
 
-        <div className="mt-4 space-y-3 border-t border-console-border pt-4">
+        <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
           <div>
             <input
               ref={fileInputRef}
@@ -168,7 +185,7 @@ function AdminModuleDetailPage() {
               type="button"
               disabled={extracting}
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-console-text-dim ring-1 ring-console-border transition-all hover:bg-console-surface-2 disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary disabled:opacity-40"
             >
               {extracting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
@@ -182,13 +199,13 @@ function AdminModuleDetailPage() {
             value={matTitle}
             onChange={(e) => setMatTitle(e.target.value)}
             placeholder="Title"
-            className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+            className={FIELD_CLASS}
           />
           <div className="grid grid-cols-3 gap-2">
             <select
               value={matKind}
               onChange={(e) => setMatKind(e.target.value)}
-              className="rounded-md border border-console-border bg-console-bg px-2 py-2 text-xs text-console-text focus:outline-none focus:ring-1 focus:ring-console-accent"
+              className={SELECT_CLASS}
             >
               {KIND_OPTIONS.map((k) => (
                 <option key={k} value={k}>
@@ -201,47 +218,47 @@ function AdminModuleDetailPage() {
               value={matPages}
               onChange={(e) => setMatPages(e.target.value)}
               placeholder="Pages"
-              className="rounded-md border border-console-border bg-console-bg px-2 py-2 text-xs text-console-text focus:outline-none focus:ring-1 focus:ring-console-accent"
+              className={SELECT_CLASS}
             />
             <input
               type="number"
               value={matSizeMb}
               onChange={(e) => setMatSizeMb(e.target.value)}
               placeholder="Size (MB)"
-              className="rounded-md border border-console-border bg-console-bg px-2 py-2 text-xs text-console-text focus:outline-none focus:ring-1 focus:ring-console-accent"
+              className={SELECT_CLASS}
             />
           </div>
           <input
             value={heading}
             onChange={(e) => setHeading(e.target.value)}
             placeholder="Heading"
-            className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+            className={FIELD_CLASS}
           />
           <textarea
             value={lead}
             onChange={(e) => setLead(e.target.value)}
             rows={2}
             placeholder="Lead paragraph"
-            className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+            className={`${FIELD_CLASS} resize-none`}
           />
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={5}
             placeholder="Body (separate paragraphs with a blank line)"
-            className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+            className={`${FIELD_CLASS} resize-none`}
           />
           <input
             value={pull}
             onChange={(e) => setPull(e.target.value)}
             placeholder="Pull quote (optional)"
-            className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+            className={FIELD_CLASS}
           />
           <button
             type="button"
             disabled={creatingMaterial}
             onClick={() => void handleAddMaterial()}
-            className="inline-flex items-center gap-2 rounded-md bg-console-accent px-4 py-2 text-xs font-semibold text-console-bg transition-all active:scale-[0.97] disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
           >
             {creatingMaterial ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
@@ -254,34 +271,36 @@ function AdminModuleDetailPage() {
       </section>
 
       {/* Quiz */}
-      <section className="mt-5 rounded-lg border border-console-border bg-console-surface p-5">
+      <section className="animate-rise mt-5 rounded-2xl bg-card p-5 ring-1 ring-border/60">
         <div className="flex items-center gap-2.5">
-          <ListChecks className="h-4 w-4 text-console-info" strokeWidth={1.75} />
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+            <ListChecks className="h-4 w-4" strokeWidth={1.75} />
+          </div>
           <div>
-            <p className="text-[13px] font-semibold text-console-text">Quiz questions</p>
-            <p className="text-[11px] text-console-text-faint">
+            <p className="text-sm font-medium text-prestige-deep">Quiz questions</p>
+            <p className="text-[11px] text-muted-foreground">
               {existingQuestions.length} live — shared across every student in this module
             </p>
           </div>
         </div>
 
         {existingQuestions.length > 0 && (
-          <ul className="mt-3 space-y-1 border-t border-console-border pt-3">
+          <ul className="mt-3 space-y-1 border-t border-border/60 pt-3">
             {existingQuestions.map((q, i) => (
-              <li key={i} className="truncate text-xs text-console-text-dim">
+              <li key={i} className="truncate text-xs text-muted-foreground">
                 {i + 1}. {q}
               </li>
             ))}
           </ul>
         )}
 
-        <div className="mt-4 space-y-3 border-t border-console-border pt-4">
+        <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
           <textarea
             value={qQuestion}
             onChange={(e) => setQQuestion(e.target.value)}
             rows={2}
             placeholder="e.g. What does RLS stand for?"
-            className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+            className={`${FIELD_CLASS} resize-none`}
           />
           {qOptions.map((opt, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -291,6 +310,7 @@ function AdminModuleDetailPage() {
                 checked={qCorrectIndex === i}
                 onChange={() => setQCorrectIndex(i)}
                 aria-label={`Option ${i + 1} is correct`}
+                className="accent-prestige-deep"
               />
               <input
                 type="text"
@@ -299,7 +319,7 @@ function AdminModuleDetailPage() {
                   setQOptions((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))
                 }
                 placeholder={`Option ${i + 1}${i === qCorrectIndex ? " (correct)" : ""}`}
-                className="w-full rounded-md border border-console-border bg-console-bg px-3 py-2 text-sm text-console-text placeholder:text-console-text-faint focus:outline-none focus:ring-1 focus:ring-console-accent"
+                className={FIELD_CLASS}
               />
             </div>
           ))}
@@ -307,7 +327,7 @@ function AdminModuleDetailPage() {
             type="button"
             disabled={creatingQuestion}
             onClick={() => void handleAddQuestion()}
-            className="inline-flex items-center gap-2 rounded-md bg-console-accent px-4 py-2 text-xs font-semibold text-console-bg transition-all active:scale-[0.97] disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
           >
             {creatingQuestion ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
@@ -320,30 +340,32 @@ function AdminModuleDetailPage() {
       </section>
 
       {/* Roster */}
-      <section className="mt-5 rounded-lg border border-console-border bg-console-surface p-5">
+      <section className="animate-rise mt-5 rounded-2xl bg-card p-5 ring-1 ring-border/60">
         <div className="flex items-center gap-2.5">
-          <Users className="h-4 w-4 text-console-info" strokeWidth={1.75} />
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+            <Users className="h-4 w-4" strokeWidth={1.75} />
+          </div>
           <div>
-            <p className="text-[13px] font-semibold text-console-text">Registered students</p>
-            <p className="text-[11px] text-console-text-faint">
+            <p className="text-sm font-medium text-prestige-deep">Registered students</p>
+            <p className="text-[11px] text-muted-foreground">
               Students who've enrolled themselves in this module
             </p>
           </div>
         </div>
-        <div className="mt-3 border-t border-console-border pt-3">
+        <div className="mt-3 border-t border-border/60 pt-3">
           {rosterLoading ? (
-            <p className="text-xs text-console-text-faint">Loading…</p>
+            <p className="text-xs text-muted-foreground">Loading…</p>
           ) : roster.length === 0 ? (
-            <p className="text-xs text-console-text-faint">No one has enrolled yet.</p>
+            <p className="text-xs text-muted-foreground">No one has enrolled yet.</p>
           ) : (
-            <ul className="divide-y divide-console-border">
+            <ul className="divide-y divide-border/60">
               {roster.map((entry) => (
                 <li
                   key={entry.userId}
                   className="flex items-center justify-between gap-4 py-2 text-sm"
                 >
-                  <span className="min-w-0 truncate text-console-text">{entry.fullName}</span>
-                  <span className="shrink-0 font-console-mono text-[10.5px] text-console-text-faint">
+                  <span className="min-w-0 truncate text-foreground/90">{entry.fullName}</span>
+                  <span className="shrink-0 text-[10.5px] text-muted-foreground">
                     {formatRelative(entry.enrolledAt)}
                   </span>
                 </li>
@@ -353,15 +375,16 @@ function AdminModuleDetailPage() {
         </div>
       </section>
 
-      <div className="mt-6 flex items-center justify-between font-console-mono text-[10.5px] text-console-text-faint">
+      <div className="mt-6 flex items-center justify-between text-[10.5px] text-muted-foreground">
         <span>{formatMb(module.sizeMb)} total</span>
         <Link
           to="/courses/$moduleId"
           params={{ moduleId }}
           reloadDocument
-          className="text-console-info hover:underline"
+          className="inline-flex items-center gap-1 text-prestige-mid hover:text-prestige-deep hover:underline"
         >
-          View as a student would →
+          View as a student would
+          <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
         </Link>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { MessageSquareWarning, MessageSquareText, Users } from "lucide-react";
+import { MessageSquareWarning, MessageSquareText, Plus, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { fetchAdminOverview, type AdminOverview } from "@/lib/admin-console-api";
 import { formatRelative } from "@/lib/mock-data";
 
@@ -21,17 +22,17 @@ function StatTile({
 }) {
   const toneClass =
     tone === "up"
-      ? "text-console-good"
+      ? "text-prestige-mid"
       : tone === "warn"
-        ? "text-console-warn"
-        : "text-console-text-faint";
+        ? "text-destructive"
+        : "text-muted-foreground";
   return (
-    <div className="rounded-lg border border-console-border bg-console-surface p-4">
-      <p className="text-[11.5px] text-console-text-dim">{label}</p>
-      <p className="mt-2 font-console-mono text-[26px] font-semibold tabular-nums text-console-text">
+    <div className="animate-rise rounded-2xl bg-card p-4 ring-1 ring-border/60">
+      <p className="text-[11.5px] text-muted-foreground">{label}</p>
+      <p className="mt-2 font-display text-[26px] font-medium tabular-nums text-prestige-deep">
         {value}
       </p>
-      <p className={`mt-1 font-console-mono text-[11px] tabular-nums ${toneClass}`}>{delta}</p>
+      <p className={cn("mt-1 text-[11px] tabular-nums", toneClass)}>{delta}</p>
     </div>
   );
 }
@@ -59,23 +60,22 @@ function AdminOverviewPage() {
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <p className="font-console-mono text-[11px] uppercase tracking-widest text-console-text-faint">
-            Namibia University of Science and Technology
-          </p>
-          <h1 className="mt-1 font-console-mono text-[22px] font-semibold tracking-tight text-console-text">
+          <p className="eyebrow">Namibia University of Science and Technology</p>
+          <h1 className="mt-1 font-display text-2xl font-medium tracking-tight text-prestige-deep">
             Console overview
           </h1>
         </div>
         <Link
           to="/admin/modules/new"
-          className="inline-flex items-center gap-2 rounded-md bg-console-accent px-3.5 py-2 text-[12.5px] font-semibold text-console-bg transition-transform active:scale-[0.97]"
+          className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-3.5 py-2 text-xs font-semibold text-prestige-cream transition-transform active:scale-[0.97]"
         >
-          + New module
+          <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+          New module
         </Link>
       </div>
 
       {error && (
-        <p className="rounded-lg border border-console-critical/40 bg-console-critical/10 p-4 text-sm text-console-critical">
+        <p className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive ring-1 ring-destructive/30">
           Couldn't load the console overview. Try refreshing.
         </p>
       )}
@@ -108,36 +108,36 @@ function AdminOverviewPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-            <div className="overflow-hidden rounded-lg border border-console-border bg-console-surface">
-              <div className="flex items-center justify-between border-b border-console-border px-4 py-3.5">
+            <div className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
+              <div className="flex items-center justify-between border-b border-border/60 px-4 py-3.5">
                 <div>
-                  <p className="text-[13px] font-semibold text-console-text">Feedback inbox</p>
-                  <p className="mt-0.5 text-[11.5px] text-console-text-faint">Most recent</p>
+                  <p className="text-sm font-medium text-prestige-deep">Feedback inbox</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">Most recent</p>
                 </div>
                 <Link
                   to="/admin/feedback"
-                  className="font-console-mono text-[11px] text-console-info hover:underline"
+                  className="text-xs font-medium text-prestige-mid hover:text-prestige-deep hover:underline"
                 >
                   View all →
                 </Link>
               </div>
               <div>
                 {data && data.recentFeedback.length === 0 && (
-                  <p className="px-4 py-6 text-xs text-console-text-faint">
+                  <p className="px-4 py-6 text-xs text-muted-foreground">
                     No feedback submitted yet.
                   </p>
                 )}
                 {data?.recentFeedback.map((f) => (
                   <div
                     key={f.id}
-                    className="flex gap-2.5 border-b border-console-border px-4 py-3 last:border-none"
+                    className="flex gap-2.5 border-b border-border/60 px-4 py-3 last:border-none"
                   >
-                    <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-md bg-console-surface-2 text-console-info">
+                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
                       <MessageSquareWarning className="h-3.5 w-3.5" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-xs text-console-text">{f.message}</p>
-                      <p className="mt-0.5 font-console-mono text-[10.5px] text-console-text-faint">
+                      <p className="truncate text-xs text-foreground/90">{f.message}</p>
+                      <p className="mt-0.5 text-[10.5px] text-muted-foreground">
                         {f.fullName} · {formatRelative(f.createdAt)}
                       </p>
                     </div>
@@ -146,40 +146,40 @@ function AdminOverviewPage() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-console-border bg-console-surface">
-              <div className="flex items-center justify-between border-b border-console-border px-4 py-3.5">
+            <div className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
+              <div className="flex items-center justify-between border-b border-border/60 px-4 py-3.5">
                 <div>
-                  <p className="text-[13px] font-semibold text-console-text">Recently registered</p>
-                  <p className="mt-0.5 text-[11.5px] text-console-text-faint">Across all modules</p>
+                  <p className="text-sm font-medium text-prestige-deep">Recently registered</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">Across all modules</p>
                 </div>
                 <Link
                   to="/admin/modules"
-                  className="font-console-mono text-[11px] text-console-info hover:underline"
+                  className="text-xs font-medium text-prestige-mid hover:text-prestige-deep hover:underline"
                 >
                   Modules →
                 </Link>
               </div>
               <div>
                 {data && data.recentEnrollments.length === 0 && (
-                  <p className="px-4 py-6 text-xs text-console-text-faint">
+                  <p className="px-4 py-6 text-xs text-muted-foreground">
                     No one has enrolled yet.
                   </p>
                 )}
                 {data?.recentEnrollments.map((e) => (
                   <div
                     key={`${e.userId}-${e.enrolledAt}`}
-                    className="flex items-center gap-2.5 border-b border-console-border px-4 py-2.5 last:border-none"
+                    className="flex items-center gap-2.5 border-b border-border/60 px-4 py-2.5 last:border-none"
                   >
-                    <div className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-console-surface-2 text-console-text-dim">
+                    <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
                       <Users className="h-3 w-3" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs text-console-text">{e.fullName}</p>
-                      <p className="truncate text-[10.5px] text-console-text-faint">
+                      <p className="truncate text-xs text-foreground/90">{e.fullName}</p>
+                      <p className="truncate text-[10.5px] text-muted-foreground">
                         {e.moduleTitle}
                       </p>
                     </div>
-                    <span className="shrink-0 font-console-mono text-[10px] text-console-text-faint">
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
                       {formatRelative(e.enrolledAt)}
                     </span>
                   </div>
@@ -188,7 +188,7 @@ function AdminOverviewPage() {
             </div>
           </div>
 
-          <div className="mt-8 flex items-center justify-between border-t border-console-border pt-4 font-console-mono text-[10.5px] text-console-text-faint">
+          <div className="mt-8 flex items-center justify-between border-t border-border/60 pt-4 text-[10.5px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <MessageSquareText className="h-3 w-3" strokeWidth={1.75} />
               eLearn Admin Console — internal tool, not visible to students
