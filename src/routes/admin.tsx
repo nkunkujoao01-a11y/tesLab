@@ -20,7 +20,7 @@ function AdminLayout() {
     return <div className="min-h-screen bg-background" />;
   }
 
-  if (!profile?.is_lecturer) {
+  if (!profile?.is_lecturer && !profile?.is_super_admin) {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
         <div className="max-w-[36ch] text-center">

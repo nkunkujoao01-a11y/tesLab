@@ -45,6 +45,12 @@ export type ProfileRow = {
   // since it gates write access to the shared catalog every student
   // reads. See supabase/migrations/0008_lecturer_role.sql.
   is_lecturer: boolean;
+  // Same manual-only philosophy as is_lecturer, one tier up — a super
+  // admin automatically inherits every is_lecturer-gated capability (see
+  // is_lecturer()'s redefinition in 0035_super_admin_role.sql) plus the
+  // /admin/super console. Granting/revoking this stays dashboard-only;
+  // there is no in-app "make super admin" control anywhere, deliberately.
+  is_super_admin: boolean;
 };
 
 // Mirror src/lib/db.ts's per-user IndexedDB tables — see Feature 23

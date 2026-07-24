@@ -9,7 +9,15 @@
 // completely different, disconnected app from the student side.
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, BookOpen, Inbox, type LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  BookOpen,
+  Inbox,
+  ShieldCheck,
+  UsersRound,
+  ClipboardList,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/lib/supabase";
@@ -121,6 +129,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               />
             </div>
           </div>
+          {profile?.is_super_admin && (
+            <div>
+              <p className="eyebrow px-3 pb-1.5">Super admin</p>
+              <div className="space-y-0.5">
+                <NavItem to="/admin/super" icon={ShieldCheck} label="Overview" />
+                <NavItem to="/admin/super/users" icon={UsersRound} label="User directory" />
+                <NavItem to="/admin/super/research" icon={ClipboardList} label="Research data" />
+              </div>
+            </div>
+          )}
         </nav>
 
         <div className="flex items-center gap-3 border-t border-border/60 px-6 py-5">
@@ -129,7 +147,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="min-w-0 leading-tight">
             <p className="truncate text-sm font-medium text-prestige-deep">{fullName}</p>
-            <p className="eyebrow">Lecturer</p>
+            <p className="eyebrow">{profile?.is_super_admin ? "Super admin" : "Lecturer"}</p>
           </div>
         </div>
       </aside>
@@ -147,6 +165,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <NavItem to="/admin" icon={LayoutDashboard} label="" />
           <NavItem to="/admin/modules" icon={BookOpen} label="" />
           <NavItem to="/admin/feedback" icon={Inbox} label="" count={counts.feedback} hot />
+          {profile?.is_super_admin && (
+            <>
+              <NavItem to="/admin/super" icon={ShieldCheck} label="" />
+              <NavItem to="/admin/super/users" icon={UsersRound} label="" />
+              <NavItem to="/admin/super/research" icon={ClipboardList} label="" />
+            </>
+          )}
         </nav>
       </div>
 

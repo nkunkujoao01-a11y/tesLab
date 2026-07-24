@@ -28,10 +28,12 @@ import { Route as CoursesIndexRouteImport } from './routes/courses.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as DocumentsDocIdRouteImport } from './routes/documents.$docId'
 import { Route as CoursesModuleIdRouteImport } from './routes/courses.$moduleId'
+import { Route as AdminSuperRouteImport } from './routes/admin.super'
 import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
 import { Route as DocumentsDocIdIndexRouteImport } from './routes/documents.$docId.index'
 import { Route as CoursesMoodleIndexRouteImport } from './routes/courses.moodle.index'
 import { Route as CoursesModuleIdIndexRouteImport } from './routes/courses.$moduleId.index'
+import { Route as AdminSuperIndexRouteImport } from './routes/admin.super.index'
 import { Route as AdminModulesIndexRouteImport } from './routes/admin.modules.index'
 import { Route as DocumentsCollectionsCollectionIdRouteImport } from './routes/documents.collections.$collectionId'
 import { Route as DocumentsDocIdViewRouteImport } from './routes/documents.$docId.view'
@@ -41,6 +43,8 @@ import { Route as DocumentsDocIdNotesRouteImport } from './routes/documents.$doc
 import { Route as DocumentsDocIdFlashcardsRouteImport } from './routes/documents.$docId.flashcards'
 import { Route as DocumentsDocIdChatRouteImport } from './routes/documents.$docId.chat'
 import { Route as CoursesMoodleCourseIdRouteImport } from './routes/courses.moodle.$courseId'
+import { Route as AdminSuperUsersRouteImport } from './routes/admin.super.users'
+import { Route as AdminSuperResearchRouteImport } from './routes/admin.super.research'
 import { Route as AdminModulesNewRouteImport } from './routes/admin.modules.new'
 import { Route as AdminModulesModuleIdRouteImport } from './routes/admin.modules.$moduleId'
 import { Route as DocumentsCollectionsCollectionIdIndexRouteImport } from './routes/documents.collections.$collectionId.index'
@@ -149,6 +153,11 @@ const CoursesModuleIdRoute = CoursesModuleIdRouteImport.update({
   path: '/$moduleId',
   getParentRoute: () => CoursesRoute,
 } as any)
+const AdminSuperRoute = AdminSuperRouteImport.update({
+  id: '/super',
+  path: '/super',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
   id: '/feedback',
   path: '/feedback',
@@ -168,6 +177,11 @@ const CoursesModuleIdIndexRoute = CoursesModuleIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => CoursesModuleIdRoute,
+} as any)
+const AdminSuperIndexRoute = AdminSuperIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminSuperRoute,
 } as any)
 const AdminModulesIndexRoute = AdminModulesIndexRouteImport.update({
   id: '/modules/',
@@ -215,6 +229,16 @@ const CoursesMoodleCourseIdRoute = CoursesMoodleCourseIdRouteImport.update({
   id: '/moodle/$courseId',
   path: '/moodle/$courseId',
   getParentRoute: () => CoursesRoute,
+} as any)
+const AdminSuperUsersRoute = AdminSuperUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminSuperRoute,
+} as any)
+const AdminSuperResearchRoute = AdminSuperResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
+  getParentRoute: () => AdminSuperRoute,
 } as any)
 const AdminModulesNewRoute = AdminModulesNewRouteImport.update({
   id: '/modules/new',
@@ -303,6 +327,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
   '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/super': typeof AdminSuperRouteWithChildren
   '/courses/$moduleId': typeof CoursesModuleIdRouteWithChildren
   '/documents/$docId': typeof DocumentsDocIdRouteWithChildren
   '/admin/': typeof AdminIndexRoute
@@ -310,6 +335,8 @@ export interface FileRoutesByFullPath {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/admin/super/research': typeof AdminSuperResearchRoute
+  '/admin/super/users': typeof AdminSuperUsersRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
   '/documents/$docId/chat': typeof DocumentsDocIdChatRoute
   '/documents/$docId/flashcards': typeof DocumentsDocIdFlashcardsRoute
@@ -319,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/documents/$docId/view': typeof DocumentsDocIdViewRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
+  '/admin/super/': typeof AdminSuperIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
   '/courses/moodle/': typeof CoursesMoodleIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
@@ -351,6 +379,8 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/admin/super/research': typeof AdminSuperResearchRoute
+  '/admin/super/users': typeof AdminSuperUsersRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
   '/documents/$docId/chat': typeof DocumentsDocIdChatRoute
   '/documents/$docId/flashcards': typeof DocumentsDocIdFlashcardsRoute
@@ -359,6 +389,7 @@ export interface FileRoutesByTo {
   '/documents/$docId/summary': typeof DocumentsDocIdSummaryRoute
   '/documents/$docId/view': typeof DocumentsDocIdViewRoute
   '/admin/modules': typeof AdminModulesIndexRoute
+  '/admin/super': typeof AdminSuperIndexRoute
   '/courses/$moduleId': typeof CoursesModuleIdIndexRoute
   '/courses/moodle': typeof CoursesMoodleIndexRoute
   '/documents/$docId': typeof DocumentsDocIdIndexRoute
@@ -390,6 +421,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
   '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/super': typeof AdminSuperRouteWithChildren
   '/courses/$moduleId': typeof CoursesModuleIdRouteWithChildren
   '/documents/$docId': typeof DocumentsDocIdRouteWithChildren
   '/admin/': typeof AdminIndexRoute
@@ -397,6 +429,8 @@ export interface FileRoutesById {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/admin/super/research': typeof AdminSuperResearchRoute
+  '/admin/super/users': typeof AdminSuperUsersRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
   '/documents/$docId/chat': typeof DocumentsDocIdChatRoute
   '/documents/$docId/flashcards': typeof DocumentsDocIdFlashcardsRoute
@@ -406,6 +440,7 @@ export interface FileRoutesById {
   '/documents/$docId/view': typeof DocumentsDocIdViewRoute
   '/documents/collections/$collectionId': typeof DocumentsCollectionsCollectionIdRouteWithChildren
   '/admin/modules/': typeof AdminModulesIndexRoute
+  '/admin/super/': typeof AdminSuperIndexRoute
   '/courses/$moduleId/': typeof CoursesModuleIdIndexRoute
   '/courses/moodle/': typeof CoursesMoodleIndexRoute
   '/documents/$docId/': typeof DocumentsDocIdIndexRoute
@@ -438,6 +473,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/summaries'
     | '/admin/feedback'
+    | '/admin/super'
     | '/courses/$moduleId'
     | '/documents/$docId'
     | '/admin/'
@@ -445,6 +481,8 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/admin/super/research'
+    | '/admin/super/users'
     | '/courses/moodle/$courseId'
     | '/documents/$docId/chat'
     | '/documents/$docId/flashcards'
@@ -454,6 +492,7 @@ export interface FileRouteTypes {
     | '/documents/$docId/view'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
+    | '/admin/super/'
     | '/courses/$moduleId/'
     | '/courses/moodle/'
     | '/documents/$docId/'
@@ -486,6 +525,8 @@ export interface FileRouteTypes {
     | '/documents'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/admin/super/research'
+    | '/admin/super/users'
     | '/courses/moodle/$courseId'
     | '/documents/$docId/chat'
     | '/documents/$docId/flashcards'
@@ -494,6 +535,7 @@ export interface FileRouteTypes {
     | '/documents/$docId/summary'
     | '/documents/$docId/view'
     | '/admin/modules'
+    | '/admin/super'
     | '/courses/$moduleId'
     | '/courses/moodle'
     | '/documents/$docId'
@@ -524,6 +566,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/summaries'
     | '/admin/feedback'
+    | '/admin/super'
     | '/courses/$moduleId'
     | '/documents/$docId'
     | '/admin/'
@@ -531,6 +574,8 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/admin/super/research'
+    | '/admin/super/users'
     | '/courses/moodle/$courseId'
     | '/documents/$docId/chat'
     | '/documents/$docId/flashcards'
@@ -540,6 +585,7 @@ export interface FileRouteTypes {
     | '/documents/$docId/view'
     | '/documents/collections/$collectionId'
     | '/admin/modules/'
+    | '/admin/super/'
     | '/courses/$moduleId/'
     | '/courses/moodle/'
     | '/documents/$docId/'
@@ -707,6 +753,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesModuleIdRouteImport
       parentRoute: typeof CoursesRoute
     }
+    '/admin/super': {
+      id: '/admin/super'
+      path: '/super'
+      fullPath: '/admin/super'
+      preLoaderRoute: typeof AdminSuperRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/feedback': {
       id: '/admin/feedback'
       path: '/feedback'
@@ -734,6 +787,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/courses/$moduleId/'
       preLoaderRoute: typeof CoursesModuleIdIndexRouteImport
       parentRoute: typeof CoursesModuleIdRoute
+    }
+    '/admin/super/': {
+      id: '/admin/super/'
+      path: '/'
+      fullPath: '/admin/super/'
+      preLoaderRoute: typeof AdminSuperIndexRouteImport
+      parentRoute: typeof AdminSuperRoute
     }
     '/admin/modules/': {
       id: '/admin/modules/'
@@ -797,6 +857,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/courses/moodle/$courseId'
       preLoaderRoute: typeof CoursesMoodleCourseIdRouteImport
       parentRoute: typeof CoursesRoute
+    }
+    '/admin/super/users': {
+      id: '/admin/super/users'
+      path: '/users'
+      fullPath: '/admin/super/users'
+      preLoaderRoute: typeof AdminSuperUsersRouteImport
+      parentRoute: typeof AdminSuperRoute
+    }
+    '/admin/super/research': {
+      id: '/admin/super/research'
+      path: '/research'
+      fullPath: '/admin/super/research'
+      preLoaderRoute: typeof AdminSuperResearchRouteImport
+      parentRoute: typeof AdminSuperRoute
     }
     '/admin/modules/new': {
       id: '/admin/modules/new'
@@ -885,8 +959,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminSuperRouteChildren {
+  AdminSuperResearchRoute: typeof AdminSuperResearchRoute
+  AdminSuperUsersRoute: typeof AdminSuperUsersRoute
+  AdminSuperIndexRoute: typeof AdminSuperIndexRoute
+}
+
+const AdminSuperRouteChildren: AdminSuperRouteChildren = {
+  AdminSuperResearchRoute: AdminSuperResearchRoute,
+  AdminSuperUsersRoute: AdminSuperUsersRoute,
+  AdminSuperIndexRoute: AdminSuperIndexRoute,
+}
+
+const AdminSuperRouteWithChildren = AdminSuperRoute._addFileChildren(
+  AdminSuperRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminFeedbackRoute: typeof AdminFeedbackRoute
+  AdminSuperRoute: typeof AdminSuperRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
   AdminModulesModuleIdRoute: typeof AdminModulesModuleIdRoute
   AdminModulesNewRoute: typeof AdminModulesNewRoute
@@ -895,6 +986,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminFeedbackRoute: AdminFeedbackRoute,
+  AdminSuperRoute: AdminSuperRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
   AdminModulesModuleIdRoute: AdminModulesModuleIdRoute,
   AdminModulesNewRoute: AdminModulesNewRoute,
