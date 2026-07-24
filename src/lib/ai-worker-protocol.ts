@@ -57,7 +57,17 @@ export type ErrorMessage = {
   category: ModelErrorCategory;
 };
 // Sent instead of "done"/"error" when a request arrives while the worker
-// is already generating for a different requestId — see ai.worker.ts.
+// is already generating for a different requestId *and* the queue below
+// is already at its (generous, rarely-hit) sanity limit — see
+// ai.worker.ts. A request that queues normally never gets this; it just
+// waits.
 export type BusyMessage = { type: "busy"; requestId: string };
+// Sent the instant a request actually starts running (not when it's
+// merely received/queued) — see ai.worker.ts's queue. Lets
+// ai-worker-client.ts start a request's real generation-timeout clock only
+// once it's genuinely executing, so time spent waiting behind another
+// request in the queue doesn't eat into that budget.
+export type StartedMessage = { type: "started"; requestId: string };
 
-export type WorkerResponse = TokenMessage | DoneMessage | ErrorMessage | BusyMessage;
+export type WorkerResponse =
+  TokenMessage | DoneMessage | ErrorMessage | BusyMessage | StartedMessage;

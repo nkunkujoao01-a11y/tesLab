@@ -29,29 +29,32 @@ function post(message: WorkerResponse): void {
   self.postMessage(message);
 }
 
-// Single in-flight generation per worker — reject-if-busy, not queued (see
-// DEV_LOG.md Feature 51 for why). `suppressedRequestId` lets a cancelled
-// request's eventual (non-interruptible) result be dropped silently
-// instead of posting a message back for a request the client no longer
-// has a listener for.
+// Single in-flight generation per worker, but genuinely *queued* now, not
+// reject-if-busy — real user report: a student generating a quiz while
+// the assistant chat was also mid-response (or several quiz questions
+// firing back to back) hit repeated "AI worker is busy" rejections, and
+// on a slow device the existing one-retry-after-a-second recovery
+// (use-quiz.ts) often wasn't enough headroom before the blocking
+// generation was still running, producing a real, visible failure instead
+// of just a longer wait. A queued request still finishes; it only ever
+// waits its turn. `MAX_QUEUE_LENGTH` exists purely as a sanity backstop
+// against a real bug elsewhere spamming requests — one student's one tab
+// should never realistically queue more than a couple of these.
+const MAX_QUEUE_LENGTH = 8;
 let currentRequestId: string | null = null;
+// A cancelled request's eventual (non-interruptible) generation result is
+// dropped silently instead of posting a message back for a request the
+// client no longer has a listener for — only ever the *currently running*
+// request needs this; a still-queued (not yet started) request that gets
+// cancelled is simply removed from the queue below, nothing to suppress.
 let suppressedRequestId: string | null = null;
+const queue: WorkerRequest[] = [];
 
-self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
-  const msg = e.data;
-
-  if (msg.type === "cancel") {
-    if (msg.requestId === currentRequestId) suppressedRequestId = msg.requestId;
-    return;
-  }
-
-  if (currentRequestId) {
-    post({ type: "busy", requestId: msg.requestId });
-    return;
-  }
-
+async function processRequest(msg: WorkerRequest): Promise<void> {
+  if (msg.type === "cancel") return;
   currentRequestId = msg.requestId;
   suppressedRequestId = null;
+  post({ type: "started", requestId: msg.requestId });
   try {
     let result: string;
     if (msg.type === "chat-generate") {
@@ -90,5 +93,32 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     }
   } finally {
     if (currentRequestId === msg.requestId) currentRequestId = null;
+    const next = queue.shift();
+    if (next) void processRequest(next);
   }
+}
+
+self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+  const msg = e.data;
+
+  if (msg.type === "cancel") {
+    if (msg.requestId === currentRequestId) {
+      suppressedRequestId = msg.requestId;
+      return;
+    }
+    const queuedIndex = queue.findIndex((q) => q.requestId === msg.requestId);
+    if (queuedIndex >= 0) queue.splice(queuedIndex, 1);
+    return;
+  }
+
+  if (currentRequestId) {
+    if (queue.length >= MAX_QUEUE_LENGTH) {
+      post({ type: "busy", requestId: msg.requestId });
+      return;
+    }
+    queue.push(msg);
+    return;
+  }
+
+  void processRequest(msg);
 };

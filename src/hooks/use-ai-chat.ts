@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { deviceDb, getUserDb, type AssistantMessage } from "@/lib/db";
 import { notifyIfPermitted } from "@/hooks/use-permissions";
 import { acquireWakeLock, releaseWakeLock } from "@/lib/wake-lock";
+import { getObservedGenerationMs } from "@/lib/ai-perf";
 import {
   loadChatModel,
   askChatModel,
@@ -325,46 +326,59 @@ export function useStaleAiOperationWarning(): StaleAiBreadcrumb | null {
   return breadcrumb;
 }
 
-// Staged "still working" copy for a chat send in flight — see
-// useThinkingLabel below. Times are deliberately well under
-// DEFAULT_TIMEOUT_MS (ai-worker-client.ts, 180s): the goal is to keep a
-// genuinely slow-but-working on-device generation from *reading* as
-// frozen long before it would ever hit that real timeout, not to predict
-// when it'll actually finish.
-const THINKING_STAGES: { afterMs: number; label: string }[] = [
-  { afterMs: 0, label: "Thinking…" },
-  { afterMs: 12_000, label: "Still thinking — this can take a while on some phones…" },
-  {
-    afterMs: 40_000,
-    label: "Still working — the on-device model is slow on older/budget phones. Almost there…",
-  },
-];
+const STAGE_1_LABEL = "Thinking…";
+const STAGE_2_LABEL = "Still thinking — this can take a while on some phones…";
+const STAGE_3_LABEL =
+  "Still working — the on-device model is slow on older/budget phones. Almost there…";
+
+// Used only until this device has completed at least one real generation
+// (see ai-perf.ts) — a reasonable guess, not a measurement, for how long a
+// "typical" on-device generation might take before that.
+const UNMEASURED_BASELINE_MS = 20_000;
 
 /** Staged copy for a "Thinking…" indicator that escalates the longer
  * `active` stays true, instead of one static label for the model's whole
  * (potentially minutes-long) on-device generation time. Found to matter
  * from real user reports: a flat, unchanging "Thinking…" for a long
  * on-device generation reads as the app having frozen or crashed, even
- * when it's still genuinely working — see DEFAULT_TIMEOUT_MS's own
- * comment on why on-device generation time is real but currently
- * unbounded-feeling. Resets to the first stage every time `active` toggles
- * back on, so a second, later send starts the escalation over rather than
- * picking up wherever the first one left off. */
+ * when it's still genuinely working.
+ *
+ * The escalation timing itself is dynamic, not fixed — a second real user
+ * report: fixed stage timings (originally 12s/40s) tuned around one
+ * hypothetical device meant a fast PC sat through stages meant for a much
+ * slower phone, while a genuinely slow budget phone could still reach the
+ * "almost there" stage long before it was actually close to done. Scaling
+ * both stages to a fraction of *this device's* own observed typical
+ * generation time (ai-perf.ts, the same signal ai-worker-client.ts's
+ * dynamic timeout uses) keeps the escalation meaningful either way.
+ * Resets to the first stage every time `active` toggles back on, so a
+ * second, later send starts the escalation over rather than picking up
+ * wherever the first one left off. */
 export function useThinkingLabel(active: boolean): string {
-  const [label, setLabel] = useState(THINKING_STAGES[0].label);
+  const [label, setLabel] = useState(STAGE_1_LABEL);
+  const [baselineMs, setBaselineMs] = useState(UNMEASURED_BASELINE_MS);
+
+  useEffect(() => {
+    void getObservedGenerationMs().then((observed) => {
+      if (observed !== null) setBaselineMs(observed);
+    });
+  }, []);
 
   useEffect(() => {
     if (!active) {
-      setLabel(THINKING_STAGES[0].label);
+      setLabel(STAGE_1_LABEL);
       return;
     }
-    const timers = THINKING_STAGES.slice(1).map((stage) =>
-      setTimeout(() => setLabel(stage.label), stage.afterMs),
-    );
+    const stage2At = Math.max(6_000, Math.round(baselineMs * 0.5));
+    const stage3At = Math.max(20_000, Math.round(baselineMs * 1.5));
+    const timers = [
+      setTimeout(() => setLabel(STAGE_2_LABEL), stage2At),
+      setTimeout(() => setLabel(STAGE_3_LABEL), stage3At),
+    ];
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [active]);
+  }, [active, baselineMs]);
 
   return label;
 }
