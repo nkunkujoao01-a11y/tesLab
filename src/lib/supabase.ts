@@ -110,6 +110,8 @@ export type FeedbackRow = {
   user_id: string;
   message: string;
   image_paths: string[];
+  // 0024_feedback_rating.sql — nullable, optional 1-5 satisfaction rating.
+  rating: number | null;
   created_at: string;
 };
 

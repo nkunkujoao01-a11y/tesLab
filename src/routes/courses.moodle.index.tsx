@@ -55,7 +55,7 @@ function MoodleCourses() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {courses.map((course) => (
               <Link
                 key={course.id}
@@ -66,7 +66,7 @@ function MoodleCourses() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-prestige-mid">
                   {course.shortName}
                 </p>
-                <h3 className="mt-2 font-display text-lg font-medium leading-tight text-prestige-deep text-balance">
+                <h3 className="mt-2 break-words font-display text-lg font-medium leading-tight text-prestige-deep text-balance">
                   {course.fullName}
                 </h3>
                 {course.lecturerName && (

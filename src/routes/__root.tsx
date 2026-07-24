@@ -14,9 +14,11 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { useAutoSync } from "@/hooks/use-sync";
 import { usePrecacheRoutes } from "@/hooks/use-precache-routes";
 import { useDeadlineReminders, useStreakReminder } from "@/hooks/use-reminder-notifications";
+import { useServiceWorkerUpdateNotice } from "@/hooks/use-sw-update";
 import { Toaster } from "@/components/ui/sonner";
 import { WelcomeTour } from "@/components/WelcomeTour";
 import { ByokPrompt } from "@/components/ByokPrompt";
+import { InstallAppPrompt } from "@/components/InstallAppPrompt";
 
 function NotFoundComponent() {
   return (
@@ -179,6 +181,8 @@ function RootComponent() {
     }
   }, []);
 
+  useServiceWorkerUpdateNotice();
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -188,6 +192,7 @@ function RootComponent() {
         <Outlet />
         <WelcomeTour />
         <ByokPrompt />
+        <InstallAppPrompt />
         <Toaster position="bottom-center" richColors closeButton />
       </AuthProvider>
     </QueryClientProvider>

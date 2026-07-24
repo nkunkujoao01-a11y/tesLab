@@ -47,7 +47,7 @@ export function useSubmitFeedback() {
   const [submitting, setSubmitting] = useState(false);
 
   const submitFeedback = useCallback(
-    async (message: string, images: FeedbackImage[]) => {
+    async (message: string, images: FeedbackImage[], rating?: number) => {
       if (!user) return false;
       setSubmitting(true);
       const feedbackId = crypto.randomUUID();
@@ -69,6 +69,10 @@ export function useSubmitFeedback() {
           user_id: user.id,
           message: message.trim(),
           image_paths: imagePaths,
+          // 0024_feedback_rating.sql — undefined stays a real SQL null
+          // (supabase-js omits an undefined key entirely), not a fake 0;
+          // a bug report with no rating attached is a valid submission.
+          rating: rating ?? null,
           created_at: new Date().toISOString(),
         });
         if (error) throw error;

@@ -48,7 +48,7 @@ function Courses() {
 
       <div className="space-y-8 px-6 lg:px-10 lg:pb-16">
         {/* My documents + Summaries + Quiz/flashcard library */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           <Link
             to="/courses/moodle"
             className="animate-rise group flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-border/60 transition-colors hover:ring-prestige-gold/40"
@@ -154,7 +154,7 @@ function Courses() {
         </Link>
 
         {/* Grid */}
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {rest.map((m) => {
             const isDownloaded = downloadedIds.has(m.id);
             const completion = moduleCompletion(m.materials, m.id, readMaterialIds);
