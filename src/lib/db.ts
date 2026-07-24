@@ -372,6 +372,17 @@ export type MoodleAssignment = {
   allowSubmissionsFrom?: number;
 };
 
+/** A student's own weekly study goal — purely self-tracking, never synced
+ * to Supabase or visible to anyone else (same local-only philosophy as
+ * every other table in this file). One row per week, keyed by that
+ * week's Sunday start (see use-study-goals.ts), so past weeks' goals
+ * naturally stay around as a track record rather than being overwritten. */
+export type StudyGoal = {
+  weekStart: number;
+  target: number;
+  createdAt: number;
+};
+
 /** A Moodle resource file, fetched through fetchMoodleFile (moodle-server.ts,
  * proxied server-side so the wstoken never touches a client-visible URL)
  * and cached here so re-opening the same material doesn't refetch —
@@ -482,6 +493,7 @@ class UserDB extends Dexie {
   moodleGrades!: EntityTable<MoodleGrade, "key">;
   moodleAssignments!: EntityTable<MoodleAssignment, "key">;
   moodleFiles!: EntityTable<MoodleFile, "moduleKey">;
+  studyGoals!: EntityTable<StudyGoal, "weekStart">;
 
   constructor(userId: string) {
     super(`elearn_user_${userId}`);
@@ -573,6 +585,11 @@ class UserDB extends Dexie {
     // comment) — also purely additive.
     this.version(15).stores({
       moodleAssignments: "key, courseId, dueDate",
+    });
+    // A student's own weekly study goal (see StudyGoal's own comment) —
+    // also purely additive.
+    this.version(16).stores({
+      studyGoals: "weekStart",
     });
   }
 }

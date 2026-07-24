@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { notifyIfPermitted } from "@/hooks/use-permissions";
 import { useUpcomingDeadlines } from "@/hooks/use-moodle-courses";
 import { useStreakGrid } from "@/hooks/use-activity";
+import { useCurrentWeekGoal, useWeekProgress, getCurrentWeekStart } from "@/hooks/use-study-goals";
 
 const DEADLINE_REMINDER_WINDOW_HOURS = 48;
 
@@ -111,4 +112,33 @@ export function useStreakReminder(): void {
       await db.syncMeta.put({ key, value: "1" });
     })();
   }, [user, grid]);
+}
+
+/** Notifies at most once per week, only when a goal is actually set and
+ * the student is genuinely behind pace — past the midpoint of the week
+ * (Wed/Thu onward) and under half their target so far. Not a daily nag:
+ * says nothing if no goal is set, or if they're already on pace. */
+export function useGoalReminder(): void {
+  const { user } = useAuth();
+  const { target } = useCurrentWeekGoal();
+  const progress = useWeekProgress();
+
+  useEffect(() => {
+    if (!user || !target) return;
+    const dayOfWeek = new Date().getDay(); // 0 = Sunday
+    const pastMidweek = dayOfWeek >= 3; // Wednesday onward
+    if (!pastMidweek || progress >= target / 2) return;
+
+    void (async () => {
+      const db = getUserDb(user.id);
+      const key = `goal_reminder_${getCurrentWeekStart()}`;
+      const already = await db.syncMeta.get(key);
+      if (already) return;
+      notifyIfPermitted(
+        "Behind on this week's goal",
+        `You've studied ${progress} of ${target} times this week — still time to catch up.`,
+      );
+      await db.syncMeta.put({ key, value: "1" });
+    })();
+  }, [user, target, progress]);
 }

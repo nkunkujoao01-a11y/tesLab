@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { formatRelative } from "@/lib/mock-data";
-import { useResearchSubmissions } from "@/hooks/use-platform-analytics";
+import { useResearchSubmissions, useAnonymousSuggestions } from "@/hooks/use-platform-analytics";
 
 export const Route = createFileRoute("/admin/super/research")({
   component: SuperAdminResearchPage,
@@ -14,6 +14,7 @@ function scaleAverage(answers: Record<number, number>): string {
 
 function SuperAdminResearchPage() {
   const { submissions, loading } = useResearchSubmissions();
+  const { suggestions, loading: suggestionsLoading } = useAnonymousSuggestions();
   const consentCount = submissions.filter((s) => s.consent).length;
   const agreedCount = submissions.filter((s) => s.consent?.agreed).length;
   const surveyCount = submissions.filter((s) => s.survey).length;
@@ -101,6 +102,36 @@ function SuperAdminResearchPage() {
       </div>
 
       {loading && <p className="mt-4 text-center text-xs text-muted-foreground">Loading…</p>}
+
+      {/* Anonymous suggestions — a separate, always-open channel (Profile
+          > Anonymous suggestion), not part of the one-time study above,
+          same anonymous-by-design framing (no name/email column here
+          either). */}
+      <h2 className="mt-10 font-display text-lg font-medium text-prestige-deep">
+        Anonymous suggestions
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Sent any time from Profile, not tied to the research study above.
+      </p>
+      <div className="animate-rise mt-4 overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
+        {!suggestionsLoading && suggestions.length === 0 && (
+          <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+            No anonymous suggestions yet.
+          </p>
+        )}
+        {suggestions.map((s, i) => (
+          <div key={i} className="border-b border-border/60 px-4 py-3.5 last:border-none">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10.5px] font-medium text-prestige-mid">{s.anonymousId}</p>
+              <p className="text-[10.5px] text-muted-foreground">{formatRelative(s.submittedAt)}</p>
+            </div>
+            <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">{s.message}</p>
+          </div>
+        ))}
+      </div>
+      {suggestionsLoading && (
+        <p className="mt-4 text-center text-xs text-muted-foreground">Loading…</p>
+      )}
     </div>
   );
 }

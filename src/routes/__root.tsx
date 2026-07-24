@@ -13,7 +13,11 @@ import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
 import { useAutoSync } from "@/hooks/use-sync";
 import { usePrecacheRoutes } from "@/hooks/use-precache-routes";
-import { useDeadlineReminders, useStreakReminder } from "@/hooks/use-reminder-notifications";
+import {
+  useDeadlineReminders,
+  useStreakReminder,
+  useGoalReminder,
+} from "@/hooks/use-reminder-notifications";
 import { useServiceWorkerUpdateNotice } from "@/hooks/use-sw-update";
 import { Toaster } from "@/components/ui/sonner";
 import { WelcomeTour } from "@/components/WelcomeTour";
@@ -169,6 +173,7 @@ function PrecacheRoutes() {
 function ReminderNotifications() {
   useDeadlineReminders();
   useStreakReminder();
+  useGoalReminder();
   return null;
 }
 

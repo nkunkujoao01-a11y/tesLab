@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TutorialsRouteImport } from './routes/tutorials'
 import { Route as SummariesRouteImport } from './routes/summaries'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -58,6 +59,11 @@ import { Route as CoursesModuleIdQuizDocIdRouteImport } from './routes/courses.$
 import { Route as CoursesModuleIdFlashcardsDocIdRouteImport } from './routes/courses.$moduleId.flashcards.$docId'
 import { Route as CoursesModuleIdChatDocIdRouteImport } from './routes/courses.$moduleId.chat.$docId'
 
+const TutorialsRoute = TutorialsRouteImport.update({
+  id: '/tutorials',
+  path: '/tutorials',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SummariesRoute = SummariesRouteImport.update({
   id: '/summaries',
   path: '/summaries',
@@ -326,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
+  '/tutorials': typeof TutorialsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/super': typeof AdminSuperRouteWithChildren
   '/courses/$moduleId': typeof CoursesModuleIdRouteWithChildren
@@ -373,6 +380,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
+  '/tutorials': typeof TutorialsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin': typeof AdminIndexRoute
   '/courses': typeof CoursesIndexRoute
@@ -420,6 +428,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
+  '/tutorials': typeof TutorialsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/super': typeof AdminSuperRouteWithChildren
   '/courses/$moduleId': typeof CoursesModuleIdRouteWithChildren
@@ -472,6 +481,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/summaries'
+    | '/tutorials'
     | '/admin/feedback'
     | '/admin/super'
     | '/courses/$moduleId'
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/summaries'
+    | '/tutorials'
     | '/admin/feedback'
     | '/admin'
     | '/courses'
@@ -565,6 +576,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/signup'
     | '/summaries'
+    | '/tutorials'
     | '/admin/feedback'
     | '/admin/super'
     | '/courses/$moduleId'
@@ -616,10 +628,18 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SummariesRoute: typeof SummariesRoute
+  TutorialsRoute: typeof TutorialsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tutorials': {
+      id: '/tutorials'
+      path: '/tutorials'
+      fullPath: '/tutorials'
+      preLoaderRoute: typeof TutorialsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/summaries': {
       id: '/summaries'
       path: '/summaries'
@@ -1116,6 +1136,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SummariesRoute: SummariesRoute,
+  TutorialsRoute: TutorialsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

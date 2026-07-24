@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import { Brain, ListChecks, TriangleAlert } from "lucide-react";
+import { Brain, ListChecks, Target, TriangleAlert } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { fetchModules } from "@/lib/modules-api";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import {
   useDailyActivityCounts,
   moduleCompletion,
 } from "@/hooks/use-activity";
+import { useCurrentWeekGoal, useWeekProgress } from "@/hooks/use-study-goals";
 import { useQuizInsights, useFlashcardInsights } from "@/hooks/use-progress-insights";
 import {
   ChartContainer,
@@ -17,6 +18,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+
+const GOAL_PRESETS = [2, 3, 5, 7];
 
 const ACTIVITY_CHART_CONFIG: ChartConfig = {
   count: { label: "Actions", color: "var(--prestige-gold)" },
@@ -36,6 +39,65 @@ export const Route = createFileRoute("/progress")({
   }),
   component: ProgressPage,
 });
+
+/** Purely self-tracking — no lecturer/admin ever sees this, see
+ * StudyGoal's own comment in db.ts. Preset chips rather than a raw number
+ * input: picking "3x/week" is one tap, and the four presets cover the
+ * realistic range without needing a stepper/slider. */
+function WeeklyGoalCard() {
+  const { target, setTarget, clearTarget, loading } = useCurrentWeekGoal();
+  const progress = useWeekProgress();
+
+  return (
+    <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:col-span-3 lg:p-8">
+      <div className="flex items-center gap-2 text-prestige-mid">
+        <Target className="h-4 w-4" strokeWidth={1.75} />
+        <p className="eyebrow">This week's goal</p>
+      </div>
+      {loading ? null : target ? (
+        <>
+          <div className="mt-4 flex items-end justify-between gap-4">
+            <p className="font-display text-2xl text-prestige-deep">
+              {progress} of {target} days studied
+            </p>
+            <button
+              type="button"
+              onClick={clearTarget}
+              className="shrink-0 text-[11px] font-medium text-prestige-mid hover:text-prestige-deep hover:underline"
+            >
+              Change
+            </button>
+          </div>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-prestige-deep/10">
+            <div
+              className="h-full bg-prestige-gold transition-all"
+              style={{ width: `${Math.min(100, (progress / target) * 100)}%` }}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Set a personal goal for how many days you want to study this week — just for you, nobody
+            else sees this.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {GOAL_PRESETS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setTarget(n)}
+                className="rounded-full bg-secondary px-4 py-2 text-xs font-semibold text-prestige-deep transition-colors hover:bg-prestige-deep hover:text-prestige-cream"
+              >
+                {n === 7 ? "Every day" : `${n}x/week`}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
 
 function ProgressPage() {
   const modules = Route.useLoaderData();
@@ -143,6 +205,8 @@ function ProgressPage() {
             ))}
           </div>
         </section>
+
+        <WeeklyGoalCard />
 
         {/* Daily activity trend — same underlying local activityEvents
          * data as the streak grid above, kept as real per-day counts

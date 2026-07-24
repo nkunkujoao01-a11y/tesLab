@@ -3,7 +3,11 @@ import { toast } from "sonner";
 import { getUserDb } from "@/lib/db";
 import { useAuth } from "@/hooks/use-auth";
 import { useOnlineStatus } from "@/hooks/use-online-status";
-import { submitResearchConsent, submitResearchSurvey } from "@/lib/research-study";
+import {
+  submitResearchConsent,
+  submitResearchSurvey,
+  submitAnonymousSuggestion,
+} from "@/lib/research-study";
 import type { ResearchSurveyAnswers } from "@/lib/supabase";
 
 // Bookkeeping only — whether *this signed-in account* has already been
@@ -227,4 +231,35 @@ export function useResearchSurveyCompleted(): boolean {
   }, [user]);
 
   return completed;
+}
+
+/** The general anonymous suggestion box (Profile) — separate from the
+ * survey above and from the account-tied feedback feature
+ * (use-feedback.ts). Online-only, same reasoning as
+ * useSubmitResearchSurvey: a one-off submission with no local read-path
+ * afterward. */
+export function useSubmitAnonymousSuggestion() {
+  const isOnline = useOnlineStatus();
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = useCallback(
+    async (message: string) => {
+      if (!message.trim() || !isOnline) return false;
+      setSubmitting(true);
+      try {
+        await submitAnonymousSuggestion(message);
+        toast.success("Thanks — sent anonymously.");
+        return true;
+      } catch (err) {
+        console.error("Failed to submit anonymous suggestion", err);
+        toast.error("Couldn't send that. Check your connection and try again.");
+        return false;
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [isOnline],
+  );
+
+  return { submit, submitting };
 }

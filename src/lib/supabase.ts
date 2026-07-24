@@ -184,6 +184,17 @@ export type ResearchSurveyResponseRow = {
   submitted_at: string;
 };
 
+// 0039_anonymous_suggestions.sql — same anonymous-by-design shape as
+// ResearchConsentRow above, a general always-available suggestion box
+// separate from both the (account-tied) feedback table and the one-time
+// research survey.
+export type AnonymousSuggestionRow = {
+  id: string;
+  anonymous_id: string;
+  message: string;
+  submitted_at: string;
+};
+
 // An admin-authored quiz question for a module — see Feature 57. Distinct
 // from the client-generated, per-student quizzes in `db.ts`; this is
 // shared catalog content, same access model as `materials`.
@@ -293,6 +304,12 @@ export type Database = {
       research_survey_responses: {
         Row: ResearchSurveyResponseRow;
         Insert: ResearchSurveyResponseRow;
+        Update: never;
+        Relationships: [];
+      };
+      anonymous_suggestions: {
+        Row: AnonymousSuggestionRow;
+        Insert: AnonymousSuggestionRow;
         Update: never;
         Relationships: [];
       };

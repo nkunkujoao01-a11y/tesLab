@@ -18,6 +18,8 @@ import {
   Smartphone,
   ClipboardList,
   ScrollText,
+  GraduationCap,
+  Lightbulb,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,7 +38,10 @@ import { useLastSyncedAt, useManualSync } from "@/hooks/use-sync";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { usePersistentStorage, useNotificationPermission } from "@/hooks/use-permissions";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
-import { useResearchSurveyCompleted } from "@/hooks/use-research-study";
+import {
+  useResearchSurveyCompleted,
+  useSubmitAnonymousSuggestion,
+} from "@/hooks/use-research-study";
 import { ResearchSurveyModal } from "@/components/ResearchSurveyModal";
 import {
   useSubmitFeedback,
@@ -114,6 +119,9 @@ function Profile() {
   const [installing, setInstalling] = useState(false);
   const surveyCompleted = useResearchSurveyCompleted();
   const [surveyOpen, setSurveyOpen] = useState(false);
+  const { submit: submitSuggestion, submitting: submittingSuggestion } =
+    useSubmitAnonymousSuggestion();
+  const [suggestionMessage, setSuggestionMessage] = useState("");
   const { submitFeedback, submitting: submittingFeedback } = useSubmitFeedback();
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackImages, setFeedbackImages] = useState<FeedbackImage[]>([]);
@@ -392,6 +400,56 @@ function Profile() {
             </div>
           </section>
 
+          {/* Anonymous suggestion — separate from both the survey above
+              (one-time, structured questions) and Send feedback below
+              (tied to your account). Not linked to who you are at all. */}
+          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                <Lightbulb className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-prestige-deep">Anonymous suggestion</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Not tied to your account — send an idea or comment anonymously, any time
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              <textarea
+                value={suggestionMessage}
+                onChange={(e) => setSuggestionMessage(e.target.value)}
+                placeholder="Anything you'd rather share anonymously?"
+                rows={3}
+                className="w-full resize-none rounded-lg border border-border/70 bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  disabled={!isOnline || !suggestionMessage.trim() || submittingSuggestion}
+                  aria-disabled={!isOnline}
+                  title={!isOnline ? "Sending needs a network connection" : undefined}
+                  onClick={() =>
+                    void submitSuggestion(suggestionMessage).then((ok) => {
+                      if (ok) setSuggestionMessage("");
+                    })
+                  }
+                  className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+                >
+                  {submittingSuggestion ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                  ) : null}
+                  {submittingSuggestion ? "Sending…" : "Send anonymously"}
+                </button>
+              </div>
+              {!isOnline && (
+                <p className="text-[11px] text-muted-foreground">
+                  You're offline — reconnect to send a suggestion.
+                </p>
+              )}
+            </div>
+          </section>
+
           {/* Send feedback */}
           <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
             <div className="flex items-center gap-3">
@@ -541,6 +599,23 @@ function Profile() {
                     <p className="text-sm font-medium text-prestige-deep">AI settings</p>
                     <p className="text-[11px] text-muted-foreground">
                       On-device models &amp; free cloud AI
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/tutorials"
+                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                >
+                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                    <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-prestige-deep">Tutorials</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      How offline AI, downloads, and NUST sync work
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />

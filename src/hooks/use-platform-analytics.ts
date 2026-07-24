@@ -207,3 +207,50 @@ export function useResearchSubmissions(): {
   const refetch = useCallback(() => setRefreshKey((k) => k + 1), []);
   return { submissions, loading, refetch };
 }
+
+export type AnonymousSuggestion = {
+  anonymousId: string;
+  message: string;
+  submittedAt: string;
+};
+
+/** The general anonymous suggestion box (0039_anonymous_suggestions.sql)
+ * — separate from research_consent/research_survey_responses above, same
+ * is_super_admin()-gated read access. Real rows only for an actual super
+ * admin, empty for anyone else, per that table's RLS. */
+export function useAnonymousSuggestions(): {
+  suggestions: AnonymousSuggestion[];
+  loading: boolean;
+  refetch: () => void;
+} {
+  const [suggestions, setSuggestions] = useState<AnonymousSuggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void supabase
+      .from("anonymous_suggestions")
+      .select("anonymous_id, message, submitted_at")
+      .order("submitted_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) console.error("Failed to load anonymous suggestions", error);
+        setSuggestions(
+          (data ?? []).map((row) => ({
+            anonymousId: row.anonymous_id,
+            message: row.message,
+            submittedAt: row.submitted_at,
+          })),
+        );
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), []);
+  return { suggestions, loading, refetch };
+}
