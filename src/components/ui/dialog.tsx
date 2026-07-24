@@ -38,7 +38,15 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        // Same real mobile bug and fix as alert-dialog.tsx's identical
+        // comment — `w-full` on a `fixed`-positioned box means 100% of
+        // the viewport, so this sat flush against both screen edges below
+        // the max-w-lg breakpoint, with `sm:rounded-lg` not even rounding
+        // it there. `w-[calc(100%-2rem)]` leaves a real margin on both
+        // sides; rounded on every breakpoint now that it's never
+        // edge-to-edge. slide-in-from-bottom pairs with the existing
+        // zoom/fade for a livelier entrance.
+        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-bottom-10 data-[state=closed]:slide-out-to-bottom-10",
         className,
       )}
       {...props}

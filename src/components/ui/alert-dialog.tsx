@@ -34,7 +34,18 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        // Real, reported mobile bug: `w-full` here means 100% of the
+        // viewport (this is `fixed`-positioned, not constrained by a
+        // parent), so on any screen narrower than max-w-lg the dialog sat
+        // flush against both screen edges with zero margin, and
+        // `sm:rounded-lg` meant it wasn't even rounded there either.
+        // `w-[calc(100%-2rem)]` keeps the existing centering transform
+        // (which centers whatever width the box actually has) but leaves
+        // a real 1rem gap on each side; rounded on every breakpoint now
+        // that it's never edge-to-edge. The slide-in-from-bottom pairs
+        // with the existing zoom/fade for a livelier "flies up into
+        // place" entrance instead of a flat zoom, another real request.
+        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-bottom-10 data-[state=closed]:slide-out-to-bottom-10",
         className,
       )}
       {...props}
