@@ -3,6 +3,7 @@ import { liveQuery } from "dexie";
 import { toast } from "sonner";
 import { deviceDb, getUserDb, type AssistantMessage } from "@/lib/db";
 import { notifyIfPermitted } from "@/hooks/use-permissions";
+import { acquireWakeLock, releaseWakeLock } from "@/lib/wake-lock";
 import {
   loadChatModel,
   askChatModel,
@@ -154,6 +155,10 @@ export function useDownloadChatModel() {
       if (currentProgress < FINALIZING_THRESHOLD) return;
       stallTimer = setTimeout(() => setFinalizing(true), STALL_MS);
     };
+    // Best-effort only — see wake-lock.ts for exactly what this does and
+    // doesn't protect against (screen-off while foregrounded, not
+    // backgrounding/app-switching).
+    const wakeLock = await acquireWakeLock();
     try {
       const totals = new Map<string, number>();
       const loaded = new Map<string, number>();
@@ -183,6 +188,7 @@ export function useDownloadChatModel() {
       setStatus("error");
     } finally {
       clearTimeout(stallTimer);
+      void releaseWakeLock(wakeLock);
     }
   }, []);
 

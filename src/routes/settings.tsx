@@ -413,6 +413,10 @@ function Settings() {
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   {finalizing ? "Finishing up — almost there…" : `Downloading… ${progress}%`}
                 </p>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Keep this tab open and in view — switching apps or letting the screen lock can
+                  interrupt the download and restart it from zero.
+                </p>
               </div>
             ) : (
               <div>
@@ -527,6 +531,10 @@ function Settings() {
                   {chatFinalizing
                     ? "Finishing up — almost there…"
                     : `Downloading ${CHAT_MODELS[chatModelChoice].label}… ${chatProgress}%`}
+                </p>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Keep this tab open and in view — switching apps or letting the screen lock can
+                  interrupt the download and restart it from zero.
                 </p>
               </div>
             ) : (

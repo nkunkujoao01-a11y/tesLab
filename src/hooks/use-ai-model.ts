@@ -7,6 +7,7 @@ import {
   type ModelProgress,
 } from "@/lib/ai-model";
 import { notifyIfPermitted } from "@/hooks/use-permissions";
+import { acquireWakeLock, releaseWakeLock } from "@/lib/wake-lock";
 
 const SETTING_KEY = "ai_model_downloaded";
 // Separate from SETTING_KEY: whether the download actually persisted for
@@ -84,6 +85,10 @@ export function useDownloadAIModel() {
       if (currentProgress < FINALIZING_THRESHOLD) return;
       stallTimer = setTimeout(() => setFinalizing(true), STALL_MS);
     };
+    // Best-effort only — see wake-lock.ts for exactly what this does and
+    // doesn't protect against (screen-off while foregrounded, not
+    // backgrounding/app-switching).
+    const wakeLock = await acquireWakeLock();
     try {
       // transformers.js reports per-file progress; multiple files (tokenizer,
       // encoder, decoder) download in parallel, so track a simple overall
@@ -119,6 +124,7 @@ export function useDownloadAIModel() {
       setStatus("error");
     } finally {
       clearTimeout(stallTimer);
+      void releaseWakeLock(wakeLock);
     }
   }, []);
 

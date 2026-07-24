@@ -12,12 +12,29 @@ let viewTransitionRejectionsSilenced = false;
 // skipped". That's expected View Transitions API behavior, not a bug, but
 // TanStack Router doesn't catch it, so it otherwise surfaces as an
 // uncaught rejection in the console on ordinary navigation.
+//
+// A second, real-device-reported variant of the same underlying class:
+// navigating right as the tab is backgrounded (screen locked, app
+// switched, PWA left) — Chrome requires the document to be visible to run
+// a view transition, and rejects with `InvalidStateError` instead of the
+// "skipped" AbortError above when that's not the case. Same reasoning
+// applies: the navigation itself still completes (React Router doesn't
+// depend on the transition promise to finish updating the DOM), only the
+// cosmetic cross-fade is skipped, so this is equally safe to silence
+// rather than let it read as a crash in the console.
 function silenceExpectedViewTransitionRejections() {
   if (viewTransitionRejectionsSilenced || typeof window === "undefined") return;
   viewTransitionRejectionsSilenced = true;
   window.addEventListener("unhandledrejection", (event) => {
     const reason = event.reason as { name?: string; message?: string } | undefined;
     if (reason?.name === "AbortError" && reason.message?.includes("skipped")) {
+      event.preventDefault();
+      return;
+    }
+    if (
+      reason?.name === "InvalidStateError" &&
+      reason.message?.toLowerCase().includes("transition")
+    ) {
       event.preventDefault();
     }
   });

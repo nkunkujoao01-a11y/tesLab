@@ -471,6 +471,19 @@ export function useGenerateQuiz() {
           toast.error("Couldn't generate a quiz from this document. Try again.");
           return;
         }
+        // Real gap found from on-device generation: a slow/timed-out
+        // question is silently dropped (see the catch above — "shouldn't
+        // sink the rest"), which is the right call for the quiz itself,
+        // but left a student with e.g. 2 of 5 questions and zero
+        // indication anything went wrong. Only fires for the on-device
+        // path, where this is common; the cloud path either returns the
+        // full set or fails as a whole (see the try/catch above), so it
+        // never partially under-delivers this way.
+        if (!usedCloud && questions.length < questionCount) {
+          toast.warning(
+            `Generated ${questions.length} of ${questionCount} questions — the rest timed out on this device. Connecting a free cloud AI key (Settings) avoids this.`,
+          );
+        }
         await getUserDb(user.id).generatedQuizzes.put({
           docId,
           questions,
