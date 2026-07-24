@@ -115,6 +115,24 @@ export type FeedbackRow = {
   created_at: string;
 };
 
+// 0028_analytics_and_messaging.sql — see that migration's own comment for
+// why the thread is keyed by (module, student), not a specific lecturer.
+export type ModuleConversationRow = {
+  module_id: string;
+  student_id: string;
+  replies_allowed: boolean;
+};
+
+export type ModuleMessageRow = {
+  id: string;
+  module_id: string;
+  student_id: string;
+  sender_role: "lecturer" | "student";
+  sender_id: string;
+  body: string;
+  created_at: string;
+};
+
 // 0027_module_grades.sql — one row per graded item per student (not a
 // single "final grade" column), so a module can carry a real breakdown
 // ("Assignment 1", "Midterm", ...) over a term.
@@ -272,6 +290,18 @@ export type Database = {
       module_grades: {
         Row: ModuleGradeRow;
         Insert: ModuleGradeRow;
+        Update: never;
+        Relationships: [];
+      };
+      module_conversations: {
+        Row: ModuleConversationRow;
+        Insert: ModuleConversationRow;
+        Update: Partial<Pick<ModuleConversationRow, "replies_allowed">>;
+        Relationships: [];
+      };
+      module_messages: {
+        Row: ModuleMessageRow;
+        Insert: Omit<ModuleMessageRow, "created_at">;
         Update: never;
         Relationships: [];
       };

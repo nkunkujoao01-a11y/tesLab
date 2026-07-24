@@ -14,6 +14,8 @@ import {
   UserCheck,
   UserPlus,
   Award,
+  MessageCircle,
+  X,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { QuizPanel } from "@/components/QuizFlashcards";
@@ -46,6 +48,8 @@ import {
 } from "@/hooks/use-activity";
 import { useModuleEnrollment } from "@/hooks/use-enrollment";
 import { useModuleGrades } from "@/hooks/use-grades";
+import { useAuth } from "@/hooks/use-auth";
+import { ModuleMessageThread } from "@/components/ModuleMessageThread";
 
 export const Route = createFileRoute("/courses/$moduleId/")({
   loader: async ({ params }) => {
@@ -202,6 +206,8 @@ function ModuleDetail() {
   // needed client-side, the same query just can never return anyone
   // else's grades.
   const { grades } = useModuleGrades(module.id);
+  const { user } = useAuth();
+  const [messagesOpen, setMessagesOpen] = useState(false);
 
   return (
     <MobileShell>
@@ -260,6 +266,16 @@ function ModuleDetail() {
                 <Bot className="h-3.5 w-3.5" strokeWidth={1.75} />
                 Ask AI about this module
               </Link>
+              {enrolled && (
+                <button
+                  type="button"
+                  onClick={() => setMessagesOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97]"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  Messages
+                </button>
+              )}
             </div>
             <div className="mt-6 h-px w-16 bg-prestige-gold" />
           </header>
@@ -491,6 +507,31 @@ function ModuleDetail() {
           </div>
         </aside>
       </div>
+
+      {messagesOpen && user && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={() => setMessagesOpen(false)}
+        >
+          <div
+            className="flex h-[70vh] w-full max-w-[480px] flex-col rounded-t-2xl bg-background p-5 sm:h-[560px] sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 pb-3">
+              <p className="text-sm font-medium text-prestige-deep">Messages</p>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setMessagesOpen(false)}
+                className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-prestige-deep"
+              >
+                <X className="h-4 w-4" strokeWidth={1.75} />
+              </button>
+            </div>
+            <ModuleMessageThread moduleId={module.id} studentId={user.id} isLecturerView={false} />
+          </div>
+        </div>
+      )}
     </MobileShell>
   );
 }

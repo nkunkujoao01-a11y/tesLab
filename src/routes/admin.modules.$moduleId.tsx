@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Award,
   Loader2,
+  MessageCircle,
   Plus,
   Sparkles,
   Trash2,
@@ -29,7 +30,9 @@ import {
   useAdminManageEnrollment,
 } from "@/hooks/use-enrollment";
 import { useModuleGrades, useManageGrades } from "@/hooks/use-grades";
+import { useModuleAnalytics } from "@/hooks/use-module-analytics";
 import { useGenerateModuleQuizDraft } from "@/hooks/use-admin-quiz-gen";
+import { ModuleMessageThread } from "@/components/ModuleMessageThread";
 import { extractMaterialFields } from "@/lib/admin-content-extract";
 import { PdfExtractionError } from "@/lib/pdf-extract";
 import { formatMb, formatRelative } from "@/lib/mock-data";
@@ -107,6 +110,8 @@ function AdminModuleDetailPage() {
   };
 
   const rosterNameById = new Map(roster.map((r) => [r.userId, r.fullName]));
+  const { analytics } = useModuleAnalytics(moduleId, roster);
+  const [messagingStudentId, setMessagingStudentId] = useState<string | null>(null);
 
   const [matTitle, setMatTitle] = useState("");
   const [matKind, setMatKind] = useState(KIND_OPTIONS[0]);
@@ -636,32 +641,82 @@ function AdminModuleDetailPage() {
             <p className="text-xs text-muted-foreground">No one has enrolled yet.</p>
           ) : (
             <ul className="divide-y divide-border/60">
-              {roster.map((entry) => (
-                <li
-                  key={entry.userId}
-                  className="flex items-center justify-between gap-3 py-2 text-sm"
-                >
-                  <span className="min-w-0 truncate text-foreground/90">{entry.fullName}</span>
-                  <span className="flex shrink-0 items-center gap-3">
-                    <span className="text-[10.5px] text-muted-foreground">
+              {roster.map((entry) => {
+                const stats = analytics.get(entry.userId);
+                return (
+                  <li key={entry.userId} className="py-2.5 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate text-foreground/90">{entry.fullName}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Message ${entry.fullName}`}
+                          onClick={() => setMessagingStudentId(entry.userId)}
+                          className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-prestige-deep/10 hover:text-prestige-deep"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${entry.fullName}`}
+                          disabled={mutatingEnrollment}
+                          onClick={() => void handleRemoveStudent(entry.userId)}
+                          className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                        >
+                          <UserMinus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                        </button>
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10.5px] text-muted-foreground">
+                      {stats ? `${stats.materialsRead}/${module.materials.length} materials` : "…"}
+                      {stats?.avgGradePct !== null && stats?.avgGradePct !== undefined && (
+                        <> · avg grade {stats.avgGradePct}%</>
+                      )}
+                      {" · "}
+                      {stats?.lastActiveAt
+                        ? `last active ${formatRelative(new Date(stats.lastActiveAt).toISOString())}`
+                        : "no activity yet"}
+                      {" · enrolled "}
                       {formatRelative(entry.enrolledAt)}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${entry.fullName}`}
-                      disabled={mutatingEnrollment}
-                      onClick={() => void handleRemoveStudent(entry.userId)}
-                      className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-                    >
-                      <UserMinus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </button>
-                  </span>
-                </li>
-              ))}
+                    </p>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
       </section>
+
+      {messagingStudentId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={() => setMessagingStudentId(null)}
+        >
+          <div
+            className="flex h-[70vh] w-full max-w-[480px] flex-col rounded-t-2xl bg-background p-5 sm:h-[560px] sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 pb-3">
+              <p className="text-sm font-medium text-prestige-deep">
+                {rosterNameById.get(messagingStudentId)}
+              </p>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setMessagingStudentId(null)}
+                className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-prestige-deep"
+              >
+                <X className="h-4 w-4" strokeWidth={1.75} />
+              </button>
+            </div>
+            <ModuleMessageThread
+              moduleId={moduleId}
+              studentId={messagingStudentId}
+              isLecturerView
+            />
+          </div>
+        </div>
+      )}
 
       {/* Grades */}
       <section className="animate-rise mt-5 rounded-2xl bg-card p-5 ring-1 ring-border/60">
