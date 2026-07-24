@@ -166,6 +166,14 @@ function Signup() {
           </button>
         </form>
 
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          By creating an account, you agree to our{" "}
+          <Link to="/legal" className="gold-underline text-prestige-deep">
+            Terms &amp; Privacy Policy
+          </Link>
+          .
+        </p>
+
         <div className="mt-6 flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />
           <span className="text-xs uppercase tracking-widest text-muted-foreground">or</span>

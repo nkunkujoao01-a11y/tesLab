@@ -31,6 +31,7 @@ import {
 } from "@/hooks/use-enrollment";
 import { useModuleGrades, useManageGrades } from "@/hooks/use-grades";
 import { useModuleAnalytics } from "@/hooks/use-module-analytics";
+import { useMoodleCourseMatch } from "@/hooks/use-moodle-course-match";
 import { useGenerateModuleQuizDraft } from "@/hooks/use-admin-quiz-gen";
 import { ModuleMessageThread } from "@/components/ModuleMessageThread";
 import { extractMaterialFields } from "@/lib/admin-content-extract";
@@ -73,6 +74,26 @@ function AdminModuleDetailPage() {
     if (ok) {
       setStudentQuery("");
       refetchRoster();
+    }
+  };
+
+  const rosterIds = new Set(roster.map((r) => r.userId));
+  const { matches: courseMatches, loading: matchingCourses } = useMoodleCourseMatch(
+    module.code,
+    module.lecturer,
+    rosterIds,
+  );
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+
+  const handleAssignAllMatches = async () => {
+    setBulkAssigning(true);
+    try {
+      for (const s of courseMatches) {
+        await assignStudent(s.userId);
+      }
+      refetchRoster();
+    } finally {
+      setBulkAssigning(false);
     }
   };
 
@@ -633,6 +654,45 @@ function AdminModuleDetailPage() {
             </div>
           )}
         </div>
+
+        {courseMatches.length > 0 && (
+          <div className="mt-4 rounded-xl bg-prestige-deep/5 p-4">
+            <p className="text-xs font-semibold text-prestige-deep">
+              Found {courseMatches.length} student{courseMatches.length === 1 ? "" : "s"} on a
+              matching real NUST course
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Matched by course code or lecturer against{" "}
+              {[...new Set(courseMatches.map((s) => s.courseFullName))].join(", ")} — review before
+              adding.
+            </p>
+            <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+              {courseMatches.map((s) => (
+                <li key={s.userId} className="truncate text-xs text-foreground/90">
+                  {s.fullName}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              disabled={bulkAssigning || mutatingEnrollment}
+              onClick={() => void handleAssignAllMatches()}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-3.5 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
+            >
+              {bulkAssigning ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+              ) : (
+                <UserPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+              )}
+              Add all {courseMatches.length}
+            </button>
+          </div>
+        )}
+        {matchingCourses && courseMatches.length === 0 && (
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            Checking real NUST courses for a match…
+          </p>
+        )}
 
         <div className="mt-4 border-t border-border/60 pt-3">
           {rosterLoading ? (
