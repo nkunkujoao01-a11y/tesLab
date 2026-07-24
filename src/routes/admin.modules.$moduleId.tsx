@@ -6,6 +6,7 @@ import {
   Award,
   Loader2,
   Plus,
+  Sparkles,
   Trash2,
   Upload,
   UserMinus,
@@ -13,19 +14,26 @@ import {
   Users,
   FileText,
   ListChecks,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchModule } from "@/lib/modules-api";
-import { useCreateMaterial, useCreateModuleQuizQuestion } from "@/hooks/use-catalog-admin";
+import {
+  useCreateMaterial,
+  useCreateModuleQuizQuestion,
+  useCreateModuleQuizQuestions,
+} from "@/hooks/use-catalog-admin";
 import {
   useModuleRoster,
   useSearchStudents,
   useAdminManageEnrollment,
 } from "@/hooks/use-enrollment";
 import { useModuleGrades, useManageGrades } from "@/hooks/use-grades";
+import { useGenerateModuleQuizDraft } from "@/hooks/use-admin-quiz-gen";
 import { extractMaterialFields } from "@/lib/admin-content-extract";
 import { PdfExtractionError } from "@/lib/pdf-extract";
 import { formatMb, formatRelative } from "@/lib/mock-data";
+import type { QuizQuestion } from "@/lib/quiz-gen";
 
 export const Route = createFileRoute("/admin/modules/$moduleId")({
   loader: async ({ params }) => {
@@ -116,6 +124,62 @@ function AdminModuleDetailPage() {
   const [qOptions, setQOptions] = useState(["", "", "", ""]);
   const [qCorrectIndex, setQCorrectIndex] = useState(0);
   const [questionsAdded, setQuestionsAdded] = useState<string[]>([]);
+
+  const {
+    generateDraft,
+    generating: generatingQuiz,
+    progress: quizGenProgress,
+  } = useGenerateModuleQuizDraft();
+  const { createModuleQuizQuestions, creating: publishingQuiz } = useCreateModuleQuizQuestions();
+  const [quizSourceFileName, setQuizSourceFileName] = useState<string | null>(null);
+  const [quizDraft, setQuizDraft] = useState<QuizQuestion[] | null>(null);
+  const quizFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGenerateQuizFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setQuizSourceFileName(file.name);
+    setQuizDraft(null);
+    try {
+      const fields = await extractMaterialFields(file);
+      const sourceText = [fields.heading, fields.lead, fields.body].filter(Boolean).join("\n\n");
+      const draft = await generateDraft(sourceText);
+      if (draft.length > 0) setQuizDraft(draft);
+    } catch (err) {
+      console.error("Failed to read file for quiz generation", err);
+      toast.error(
+        err instanceof PdfExtractionError
+          ? err.message
+          : "Couldn't read that file. Try a PDF, Word document, image, Markdown, or plain-text file instead.",
+      );
+    }
+  };
+
+  const updateDraftQuestion = (index: number, next: QuizQuestion) => {
+    setQuizDraft((prev) => (prev ? prev.map((q, i) => (i === index ? next : q)) : prev));
+  };
+
+  const removeDraftQuestion = (index: number) => {
+    setQuizDraft((prev) => (prev ? prev.filter((_, i) => i !== index) : prev));
+  };
+
+  const handlePublishQuizDraft = async () => {
+    if (!quizDraft || quizDraft.length === 0) return;
+    const ok = await createModuleQuizQuestions(moduleId, quizDraft);
+    if (ok) {
+      toast.success(
+        `Published ${quizDraft.length} question${quizDraft.length === 1 ? "" : "s"} to every student in this module.`,
+      );
+      setQuizDraft(null);
+      setQuizSourceFileName(null);
+      // The module loader's own quiz list won't reflect this until the
+      // page reloads — same reasoning as the manual "Add question" flow's
+      // own questionsAdded tracking below, kept consistent rather than
+      // introducing a second, different "what's new since load" pattern.
+      setQuestionsAdded((prev) => [...prev, ...quizDraft.map((q) => q.question)]);
+    }
+  };
 
   const handleExtractFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -352,6 +416,125 @@ function AdminModuleDetailPage() {
             ))}
           </ul>
         )}
+
+        {/* AI generation */}
+        <div className="mt-4 rounded-xl bg-prestige-deep/5 p-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-prestige-gold" strokeWidth={1.75} />
+            <p className="text-xs font-semibold text-prestige-deep">Generate a quiz with AI</p>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Upload a PDF, Word document, image, or text file — AI drafts multiple-choice questions
+            from it for you to review before publishing to every student.
+          </p>
+          <input
+            ref={quizFileInputRef}
+            type="file"
+            accept=".pdf,.docx,.md,.markdown,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain,image/*"
+            className="hidden"
+            onChange={(e) => void handleGenerateQuizFromFile(e)}
+          />
+          <button
+            type="button"
+            disabled={generatingQuiz}
+            onClick={() => quizFileInputRef.current?.click()}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-3.5 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
+          >
+            {generatingQuiz ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} />
+            )}
+            {generatingQuiz
+              ? quizGenProgress
+                ? `Generating question ${quizGenProgress.current} of ${quizGenProgress.total}…`
+                : "Generating…"
+              : "Generate from a file"}
+          </button>
+          {quizSourceFileName && !generatingQuiz && (
+            <p className="mt-2 text-[10.5px] text-muted-foreground">From {quizSourceFileName}</p>
+          )}
+
+          {quizDraft && quizDraft.length > 0 && (
+            <div className="mt-4 space-y-4 border-t border-prestige-deep/10 pt-4">
+              <p className="text-[11px] font-medium text-prestige-deep">
+                Review before publishing — {quizDraft.length} question
+                {quizDraft.length === 1 ? "" : "s"}
+              </p>
+              {quizDraft.map((q, qi) => (
+                <div key={qi} className="rounded-lg bg-card p-3 ring-1 ring-border/60">
+                  <div className="flex items-start justify-between gap-2">
+                    <textarea
+                      value={q.question}
+                      onChange={(e) => updateDraftQuestion(qi, { ...q, question: e.target.value })}
+                      rows={2}
+                      className={`${FIELD_CLASS} resize-none text-xs`}
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Remove question ${qi + 1}`}
+                      onClick={() => removeDraftQuestion(qi)}
+                      className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    {q.options.map((opt, oi) => (
+                      <div key={oi} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`draft-correct-${qi}`}
+                          checked={q.correctIndex === oi}
+                          onChange={() => updateDraftQuestion(qi, { ...q, correctIndex: oi })}
+                          aria-label={`Option ${oi + 1} is correct`}
+                          className="accent-prestige-deep"
+                        />
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={(e) =>
+                            updateDraftQuestion(qi, {
+                              ...q,
+                              options: q.options.map((o, j) => (j === oi ? e.target.value : o)),
+                            })
+                          }
+                          className={`${FIELD_CLASS} text-xs`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={publishingQuiz}
+                  onClick={() => void handlePublishQuizDraft()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
+                >
+                  {publishingQuiz ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                  ) : (
+                    <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  )}
+                  Publish to students
+                </button>
+                <button
+                  type="button"
+                  disabled={publishingQuiz}
+                  onClick={() => {
+                    setQuizDraft(null);
+                    setQuizSourceFileName(null);
+                  }}
+                  className="rounded-lg px-4 py-2 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-40"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
           <textarea

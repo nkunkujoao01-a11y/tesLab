@@ -184,3 +184,46 @@ export function useCreateModuleQuizQuestion() {
 
   return { createModuleQuizQuestion, creating };
 }
+
+/** Publishes a whole reviewed AI-generated draft (see
+ * use-admin-quiz-gen.ts) to a module in one call — a single batch insert
+ * rather than N sequential useCreateModuleQuizQuestion calls, since these
+ * questions were already generated and reviewed together as one set and
+ * should land in the same all-or-nothing request rather than risking a
+ * half-published quiz if one of N sequential inserts happened to fail. */
+export function useCreateModuleQuizQuestions() {
+  const [creating, setCreating] = useState(false);
+
+  const createModuleQuizQuestions = useCallback(
+    async (moduleId: string, questions: QuizQuestion[]) => {
+      if (questions.length === 0) return false;
+      setCreating(true);
+      try {
+        const { error } = await supabase.from("module_quizzes").insert(
+          questions.map((q) => ({
+            id: crypto.randomUUID(),
+            module_id: moduleId,
+            question: q.question.trim(),
+            options: q.options.map((o) => o.trim()),
+            correct_index: q.correctIndex,
+          })),
+        );
+        if (error) {
+          console.error("Failed to publish module quiz", error);
+          toast.error(
+            error.code === "42501"
+              ? "Your account isn't set up as a lecturer yet."
+              : "Couldn't publish the quiz. Try again.",
+          );
+          return false;
+        }
+        return true;
+      } finally {
+        setCreating(false);
+      }
+    },
+    [],
+  );
+
+  return { createModuleQuizQuestions, creating };
+}
