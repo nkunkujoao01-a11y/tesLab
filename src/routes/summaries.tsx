@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Check, Copy, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { formatRelative } from "@/lib/mock-data";
@@ -41,6 +41,15 @@ function Summaries() {
 
   return (
     <MobileShell>
+      <div className="px-6 pt-6 lg:px-10 lg:pt-8">
+        <Link
+          to="/courses"
+          className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+          Library
+        </Link>
+      </div>
       <PageHeader
         eyebrow="AI summaries"
         title="Everything you asked the model"

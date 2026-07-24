@@ -9,10 +9,10 @@
 // real usage (see use-research-study.ts), but also reachable anytime,
 // voluntarily, from Profile — this component doesn't know or care which
 // path opened it, both just render it with `onClose`.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSubmitResearchSurvey } from "@/hooks/use-research-study";
+import { useSubmitResearchSurvey, useResearchSurveyDraft } from "@/hooks/use-research-study";
 import type { ResearchSurveyAnswers } from "@/lib/supabase";
 
 const SUS_QUESTIONS: [number, string][] = [
@@ -56,10 +56,13 @@ const DATA_QUESTIONS: [number, string][] = [
   [20, "Overall, I am satisfied with the performance of this platform."],
 ];
 
+const CONTINUE_DEVELOPMENT_QUESTION =
+  "Would you like to see this app continue being developed with more features?";
+
 const OPEN_QUESTIONS: [number, string][] = [
-  [21, "What was the best feature of this platform?"],
-  [22, "What was the most difficult part of using this platform?"],
-  [23, "Do you have any suggestions for improvement?"],
+  [22, "What was the best feature of this platform?"],
+  [23, "What was the most difficult part of using this platform?"],
+  [24, "Do you have any suggestions for improvement?"],
 ];
 
 type Step = { key: string; title: string; instructions: string };
@@ -125,19 +128,61 @@ function ScaleRow({
 
 export function ResearchSurveyModal({ onClose }: { onClose: () => void }) {
   const { submit, submitting } = useSubmitResearchSurvey();
+  const { draft, loading: draftLoading, saveDraft, clearDraft } = useResearchSurveyDraft();
   const [stepIndex, setStepIndex] = useState(0);
   const [sus, setSus] = useState<Record<number, number>>({});
   const [tam, setTam] = useState<Record<number, number>>({});
   const [dataEfficiency, setDataEfficiency] = useState<Record<number, number>>({});
   const [openEnded, setOpenEnded] = useState<Record<number, string>>({});
+  const [continueDevelopment, setContinueDevelopment] = useState<number | undefined>(undefined);
+  // Distinguishes "haven't hydrated from the saved draft yet" from a real
+  // step-0 first visit — without this, the very first render's blank
+  // state would immediately overwrite a real in-progress draft before the
+  // hydration effect below even runs.
+  const hydrated = useRef(false);
+
+  // Restore an in-progress draft exactly once, the moment it's done
+  // loading — never again after that (this component only mounts once
+  // per open), so a student's own further edits aren't fought by this
+  // effect re-firing.
+  useEffect(() => {
+    if (draftLoading || hydrated.current) return;
+    hydrated.current = true;
+    if (draft) {
+      setStepIndex(draft.stepIndex);
+      setSus(draft.sus);
+      setTam(draft.tam);
+      setDataEfficiency(draft.dataEfficiency);
+      setOpenEnded(draft.openEnded);
+      setContinueDevelopment(draft.continueDevelopment);
+    }
+  }, [draft, draftLoading]);
+
+  // Persists on every change once hydration has happened — so closing the
+  // app (or just this modal) mid-survey never loses progress. Skipped
+  // before hydration so the blank initial state can't clobber a real
+  // saved draft in the instant before it loads.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    saveDraft({ stepIndex, sus, tam, dataEfficiency, openEnded, continueDevelopment });
+  }, [stepIndex, sus, tam, dataEfficiency, openEnded, continueDevelopment, saveDraft]);
 
   const step = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
 
   const handleSubmit = async () => {
-    const answers: ResearchSurveyAnswers = { sus, tam, dataEfficiency, openEnded };
+    const answers: ResearchSurveyAnswers = {
+      sus,
+      tam,
+      dataEfficiency,
+      openEnded,
+      continueDevelopment,
+    };
     const ok = await submit(answers);
-    if (ok) onClose();
+    if (ok) {
+      clearDraft();
+      onClose();
+    }
   };
 
   return (
@@ -208,6 +253,12 @@ export function ResearchSurveyModal({ onClose }: { onClose: () => void }) {
             ))}
           {step.key === "open" && (
             <div className="space-y-5">
+              <ScaleRow
+                number={21}
+                question={CONTINUE_DEVELOPMENT_QUESTION}
+                value={continueDevelopment}
+                onChange={setContinueDevelopment}
+              />
               {OPEN_QUESTIONS.map(([n, q]) => (
                 <div key={n}>
                   <label className="text-sm font-medium text-prestige-deep">{q}</label>

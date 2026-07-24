@@ -119,7 +119,7 @@ function Login() {
               placeholder="you@example.com or 12345678"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              className="h-11 rounded-lg"
+              className="h-14 rounded-lg text-base md:text-base"
             />
           </div>
           <div className="space-y-1.5">
@@ -133,7 +133,7 @@ function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-11 rounded-lg"
+              className="h-14 rounded-lg text-base md:text-base"
             />
           </div>
 

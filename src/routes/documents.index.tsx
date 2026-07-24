@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
+  ArrowLeft,
   FileText,
   Folder,
   FolderPlus,
@@ -127,6 +128,15 @@ function DocumentsIndex() {
 
   return (
     <MobileShell>
+      <div className="px-6 pt-6 lg:px-10 lg:pt-8">
+        <Link
+          to="/courses"
+          className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+          Library
+        </Link>
+      </div>
       <PageHeader
         eyebrow="My documents"
         title="Your own PDFs, extracted on-device"

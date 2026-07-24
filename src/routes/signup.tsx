@@ -116,7 +116,7 @@ function Signup() {
               autoComplete="name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="h-11 rounded-lg"
+              className="h-14 rounded-lg text-base md:text-base"
             />
           </div>
           <div className="space-y-1.5">
@@ -130,7 +130,7 @@ function Signup() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-11 rounded-lg"
+              className="h-14 rounded-lg text-base md:text-base"
             />
           </div>
           <div className="space-y-1.5">
@@ -145,7 +145,7 @@ function Signup() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-11 rounded-lg"
+              className="h-14 rounded-lg text-base md:text-base"
             />
           </div>
 

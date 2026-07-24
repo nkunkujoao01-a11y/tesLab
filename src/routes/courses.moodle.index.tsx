@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRight, GraduationCap } from "lucide-react";
+import { ArrowLeft, ChevronRight, GraduationCap } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { useMoodleCourses } from "@/hooks/use-moodle-courses";
 import { useMoodleConnection } from "@/hooks/use-moodle";
@@ -23,6 +23,15 @@ function MoodleCourses() {
 
   return (
     <MobileShell>
+      <div className="px-6 pt-6 lg:px-10 lg:pt-8">
+        <Link
+          to="/courses"
+          className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+          Library
+        </Link>
+      </div>
       <PageHeader eyebrow="NUST eLearning" title="My courses" />
 
       <div className="space-y-4 px-6 pb-16 lg:px-10">

@@ -172,6 +172,9 @@ export type ResearchSurveyAnswers = {
   dataEfficiency: Record<number, number>;
   // Open-ended, optional free text.
   openEnded: Record<number, string>;
+  // "Would you like to see this app continue being developed with more
+  // features?" — 1-5, undefined if skipped.
+  continueDevelopment?: number;
 };
 
 export type ResearchSurveyResponseRow = {

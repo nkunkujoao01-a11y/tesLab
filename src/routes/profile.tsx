@@ -110,7 +110,7 @@ function Profile() {
   const isOnline = useOnlineStatus();
   const persistentStorage = usePersistentStorage();
   const notificationPermission = useNotificationPermission();
-  const { installed, canPromptInstall, promptInstall, isIos } = usePwaInstall();
+  const { installed, canPromptInstall, promptInstall, isIos, isAndroid } = usePwaInstall();
   const [installing, setInstalling] = useState(false);
   const surveyCompleted = useResearchSurveyCompleted();
   const [surveyOpen, setSurveyOpen] = useState(false);
@@ -343,11 +343,18 @@ function Profile() {
                   )}
                   Install on this device
                 </button>
+              ) : isAndroid ? (
+                <p className="text-xs text-muted-foreground">
+                  Open this page in Chrome, tap the <span className="font-medium">⋮ menu</span> in
+                  the top right, then <span className="font-medium">"Install app"</span> (or "Add to
+                  Home screen"). The button above will also appear here on its own after you've used
+                  the app a little more.
+                </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Open this page in Chrome or Edge (Android/Windows/Mac) to install — look for an
-                  install icon in the address bar, or this button will appear once the browser
-                  offers it.
+                  Open this page in Chrome or Edge on a computer to install — look for an install
+                  icon at the right end of the address bar, or this button will appear here once the
+                  browser offers it.
                 </p>
               )}
             </div>

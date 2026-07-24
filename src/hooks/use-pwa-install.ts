@@ -25,6 +25,11 @@ function isIos(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+function isAndroid(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /android/i.test(navigator.userAgent);
+}
+
 /** Tracks whether this device can install the app, is already running it
  * installed, or (iOS specifically) needs the manual "Share > Add to Home
  * Screen" flow since Safari never fires `beforeinstallprompt` at all —
@@ -73,5 +78,6 @@ export function usePwaInstall() {
     canPromptInstall: deferredPrompt !== null,
     promptInstall,
     isIos: isIos(),
+    isAndroid: isAndroid(),
   };
 }

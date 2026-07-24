@@ -256,7 +256,7 @@ function Settings() {
                     value={keyInput}
                     onChange={(e) => setKeyInput(e.target.value)}
                     placeholder="2. Paste your key here"
-                    className="h-10 flex-1 rounded-lg border border-border/70 bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                    className="h-14 flex-1 rounded-lg border border-border/70 bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
                   />
                   <button
                     type="submit"
@@ -333,7 +333,7 @@ function Settings() {
                     onChange={(e) => setMoodleStudentNumber(e.target.value)}
                     placeholder="Student number"
                     autoComplete="username"
-                    className="h-10 flex-1 rounded-lg border border-border/70 bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                    className="h-14 flex-1 rounded-lg border border-border/70 bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
                   />
                   <input
                     type="password"
@@ -341,7 +341,7 @@ function Settings() {
                     onChange={(e) => setMoodlePassword(e.target.value)}
                     placeholder="NUST eLearning password"
                     autoComplete="current-password"
-                    className="h-10 flex-1 rounded-lg border border-border/70 bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                    className="h-14 flex-1 rounded-lg border border-border/70 bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
                   />
                   <button
                     type="submit"

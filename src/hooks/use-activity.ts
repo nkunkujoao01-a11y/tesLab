@@ -195,6 +195,58 @@ export function useStreakGrid(weeks = 12): number[][] {
   return grid;
 }
 
+export type DailyActivityPoint = { day: string; date: number; count: number };
+
+/** Raw (unbinned) per-day activity counts for the last `days` days —
+ * useStreakGrid deliberately buckets counts into a 0-3 intensity for the
+ * heatmap, which throws away the actual number; this is the same
+ * underlying local activityEvents data, just kept as real counts, for the
+ * animated trend chart on the Progress page. */
+export function useDailyActivityCounts(days = 14): DailyActivityPoint[] {
+  const { user } = useAuth();
+  const [points, setPoints] = useState<DailyActivityPoint[]>(() =>
+    Array.from({ length: days }, (_, i) => ({
+      day: new Date(startOfDay(Date.now()) - (days - 1 - i) * DAY_MS).toLocaleDateString(
+        undefined,
+        { weekday: "short" },
+      ),
+      date: startOfDay(Date.now()) - (days - 1 - i) * DAY_MS,
+      count: 0,
+    })),
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    const db = getUserDb(user.id);
+    const rangeStart = startOfDay(Date.now()) - (days - 1) * DAY_MS;
+    const sub = liveQuery(() =>
+      db.activityEvents.where("timestamp").aboveOrEqual(rangeStart).toArray(),
+    ).subscribe({
+      next: (events) => {
+        const countByDay = new Map<number, number>();
+        for (const event of events) {
+          const day = startOfDay(event.timestamp);
+          countByDay.set(day, (countByDay.get(day) ?? 0) + 1);
+        }
+        setPoints(
+          Array.from({ length: days }, (_, i) => {
+            const dayTs = rangeStart + i * DAY_MS;
+            return {
+              day: new Date(dayTs).toLocaleDateString(undefined, { weekday: "short" }),
+              date: dayTs,
+              count: countByDay.get(dayTs) ?? 0,
+            };
+          }),
+        );
+      },
+      error: (err) => console.error("Failed to compute daily activity counts", err),
+    });
+    return () => sub.unsubscribe();
+  }, [user, days]);
+
+  return points;
+}
+
 export function useSummariesGeneratedCount(): number {
   const { user } = useAuth();
   const [count, setCount] = useState(0);

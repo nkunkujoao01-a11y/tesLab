@@ -1,10 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { Brain, ListChecks, TriangleAlert } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { fetchModules } from "@/lib/modules-api";
 import { cn } from "@/lib/utils";
-import { useStreakGrid, useReadMaterialIds, moduleCompletion } from "@/hooks/use-activity";
+import {
+  useStreakGrid,
+  useReadMaterialIds,
+  useDailyActivityCounts,
+  moduleCompletion,
+} from "@/hooks/use-activity";
 import { useQuizInsights, useFlashcardInsights } from "@/hooks/use-progress-insights";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+
+const ACTIVITY_CHART_CONFIG: ChartConfig = {
+  count: { label: "Actions", color: "var(--prestige-gold)" },
+};
 
 export const Route = createFileRoute("/progress")({
   loader: () => fetchModules(),
@@ -24,6 +40,7 @@ export const Route = createFileRoute("/progress")({
 function ProgressPage() {
   const modules = Route.useLoaderData();
   const streak = useStreakGrid();
+  const dailyActivity = useDailyActivityCounts(14);
   const readMaterialIds = useReadMaterialIds();
   const quizInsights = useQuizInsights(modules);
   const flashcardInsights = useFlashcardInsights(modules);
@@ -125,6 +142,26 @@ function ProgressPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Daily activity trend — same underlying local activityEvents
+         * data as the streak grid above, kept as real per-day counts
+         * instead of the grid's 0-3 bucketed intensity, for a clearer
+         * recent-activity shape at a glance. */}
+        <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:col-span-3 lg:p-8">
+          <p className="eyebrow">Last 14 days</p>
+          <p className="mt-1 font-display text-lg text-prestige-deep">Actions per day</p>
+          <ChartContainer config={ACTIVITY_CHART_CONFIG} className="mt-5 h-[180px] w-full">
+            <BarChart data={dailyActivity}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} interval={1} />
+              <ChartTooltip
+                cursor={false}
+                content={<ChartTooltipContent labelKey="day" indicator="line" />}
+              />
+              <Bar dataKey="count" fill="var(--color-count)" radius={4} animationDuration={600} />
+            </BarChart>
+          </ChartContainer>
         </section>
 
         {/* How you're doing — real quiz/flashcard performance, not just

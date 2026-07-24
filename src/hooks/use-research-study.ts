@@ -5,8 +5,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { submitResearchConsent, submitResearchSurvey } from "@/lib/research-study";
 import type { ResearchSurveyAnswers } from "@/lib/supabase";
-import { useSummariesGeneratedCount } from "@/hooks/use-activity";
-import { useDownloadedMaterialIds } from "@/hooks/use-downloads";
 
 // Bookkeeping only — whether *this signed-in account* has already been
 // asked, stored in its own local UserDB (see db.ts) so it's never shown
@@ -15,8 +13,18 @@ import { useDownloadedMaterialIds } from "@/hooks/use-downloads";
 // leaves the device and carries no answer content, just "already asked."
 const CONSENT_RESPONDED_KEY = "research_consent_responded";
 const CONSENT_AGREED_KEY = "research_consent_agreed";
-const SURVEY_SHOWN_KEY = "research_survey_shown";
 const SURVEY_COMPLETED_KEY = "research_survey_completed";
+// In-progress answers, so closing the app (or just this modal) mid-survey
+// doesn't lose what was already filled in — see ResearchSurveyModal, which
+// reads/writes this on every step. Cleared only on a real successful
+// submit (useSubmitResearchSurvey below), never on a plain close.
+const SURVEY_DRAFT_KEY = "research_survey_draft";
+
+// Resets on a real reload/app relaunch (module-level, not persisted) —
+// lets the prompt reappear at every fresh app open until the survey is
+// actually completed, without also reopening on every in-app navigation
+// after a student has already closed it once this session.
+let closedThisLoad = false;
 
 /** Whether the mandatory consent gate should show — true only once, the
  * first time a signed-in student who hasn't yet responded (agreed *or*
@@ -63,39 +71,109 @@ export function useResearchConsentGate(): {
   return { shouldShow: Boolean(user) && responded === false, respond };
 }
 
-/** Whether the optional post-task survey should auto-prompt — once,
- * after real usage (a generated summary, or a downloaded material), never
- * again once shown (whether or not it was actually completed — a
- * dismissed prompt shouldn't keep reappearing). Also reachable anytime,
+/** Whether the optional post-task survey should auto-prompt — shows at
+ * every fresh app open/login for a student who has responded to the
+ * consent gate but not yet completed the survey, and keeps reappearing on
+ * the next app open (not the same one — see `closedThisLoad`) until it's
+ * actually completed, not just shown. In-progress answers survive a close
+ * via SURVEY_DRAFT_KEY (see ResearchSurveyModal), so nothing is lost if a
+ * student closes the app mid-survey by mistake. Also reachable anytime,
  * voluntarily, from Profile regardless of this. */
 export function useResearchSurveyPrompt(): {
   shouldShow: boolean;
   dismiss: () => void;
 } {
   const { user } = useAuth();
-  const summariesCount = useSummariesGeneratedCount();
-  const downloadedCount = useDownloadedMaterialIds().size;
-  const [alreadyShown, setAlreadyShown] = useState<boolean | null>(null);
+  const [consentResponded, setConsentResponded] = useState<boolean | null>(null);
+  const [completed, setCompleted] = useState<boolean | null>(null);
+  const [closed, setClosed] = useState(closedThisLoad);
 
   useEffect(() => {
     if (!user) {
-      setAlreadyShown(null);
+      setConsentResponded(null);
+      setCompleted(null);
       return;
     }
-    void getUserDb(user.id)
-      .syncMeta.get(SURVEY_SHOWN_KEY)
-      .then((row) => setAlreadyShown(row?.value === "true"));
+    const db = getUserDb(user.id);
+    void db.syncMeta
+      .get(CONSENT_RESPONDED_KEY)
+      .then((row) => setConsentResponded(row?.value === "true"));
+    void db.syncMeta.get(SURVEY_COMPLETED_KEY).then((row) => setCompleted(row?.value === "true"));
   }, [user]);
 
   const dismiss = useCallback(() => {
-    if (!user) return;
-    setAlreadyShown(true);
-    void getUserDb(user.id).syncMeta.put({ key: SURVEY_SHOWN_KEY, value: "true" });
+    closedThisLoad = true;
+    setClosed(true);
+  }, []);
+
+  return {
+    shouldShow: Boolean(user) && consentResponded === true && completed === false && !closed,
+    dismiss,
+  };
+}
+
+export type ResearchSurveyDraft = {
+  stepIndex: number;
+  sus: Record<number, number>;
+  tam: Record<number, number>;
+  dataEfficiency: Record<number, number>;
+  openEnded: Record<number, string>;
+  continueDevelopment: number | undefined;
+};
+
+/** Reads/writes the in-progress survey draft — see SURVEY_DRAFT_KEY's own
+ * comment above for why this exists. `loading` distinguishes "haven't
+ * checked yet" from "checked, there's genuinely no draft," so
+ * ResearchSurveyModal doesn't overwrite a real in-progress draft with
+ * blank state before the read resolves. */
+export function useResearchSurveyDraft(): {
+  draft: ResearchSurveyDraft | null;
+  loading: boolean;
+  saveDraft: (draft: ResearchSurveyDraft) => void;
+  clearDraft: () => void;
+} {
+  const { user } = useAuth();
+  const [draft, setDraft] = useState<ResearchSurveyDraft | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setDraft(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    void getUserDb(user.id)
+      .syncMeta.get(SURVEY_DRAFT_KEY)
+      .then((row) => {
+        if (!row) {
+          setDraft(null);
+          return;
+        }
+        try {
+          setDraft(JSON.parse(row.value) as ResearchSurveyDraft);
+        } catch (err) {
+          console.error("Failed to parse saved survey draft", err);
+          setDraft(null);
+        }
+      })
+      .finally(() => setLoading(false));
   }, [user]);
 
-  const hasDoneRealTask = summariesCount > 0 || downloadedCount > 0;
+  const saveDraft = useCallback(
+    (next: ResearchSurveyDraft) => {
+      if (!user) return;
+      void getUserDb(user.id).syncMeta.put({ key: SURVEY_DRAFT_KEY, value: JSON.stringify(next) });
+    },
+    [user],
+  );
 
-  return { shouldShow: Boolean(user) && alreadyShown === false && hasDoneRealTask, dismiss };
+  const clearDraft = useCallback(() => {
+    if (!user) return;
+    void getUserDb(user.id).syncMeta.delete(SURVEY_DRAFT_KEY);
+  }, [user]);
+
+  return { draft, loading, saveDraft, clearDraft };
 }
 
 /** Submits the survey — online-only, same "gate on being online, no
