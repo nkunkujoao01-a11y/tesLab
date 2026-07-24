@@ -159,7 +159,14 @@ function orderLinesForReading(lines: RawLine[]): RawLine[] {
   return [...left, ...right];
 }
 
-const BULLET_PATTERN = /^[•●▪◦‣∙·-]\s+|^\*\s+/;
+// ☐☑☒□ (checkbox/ballot-box glyphs) added alongside the round bullet
+// glyphs — real, reported bug: a checklist-style source document (e.g. a
+// requirements list with "☐ Upload documents") left that literal glyph
+// embedded in the bullet's text since it wasn't recognized as a marker,
+// so it rendered doubled up with StructuredText's own `<li>` disc marker
+// ("• ☐ Upload documents"). Stripped the same way as every other
+// recognized bullet glyph now, not treated as part of the item's text.
+const BULLET_PATTERN = /^[•●▪◦‣∙·☐☑☒□-]\s+|^\*\s+/;
 const NUMBERED_PATTERN = /^(\d+[.)]|[a-zA-Z][.)]|\([a-zA-Z0-9]+\))\s+/;
 // A reference-list entry ("[24] S. Lujan..." or IEEE-style "[Abran 2010]
 // Alain Abran...") starts with a bracketed marker — square brackets

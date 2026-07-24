@@ -66,6 +66,37 @@ function buildCloudChatPrompt(turns: ChatTurn[]): string {
 // than genuine relevance. Requiring 2 cuts most of that noise out.
 const MIN_CONFIDENT_SCORE = 2;
 
+// Real, reported gap: a student asking "what module is this" or "what doc
+// is this" got the same generic "I couldn't find anything" retrieval-miss
+// response as a genuinely unanswerable question like "is it good" — but
+// this one isn't unanswerable at all, the app already knows the title(s)
+// perfectly well; keyword-overlap retrieval (retrieval.ts) just has no
+// reason to ever find a chunk of *content* for a question that's really
+// asking about the document's own identity, not something written inside
+// it. Checked before retrieval runs at all, not folded into the
+// low-confidence fallback — answered directly from `documents` rather
+// than run through the model (on-device or cloud) at all, since there's
+// nothing to generate here, only a fact to state.
+const META_IDENTITY_PATTERNS = [
+  /\b(what|which)\s+(module|document|doc|file|collection)\s+(is|am\s+i\s+in)\s+this\b/i,
+  /\bwhat\s+is\s+this\s+(module|document|doc|file|collection)\b/i,
+  /\bwhat('?s| is)\s+in\s+this\s+(module|document|doc|file|collection)\b/i,
+];
+
+function isMetaIdentityQuestion(query: string): boolean {
+  return META_IDENTITY_PATTERNS.some((pattern) => pattern.test(query));
+}
+
+function describeDocuments(documents: RetrievableDocument[]): string {
+  if (documents.length === 0) {
+    return "This doesn't have any documents yet, so there's nothing to show.";
+  }
+  if (documents.length === 1) {
+    return `This is "${documents[0].title}".`;
+  }
+  return `This contains: ${documents.map((d) => `"${d.title}"`).join(", ")}.`;
+}
+
 /** Reuses the same on-device chat model as the general "Ask AI" assistant
  * (Phase I1) — there is no separate download for this, since it's the
  * same engine grounded with different context per turn. See
@@ -95,7 +126,9 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
       setSending(true);
       setStreamingText("");
       try {
-        const chunks = retrieveRelevantChunks(documents, trimmed);
+        const chunks = isMetaIdentityQuestion(trimmed)
+          ? []
+          : retrieveRelevantChunks(documents, trimmed);
         // Requiring zero chunks was too narrow a guard: a question can
         // retrieve one or two chunks that only share a single incidental
         // word with the query (score 1) — barely related, not a real
@@ -109,7 +142,9 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
         const isConfident = chunks.length > 0 && chunks[0].score >= MIN_CONFIDENT_SCORE;
         let response: string;
 
-        if (!isConfident) {
+        if (isMetaIdentityQuestion(trimmed)) {
+          response = describeDocuments(documents);
+        } else if (!isConfident) {
           // Deterministic, not model-generated, for this specific case —
           // real testing found the small on-device model unreliable here
           // even with an explicit instruction not to: given nothing

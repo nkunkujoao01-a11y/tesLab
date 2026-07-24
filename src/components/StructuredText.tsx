@@ -10,6 +10,26 @@ function unescapeTableCell(cell: string): string {
   return cell.replace(/\\\|/g, "|");
 }
 
+// Real, reported bug: the AI chat's system prompt asks for real headings/
+// bullets (see use-ai-chat.ts), but a model — especially the cloud one —
+// also reaches for `**bold**` around key terms the way it would in any
+// other Markdown context, same as pdf.js source PDFs never do but a
+// model-generated answer very commonly does. Left unparsed, that showed
+// up as literal, ugly asterisks in the rendered text. Only `**bold**` is
+// handled, not a full inline-Markdown parser (italics, links, code) — the
+// one inline pattern actually observed in practice; the same "just enough
+// for what's actually emitted, not a general parser" discipline this
+// component's own top comment already applies to block-level structure.
+function renderInline(text: string): React.ReactNode[] {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return parts.map((part, i) =>
+    // Odd indices are always the captured group inside `**...**` — a
+    // plain `String.split` with a capturing group interleaves literal
+    // text (even indices) and matched groups (odd indices) this way.
+    i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
+  );
+}
+
 /** Parses one GFM-style pipe-table block (as emitted by pdf-extract.ts's
  * detectTableRows/formatStructuredText) into header + body rows. Plain
  * string splitting, not a Markdown table parser — this only ever needs to
@@ -56,7 +76,7 @@ export function StructuredText({ text, className }: StructuredTextProps) {
     elements.push(
       <ul key={`ul-${elements.length}`} className="list-disc space-y-1.5 pl-5">
         {bulletBuffer.map((item, i) => (
-          <li key={i}>{item}</li>
+          <li key={i}>{renderInline(item)}</li>
         ))}
       </ul>,
     );
@@ -81,7 +101,7 @@ export function StructuredText({ text, className }: StructuredTextProps) {
                     key={i}
                     className="border-b border-prestige-deep/20 px-2 py-1 text-left font-medium"
                   >
-                    {cell}
+                    {renderInline(cell)}
                   </th>
                 ))}
               </tr>
@@ -91,7 +111,7 @@ export function StructuredText({ text, className }: StructuredTextProps) {
                 <tr key={ri}>
                   {row.map((cell, ci) => (
                     <td key={ci} className="border-b border-prestige-deep/10 px-2 py-1">
-                      {cell}
+                      {renderInline(cell)}
                     </td>
                   ))}
                 </tr>
@@ -109,7 +129,7 @@ export function StructuredText({ text, className }: StructuredTextProps) {
           key={elements.length}
           className="mt-2 font-display text-base font-medium text-prestige-deep"
         >
-          {block.slice(3)}
+          {renderInline(block.slice(3))}
         </h3>,
       );
     } else if (block.startsWith("# ")) {
@@ -118,11 +138,11 @@ export function StructuredText({ text, className }: StructuredTextProps) {
           key={elements.length}
           className="mt-3 font-display text-xl font-medium text-prestige-deep"
         >
-          {block.slice(2)}
+          {renderInline(block.slice(2))}
         </h2>,
       );
     } else {
-      elements.push(<p key={elements.length}>{block}</p>);
+      elements.push(<p key={elements.length}>{renderInline(block)}</p>);
     }
   }
   flushBullets();
