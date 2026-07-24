@@ -49,6 +49,10 @@ type ModelDtype =
 export type ChatModelInfo = {
   id: string;
   dtype: ModelDtype;
+  // Tried automatically, once, only if `dtype` fails with a *fatal*
+  // (deterministic, not transient) error — see loadChatModel's own
+  // comment on why this exists specifically for smollm2's "q8" gamble.
+  fallbackDtype?: ModelDtype;
   label: string;
   description: string;
   approxSizeMb: number;
@@ -63,36 +67,35 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
   // the reasoning that it's a plain per-tensor quantization scheme
   // (DequantizeLinear/MatMulInteger) with long-standing WASM support — that
   // reasoning was wrong: the *exact same* GatherBlockQuantized error
-  // reproduced on the same real device after that fix shipped. The most
-  // likely explanation is that onnx-community's export tooling applies
-  // block quantization to the token-embedding table specifically, as a
-  // size-optimization, independent of the overall dtype label — so
-  // "int8" still hit the same unsupported op for embed_tokens even though
-  // the rest of the model's weights genuinely were plain int8. "fp32" (no
-  // quantization anywhere in the graph, on any tensor, embeddings
-  // included) is the only choice left that's *certain* to avoid this
-  // specific op, at a real cost: ~1.45GB, larger than "q4" ever was.
-  // Reliability over size given this model is the app's default and this
-  // exact failure has now been hit twice on a real device — not verified
-  // end-to-end here either, but this is the last lever available short of
-  // dropping GatherBlockQuantized-affected exports as an option entirely.
+  // reproduced on the same real device after that fix shipped. Moved to
+  // "fp32" (no quantization anywhere, guaranteed to avoid that op) at a
+  // real cost: ~1.45GB, and full-precision inference genuinely slow enough
+  // on a budget device to read as "frozen" or to actually run out of
+  // memory and crash — the exact complaints that then came back from real
+  // testing, just traded for a different failure mode.
+  //
+  // Trying "q8" next — a *different* file from int8/uint8 (transformers.js
+  // maps it to onnx-community's separate `model_quantized.onnx` export,
+  // confirmed via the repo's own file listing: 363MB, distinct from
+  // model_int8.onnx/model_uint8.onnx despite the same nominal bit width),
+  // and notably the library's own DEFAULT_DEVICE_DTYPE_MAPPING picks "q8"
+  // as the default for the wasm backend specifically — some signal this
+  // export path gets more real-world testing than the others. Genuinely
+  // untested on real hardware as of this change, and the last two
+  // "should work" dtype theories for this exact model both failed
+  // differently on a real device — `fallbackDtype: "fp32"` below is a
+  // real safety net, not decoration: loadChatModel retries once with it if
+  // "q8" fails with the same *fatal* (deterministic, load-time) class of
+  // error, so a repeat of that history degrades back to the known-working
+  // (if slow) path instead of fully breaking on-device chat.
   smollm2: {
     id: "onnx-community/SmolLM2-360M-Instruct-ONNX",
-    dtype: "fp32",
+    dtype: "q8",
+    fallbackDtype: "fp32",
     label: "SmolLM2 (360M)",
-    // Honest despite being the default: the fp32 requirement above (the
-    // one dtype that avoids the GatherBlockQuantized crash — see that
-    // comment) makes this the *larger* download of the two options and,
-    // being full-precision, genuinely slower to run than a quantized model
-    // this size would be. "Small and fast" described the model's parameter
-    // count, not its real on-device footprint — real user reports of slow,
-    // freezing, or crashing generation are consistent with asking a
-    // budget/older phone to run 1.45GB of full-precision math. If that's
-    // happening, a connected free cloud AI key (Settings) skips on-device
-    // generation entirely.
     description:
-      "The default — chosen for reliability, not speed. Runs at full precision to avoid a real crash bug in smaller, quantized exports, which makes it a genuinely large, slow download on older or budget phones. If it's freezing or crashing, connect a free cloud AI key in Settings instead of relying on this device.",
-    approxSizeMb: 1450,
+      "The default — small and quantized for speed. If this device hits a known kernel-compatibility crash on this export, it automatically falls back to a slower, full-precision copy rather than failing outright. If it's still freezing or crashing, connect a free cloud AI key in Settings instead of relying on this device.",
+    approxSizeMb: 363,
   },
   // Real-device testing also reported the device crashing during this
   // model's download/install (SmolLM2 self-recovered via a page refresh;
@@ -109,13 +112,8 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
     id: "onnx-community/gemma-3-1b-it-ONNX",
     dtype: "q4",
     label: "Gemma 3 (1B)",
-    // "Larger and more capable" is still true (nearly 3x the parameters),
-    // but the old "more than double the download size" line is no longer
-    // accurate now that SmolLM2 was forced to fp32 (1450MB) — this q4
-    // export is actually the *smaller* download of the two. Corrected
-    // rather than left stale.
     description:
-      "More capable (nearly 3x the parameters), and actually a smaller download than the default thanks to quantization. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
+      "Larger and more capable (nearly 3x the parameters), at more than double the download size. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
     approxSizeMb: 859,
   },
 };
@@ -218,7 +216,7 @@ export async function loadChatModel(
     return existing;
   }
 
-  const { id, dtype } = CHAT_MODELS[choice];
+  const { id, dtype, fallbackDtype } = CHAT_MODELS[choice];
   const subscribers = new Set<(p: ModelProgress) => void>();
   if (onProgress) subscribers.add(onProgress);
   progressSubscribers.set(choice, subscribers);
@@ -230,30 +228,60 @@ export async function loadChatModel(
     await markAiOperationStarted("load", CHAT_MODELS[choice].label);
     try {
       const { pipeline } = await import("@huggingface/transformers");
-      for (let attempt = 0; ; attempt++) {
-        try {
-          return await pipeline("text-generation", id, {
-            dtype,
-            progress_callback: broadcastProgress,
-          });
-        } catch (err) {
-          const category = classifyModelError(err);
-          // A fatal failure reproduces identically every time — no point
-          // spending the remaining transient-retry attempts on it. Remember
-          // it so every future call for this model rejects immediately
-          // instead of repeating the same doomed pipeline() attempt.
-          if (isFatalCategory(category)) {
-            const fatal = err instanceof Error ? err : new Error(String(err));
-            fatalModelErrors.set(choice, fatal);
-            throw fatal;
+
+      // One dtype's worth of load attempts (with the existing transient-
+      // retry policy) — called twice below: once for the primary dtype,
+      // once more for `fallbackDtype` if the primary one fails *fatally*
+      // (see loadChatModel's own comment and smollm2's CHAT_MODELS entry
+      // for why this exists). Throws whatever the final attempt threw;
+      // doesn't touch fatalModelErrors itself, so the caller decides
+      // whether a fatal failure here is truly final or worth falling
+      // back from.
+      const attemptLoad = async (attemptDtype: ModelDtype) => {
+        for (let attempt = 0; ; attempt++) {
+          try {
+            return await pipeline("text-generation", id, {
+              dtype: attemptDtype,
+              progress_callback: broadcastProgress,
+            });
+          } catch (err) {
+            const category = classifyModelError(err);
+            if (isFatalCategory(category)) throw err;
+            if (attempt >= TRANSIENT_RETRY_ATTEMPTS || category !== "transient") throw err;
+            console.error(
+              `Transient failure loading chat model (${attemptDtype}, attempt ${attempt + 1}), retrying`,
+              err,
+            );
+            await delay(TRANSIENT_RETRY_DELAY_MS);
           }
-          if (attempt >= TRANSIENT_RETRY_ATTEMPTS || category !== "transient") throw err;
+        }
+      };
+
+      try {
+        return await attemptLoad(dtype);
+      } catch (err) {
+        const category = classifyModelError(err);
+        if (isFatalCategory(category) && fallbackDtype) {
           console.error(
-            `Transient failure loading chat model (attempt ${attempt + 1}), retrying`,
+            `Chat model dtype "${dtype}" failed fatally, falling back to "${fallbackDtype}"`,
             err,
           );
-          await delay(TRANSIENT_RETRY_DELAY_MS);
+          try {
+            return await attemptLoad(fallbackDtype);
+          } catch (fallbackErr) {
+            const fallbackCategory = classifyModelError(fallbackErr);
+            const fatal =
+              fallbackErr instanceof Error ? fallbackErr : new Error(String(fallbackErr));
+            if (isFatalCategory(fallbackCategory)) fatalModelErrors.set(choice, fatal);
+            throw fatal;
+          }
         }
+        // No fallback available (or this wasn't a fatal failure to begin
+        // with) — same "remember it so every future call rejects
+        // immediately" reasoning as the fallback branch above.
+        const fatal = err instanceof Error ? err : new Error(String(err));
+        if (isFatalCategory(category)) fatalModelErrors.set(choice, fatal);
+        throw fatal;
       }
     } finally {
       // Reached only if the process is still alive to run it — a real

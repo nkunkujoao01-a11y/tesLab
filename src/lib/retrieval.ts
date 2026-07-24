@@ -54,12 +54,31 @@ const STOPWORDS = new Set([
   "your",
 ]);
 
+// A deliberately crude suffix-stripping stemmer, not a real linguistic
+// one (e.g. Porter) — found to matter from a real user report: a question
+// asking about "applications"/"registration" scored zero overlap against
+// source text that said "apply"/"register", purely because keyword
+// matching (see this file's own top comment on why it's keyword-overlap,
+// not embeddings) compares exact word forms. This closes the most common,
+// cheapest-to-fix gap — plural/verb-form endings — without pretending to
+// solve real semantic matching, which stays retrieval.ts's known,
+// documented limit.
+function stem(word: string): string {
+  if (word.length > 6 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
+  if (word.length > 5 && word.endsWith("ing")) return word.slice(0, -3);
+  if (word.length > 4 && word.endsWith("es")) return word.slice(0, -2);
+  if (word.length > 4 && word.endsWith("ed")) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  return word;
+}
+
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w))
+    .map(stem);
 }
 
 // Splits on the same block boundary StructuredText renders on (Feature 32's
