@@ -67,35 +67,28 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
   // the reasoning that it's a plain per-tensor quantization scheme
   // (DequantizeLinear/MatMulInteger) with long-standing WASM support — that
   // reasoning was wrong: the *exact same* GatherBlockQuantized error
-  // reproduced on the same real device after that fix shipped. Moved to
-  // "fp32" (no quantization anywhere, guaranteed to avoid that op) at a
-  // real cost: ~1.45GB, and full-precision inference genuinely slow enough
-  // on a budget device to read as "frozen" or to actually run out of
-  // memory and crash — the exact complaints that then came back from real
-  // testing, just traded for a different failure mode.
+  // reproduced on the same real device after that fix shipped.
   //
-  // Trying "q8" next — a *different* file from int8/uint8 (transformers.js
-  // maps it to onnx-community's separate `model_quantized.onnx` export,
-  // confirmed via the repo's own file listing: 363MB, distinct from
-  // model_int8.onnx/model_uint8.onnx despite the same nominal bit width),
-  // and notably the library's own DEFAULT_DEVICE_DTYPE_MAPPING picks "q8"
-  // as the default for the wasm backend specifically — some signal this
-  // export path gets more real-world testing than the others. Genuinely
-  // untested on real hardware as of this change, and the last two
-  // "should work" dtype theories for this exact model both failed
-  // differently on a real device — `fallbackDtype: "fp32"` below is a
-  // real safety net, not decoration: loadChatModel retries once with it if
-  // "q8" fails with the same *fatal* (deterministic, load-time) class of
-  // error, so a repeat of that history degrades back to the known-working
-  // (if slow) path instead of fully breaking on-device chat.
+  // Also tried "q8" (a genuinely different, untested file from
+  // int8/uint8 — confirmed via the model repo's own file listing) on the
+  // reasoning that it's transformers.js's own default dtype for the wasm
+  // backend. That reasoning didn't pan out either: it wasn't the same
+  // load-time crash (the automatic fallbackDtype safety net built for that
+  // case never triggered — this failed differently, during generation
+  // itself, not loading), but real-device testing reported quiz
+  // generation taking noticeably longer and still failing. Reverted back
+  // to "fp32" — the one dtype actually confirmed working on real hardware
+  // across every attempt so far, even though it's the largest and
+  // slowest option. Three real attempts at a smaller/faster dtype have
+  // now each failed differently; further guessing here isn't worth it
+  // without a way to test on the actual target device first.
   smollm2: {
     id: "onnx-community/SmolLM2-360M-Instruct-ONNX",
-    dtype: "q8",
-    fallbackDtype: "fp32",
+    dtype: "fp32",
     label: "SmolLM2 (360M)",
     description:
-      "The default — small and quantized for speed. If this device hits a known kernel-compatibility crash on this export, it automatically falls back to a slower, full-precision copy rather than failing outright. If it's still freezing or crashing, connect a free cloud AI key in Settings instead of relying on this device.",
-    approxSizeMb: 363,
+      "The default — chosen for reliability, not speed. Runs at full precision, which two different quantized exports failed on for this model — a real, if large and slow, tradeoff. If it's freezing or crashing, connect a free cloud AI key in Settings instead of relying on this device.",
+    approxSizeMb: 1450,
   },
   // Real-device testing also reported the device crashing during this
   // model's download/install (SmolLM2 self-recovered via a page refresh;
@@ -112,8 +105,11 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
     id: "onnx-community/gemma-3-1b-it-ONNX",
     dtype: "q4",
     label: "Gemma 3 (1B)",
+    // SmolLM2 being back on fp32 (1450MB) makes this q4 export the
+    // *smaller* download of the two again, despite Gemma having nearly 3x
+    // the parameters — corrected rather than left saying the opposite.
     description:
-      "Larger and more capable (nearly 3x the parameters), at more than double the download size. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
+      "More capable (nearly 3x the parameters), and actually a smaller download than the default thanks to quantization. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
     approxSizeMb: 859,
   },
 };
