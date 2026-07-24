@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Bot, Loader2, Send, Sparkles, TriangleAlert, Trash2, User } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
+import { StructuredText } from "@/components/StructuredText";
 import {
   useChatModelStatus,
   useChatModelOfflineCapable,
@@ -182,7 +183,11 @@ function Assistant() {
                       : "bg-card text-foreground/90 ring-1 ring-border/60"
                   }`}
                 >
-                  {msg.content}
+                  {msg.role === "assistant" ? (
+                    <StructuredText text={msg.content} className="space-y-2" />
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               </div>
             ))}
@@ -192,7 +197,9 @@ function Assistant() {
                   <Bot className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </div>
                 <div className="max-w-[80%] rounded-2xl bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground/90 ring-1 ring-border/60">
-                  {streamingText || (
+                  {streamingText ? (
+                    <StructuredText text={streamingText} className="space-y-2" />
+                  ) : (
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
                       {thinkingLabel}

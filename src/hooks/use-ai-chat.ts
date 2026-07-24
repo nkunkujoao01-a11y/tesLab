@@ -219,8 +219,21 @@ export function useAssistantMessages(): AssistantMessage[] {
   return messages;
 }
 
+// The structure instruction below asks for the exact same lightweight
+// markup StructuredText.tsx already renders (`#`/`##` headings, `- `
+// bullets, blocks separated by a blank line) — see that component's own
+// comment for the full vocabulary. Real user report: a flat wall-of-text
+// answer for anything with real parts (steps, comparisons, multiple
+// examples) was hard to scan. Shared between the cloud and on-device
+// paths rather than two separate prompts — harmless either way: the
+// small on-device model may or may not reliably follow it, but an answer
+// that doesn't use the markup still renders correctly as plain paragraphs
+// (see StructuredText's own fallback), so there's no regression if it
+// doesn't comply, only a real gain when it does (most reliably from the
+// cloud model).
 const SYSTEM_PROMPT =
-  "You are a helpful study assistant for university students. Answer clearly and concisely.";
+  "You are a helpful study assistant for university students. Answer clearly and concisely. " +
+  'When it genuinely helps (multi-part answers, steps, comparisons, several examples), structure your answer with a line starting "# " for a heading, "## " for a sub-heading, and "- " for a bullet point, each block separated by a blank line. Don\'t force this structure onto a short, simple answer that reads fine as plain text.';
 
 // A small on-device model has a limited practical context window and gets
 // slower with every extra token — cap how much history rides along on

@@ -13,6 +13,7 @@ import {
   User,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
+import { StructuredText } from "@/components/StructuredText";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { fetchModule } from "@/lib/modules-api";
 import { useDownloadedModuleMaterials } from "@/hooks/use-downloads";
@@ -258,7 +259,11 @@ function ModuleChat() {
                       : "bg-card text-foreground/90 ring-1 ring-border/60"
                   }`}
                 >
-                  {msg.content}
+                  {msg.role === "assistant" ? (
+                    <StructuredText text={msg.content} className="space-y-2" />
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               </div>
             ))}
@@ -268,7 +273,9 @@ function ModuleChat() {
                   <Bot className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </div>
                 <div className="max-w-[80%] rounded-2xl bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground/90 ring-1 ring-border/60">
-                  {streamingText || (
+                  {streamingText ? (
+                    <StructuredText text={streamingText} className="space-y-2" />
+                  ) : (
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
                       {thinkingLabel}
