@@ -6,6 +6,8 @@ import {
   Loader2,
   Plus,
   Upload,
+  UserMinus,
+  UserPlus,
   Users,
   FileText,
   ListChecks,
@@ -13,7 +15,11 @@ import {
 import { toast } from "sonner";
 import { fetchModule } from "@/lib/modules-api";
 import { useCreateMaterial, useCreateModuleQuizQuestion } from "@/hooks/use-catalog-admin";
-import { useModuleRoster } from "@/hooks/use-enrollment";
+import {
+  useModuleRoster,
+  useSearchStudents,
+  useAdminManageEnrollment,
+} from "@/hooks/use-enrollment";
 import { extractMaterialFields } from "@/lib/admin-content-extract";
 import { PdfExtractionError } from "@/lib/pdf-extract";
 import { formatMb, formatRelative } from "@/lib/mock-data";
@@ -39,7 +45,27 @@ function AdminModuleDetailPage() {
   const { moduleId } = Route.useParams();
   const { createMaterial, creating: creatingMaterial } = useCreateMaterial();
   const { createModuleQuizQuestion, creating: creatingQuestion } = useCreateModuleQuizQuestion();
-  const { roster, loading: rosterLoading } = useModuleRoster(moduleId);
+  const { roster, loading: rosterLoading, refetch: refetchRoster } = useModuleRoster(moduleId);
+  const [studentQuery, setStudentQuery] = useState("");
+  const { results: searchResults, searching } = useSearchStudents(studentQuery);
+  const {
+    assignStudent,
+    removeStudent,
+    mutating: mutatingEnrollment,
+  } = useAdminManageEnrollment(moduleId);
+
+  const handleAssignStudent = async (userId: string) => {
+    const ok = await assignStudent(userId);
+    if (ok) {
+      setStudentQuery("");
+      refetchRoster();
+    }
+  };
+
+  const handleRemoveStudent = async (userId: string) => {
+    const ok = await removeStudent(userId);
+    if (ok) refetchRoster();
+  };
 
   const [matTitle, setMatTitle] = useState("");
   const [matKind, setMatKind] = useState(KIND_OPTIONS[0]);
@@ -78,7 +104,7 @@ function AdminModuleDetailPage() {
       toast.error(
         err instanceof PdfExtractionError
           ? err.message
-          : "Couldn't read that file. Try a PDF, Markdown, or plain-text file instead.",
+          : "Couldn't read that file. Try a PDF, Word document, image, Markdown, or plain-text file instead.",
       );
     } finally {
       setExtracting(false);
@@ -177,7 +203,7 @@ function AdminModuleDetailPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.md,.markdown,.txt,application/pdf,text/markdown,text/plain"
+              accept=".pdf,.docx,.md,.markdown,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain,image/*"
               className="hidden"
               onChange={(e) => void handleExtractFromFile(e)}
             />
@@ -192,7 +218,7 @@ function AdminModuleDetailPage() {
               ) : (
                 <Upload className="h-3.5 w-3.5" strokeWidth={1.75} />
               )}
-              {extracting ? "Extracting…" : "Extract from PDF/Markdown/Text"}
+              {extracting ? "Extracting…" : "Extract from PDF, Word, image, or text"}
             </button>
           </div>
           <input
@@ -348,11 +374,46 @@ function AdminModuleDetailPage() {
           <div>
             <p className="text-sm font-medium text-prestige-deep">Registered students</p>
             <p className="text-[11px] text-muted-foreground">
-              Students who've enrolled themselves in this module
+              Self-enrolled, or assigned by you below
             </p>
           </div>
         </div>
-        <div className="mt-3 border-t border-border/60 pt-3">
+
+        <div className="relative mt-4 border-t border-border/60 pt-4">
+          <input
+            value={studentQuery}
+            onChange={(e) => setStudentQuery(e.target.value)}
+            placeholder="Search a student by name to assign…"
+            className={FIELD_CLASS}
+          />
+          {studentQuery.trim().length >= 2 && (
+            <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg bg-card shadow-lg ring-1 ring-border/70">
+              {searching ? (
+                <p className="px-3 py-2.5 text-xs text-muted-foreground">Searching…</p>
+              ) : searchResults.length === 0 ? (
+                <p className="px-3 py-2.5 text-xs text-muted-foreground">No students found.</p>
+              ) : (
+                searchResults.map((s) => (
+                  <button
+                    key={s.userId}
+                    type="button"
+                    disabled={mutatingEnrollment}
+                    onClick={() => void handleAssignStudent(s.userId)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm text-foreground/90 transition-colors hover:bg-secondary disabled:opacity-40"
+                  >
+                    {s.fullName}
+                    <UserPlus
+                      className="h-3.5 w-3.5 shrink-0 text-prestige-mid"
+                      strokeWidth={1.75}
+                    />
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 border-t border-border/60 pt-3">
           {rosterLoading ? (
             <p className="text-xs text-muted-foreground">Loading…</p>
           ) : roster.length === 0 ? (
@@ -362,11 +423,22 @@ function AdminModuleDetailPage() {
               {roster.map((entry) => (
                 <li
                   key={entry.userId}
-                  className="flex items-center justify-between gap-4 py-2 text-sm"
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
                 >
                   <span className="min-w-0 truncate text-foreground/90">{entry.fullName}</span>
-                  <span className="shrink-0 text-[10.5px] text-muted-foreground">
-                    {formatRelative(entry.enrolledAt)}
+                  <span className="flex shrink-0 items-center gap-3">
+                    <span className="text-[10.5px] text-muted-foreground">
+                      {formatRelative(entry.enrolledAt)}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${entry.fullName}`}
+                      disabled={mutatingEnrollment}
+                      onClick={() => void handleRemoveStudent(entry.userId)}
+                      className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                    >
+                      <UserMinus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </button>
                   </span>
                 </li>
               ))}

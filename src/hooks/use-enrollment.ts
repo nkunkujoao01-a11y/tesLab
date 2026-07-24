@@ -92,10 +92,13 @@ export type RosterEntry = {
  * has no direct foreign key to `public.profiles` (both merely reference
  * `auth.users` independently), so a `profiles(full_name)` embed isn't a
  * relationship PostgREST can infer; joining client-side avoids relying on
- * one that doesn't exist. */
+ * one that doesn't exist. Exposes `refetch` so a caller that just
+ * assigned/removed a student (useAdminManageEnrollment below) can refresh
+ * this same list instead of it silently going stale until next mount. */
 export function useModuleRoster(moduleId: string | null) {
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!moduleId) {
@@ -141,7 +144,114 @@ export function useModuleRoster(moduleId: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [moduleId]);
+  }, [moduleId, refreshKey]);
 
-  return { roster, loading };
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  return { roster, loading, refetch };
+}
+
+export type StudentSearchResult = { userId: string; fullName: string };
+
+// A short debounce, not "search on every keystroke" — a real query per
+// keystroke against `profiles` is wasted work for a name still being
+// typed, and this is a lecturer typing a student's name, not a
+// latency-critical interaction.
+const SEARCH_DEBOUNCE_MS = 300;
+
+/** Searches student profiles by name for the "assign a student" flow —
+ * `full_name` is the only searchable, non-identifying field `profiles`
+ * actually has (see 0001_init.sql; no student-number/email column
+ * exists on this table), same "Lecturers can view all profiles" RLS
+ * policy the roster view above already relies on. Empty query returns no
+ * results rather than the whole student body. */
+export function useSearchStudents(query: string): {
+  results: StudentSearchResult[];
+  searching: boolean;
+} {
+  const [results, setResults] = useState<StudentSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const timeoutId = setTimeout(() => {
+      void supabase
+        .from("profiles")
+        .select("id, full_name")
+        .ilike("full_name", `%${trimmed}%`)
+        .limit(8)
+        .then(({ data, error }) => {
+          if (error) console.error("Failed to search students", error);
+          setResults((data ?? []).map((p) => ({ userId: p.id, fullName: p.full_name })));
+          setSearching(false);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeoutId);
+  }, [query]);
+
+  return { results, searching };
+}
+
+/** Lecturer-initiated enrollment management — assign a student found via
+ * useSearchStudents, or remove one from the roster. Distinct from
+ * useModuleEnrollment above (a student's own self-service toggle): same
+ * underlying table, but this acts *on behalf of* another user, which only
+ * the "Lecturers can manage any enrollment" RLS policy
+ * (0026_admin_manage_enrollment.sql) permits. */
+export function useAdminManageEnrollment(moduleId: string) {
+  const [mutating, setMutating] = useState(false);
+
+  const assignStudent = useCallback(
+    async (userId: string) => {
+      setMutating(true);
+      try {
+        const { error } = await supabase
+          .from("module_enrollments")
+          .insert({ user_id: userId, module_id: moduleId });
+        if (error) {
+          // A student already enrolled hits the primary-key conflict —
+          // not a real failure, the end state is exactly what was asked
+          // for, so this is treated as success rather than an error toast.
+          if (error.code === "23505") return true;
+          console.error("Failed to assign student", error);
+          toast.error("Couldn't assign that student. Try again.");
+          return false;
+        }
+        return true;
+      } finally {
+        setMutating(false);
+      }
+    },
+    [moduleId],
+  );
+
+  const removeStudent = useCallback(
+    async (userId: string) => {
+      setMutating(true);
+      try {
+        const { error } = await supabase
+          .from("module_enrollments")
+          .delete()
+          .eq("user_id", userId)
+          .eq("module_id", moduleId);
+        if (error) {
+          console.error("Failed to remove student", error);
+          toast.error("Couldn't remove that student. Try again.");
+          return false;
+        }
+        return true;
+      } finally {
+        setMutating(false);
+      }
+    },
+    [moduleId],
+  );
+
+  return { assignStudent, removeStudent, mutating };
 }

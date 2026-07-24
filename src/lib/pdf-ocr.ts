@@ -78,6 +78,22 @@ export async function ocrPage(page: PDFPageProxy): Promise<string> {
   return text.trim();
 }
 
+/** Runs OCR directly on an uploaded image file (a photographed page,
+ * scanned handout, etc.) — same shared worker as ocrPage above, just
+ * handed the file's own bytes instead of a rasterized pdf.js page.
+ * tesseract.js's `recognize` accepts a File/Blob natively, so no manual
+ * canvas rendering step is needed here the way ocrPage's PDF-page source
+ * requires. Same honest "plain prose, no heading/bullet structure"
+ * degrade as ocrPage — OCR output has no font-size metadata to detect
+ * structure from either way. */
+export async function ocrImageFile(file: File): Promise<string> {
+  const worker = await getOcrWorker();
+  const {
+    data: { text },
+  } = await worker.recognize(file);
+  return text.trim();
+}
+
 /** Releases the shared OCR worker. Call once after a whole document's
  * extraction is done (success or failure) so a WASM engine that isn't
  * needed again this session doesn't stay resident in memory — most
