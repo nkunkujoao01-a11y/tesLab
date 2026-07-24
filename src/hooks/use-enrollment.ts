@@ -180,11 +180,15 @@ export function useSearchStudents(query: string): {
       return;
     }
     setSearching(true);
+    // Escape ILIKE's own wildcards so a lecturer typing a literal "%" or
+    // "_" (or "\") searches for that character, not a pattern — otherwise
+    // a query like "50%" would match far more names than intended.
+    const escaped = trimmed.replace(/[\\%_]/g, (c) => `\\${c}`);
     const timeoutId = setTimeout(() => {
       void supabase
         .from("profiles")
         .select("id, full_name")
-        .ilike("full_name", `%${trimmed}%`)
+        .ilike("full_name", `%${escaped}%`)
         .limit(8)
         .then(({ data, error }) => {
           if (error) console.error("Failed to search students", error);
