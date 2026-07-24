@@ -19,6 +19,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { WelcomeTour } from "@/components/WelcomeTour";
 import { ByokPrompt } from "@/components/ByokPrompt";
 import { InstallAppPrompt } from "@/components/InstallAppPrompt";
+import { ResearchConsentGate } from "@/components/ResearchConsentGate";
+import { ResearchSurveyPrompt } from "@/components/ResearchSurveyPrompt";
 
 function NotFoundComponent() {
   return (
@@ -193,6 +195,8 @@ function RootComponent() {
         <WelcomeTour />
         <ByokPrompt />
         <InstallAppPrompt />
+        <ResearchConsentGate />
+        <ResearchSurveyPrompt />
         <Toaster position="bottom-center" richColors closeButton />
       </AuthProvider>
     </QueryClientProvider>

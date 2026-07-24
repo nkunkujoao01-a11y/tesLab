@@ -115,6 +115,34 @@ export type FeedbackRow = {
   created_at: string;
 };
 
+// 0025_research_study.sql — see research-study.ts for the full reasoning.
+// Deliberately no user_id/email on either row: `anonymous_id` is a random
+// per-device id, never derived from or joined back to the real account.
+export type ResearchConsentRow = {
+  id: string;
+  anonymous_id: string;
+  agreed: boolean;
+  responded_at: string;
+};
+
+export type ResearchSurveyAnswers = {
+  // SUS (System Usability Scale), 10 questions, 1-5.
+  sus: Record<number, number>;
+  // Perceived usefulness/ease of use (TAM/UTAUT), 5 questions, 1-5.
+  tam: Record<number, number>;
+  // Data efficiency & satisfaction, 5 questions, 1-5.
+  dataEfficiency: Record<number, number>;
+  // Open-ended, optional free text.
+  openEnded: Record<number, string>;
+};
+
+export type ResearchSurveyResponseRow = {
+  id: string;
+  anonymous_id: string;
+  answers: ResearchSurveyAnswers;
+  submitted_at: string;
+};
+
 // An admin-authored quiz question for a module — see Feature 57. Distinct
 // from the client-generated, per-student quizzes in `db.ts`; this is
 // shared catalog content, same access model as `materials`.
@@ -212,6 +240,18 @@ export type Database = {
       feedback: {
         Row: FeedbackRow;
         Insert: FeedbackRow;
+        Update: never;
+        Relationships: [];
+      };
+      research_consent: {
+        Row: ResearchConsentRow;
+        Insert: ResearchConsentRow;
+        Update: never;
+        Relationships: [];
+      };
+      research_survey_responses: {
+        Row: ResearchSurveyResponseRow;
+        Insert: ResearchSurveyResponseRow;
         Update: never;
         Relationships: [];
       };
