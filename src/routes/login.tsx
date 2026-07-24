@@ -62,7 +62,9 @@ function Login() {
       setError(
         result.reason === "invalid_credentials"
           ? "Those NUST eLearning credentials weren't accepted. Check your student number and password."
-          : "Couldn't sign in right now. Try again in a moment.",
+          : result.reason === "rate_limited"
+            ? "Too many attempts — wait a few minutes before trying again."
+            : "Couldn't sign in right now. Try again in a moment.",
       );
       return;
     }

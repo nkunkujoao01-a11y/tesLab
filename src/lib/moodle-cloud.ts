@@ -78,7 +78,12 @@ export type ConnectMoodleResult =
   | { connected: true; fullName: string }
   | {
       connected: false;
-      reason: "invalid_credentials" | "service_unavailable" | "unexpected" | "not_signed_in";
+      reason:
+        | "invalid_credentials"
+        | "service_unavailable"
+        | "unexpected"
+        | "not_signed_in"
+        | "rate_limited";
     };
 
 /** Sends the student's NUST student number + password to our own server
@@ -107,7 +112,7 @@ export async function disconnectMoodle(): Promise<void> {
 
 export type NustLoginResult =
   | { signedIn: true; fullName: string }
-  | { signedIn: false; reason: "invalid_credentials" | "unexpected" };
+  | { signedIn: false; reason: "invalid_credentials" | "unexpected" | "rate_limited" };
 
 /** Logs in with a NUST student number + password instead of an eLearn
  * email — see loginWithNustCredentials (moodle-server.ts) for the full

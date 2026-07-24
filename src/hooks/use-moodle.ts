@@ -92,7 +92,9 @@ export function useMoodleConnection(): MoodleConnectionState {
             ? "Those NUST eLearning credentials weren't accepted. Check your student number and password."
             : result.reason === "not_signed_in"
               ? "Sign in to eLearn first, then connect your NUST account."
-              : "Couldn't connect right now. Try again in a moment.";
+              : result.reason === "rate_limited"
+                ? "Too many attempts — wait a few minutes before trying again."
+                : "Couldn't connect right now. Try again in a moment.";
         toast.error(message);
         return false;
       } catch (err) {

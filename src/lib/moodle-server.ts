@@ -31,6 +31,22 @@ type SaveMoodleConnectionFn = {
 const MOODLE_BASE_URL = "https://elearning.nust.na";
 const MOODLE_SERVICE = "moodle_mobile_app";
 
+// Typed locally for the same reason as SaveMoodleConnectionFn above — this
+// table (0031_moodle_login_rate_limit.sql) is only ever touched from this
+// one helper, via a service-role client, never the shared anon-key client.
+type MoodleLoginAttemptsTable = {
+  moodle_login_attempts: {
+    Row: { id: string; student_number: string; created_at: string };
+    Insert: { student_number: string };
+    Update: never;
+    Relationships: [];
+  };
+};
+
+const LOGIN_ATTEMPT_WINDOW_MINUTES = 15;
+const LOGIN_ATTEMPT_MAX = 5;
+const LOGIN_ATTEMPT_PRUNE_HOURS = 1;
+
 export class MoodleAuthError extends Error {
   constructor(reason: string) {
     super(reason);
@@ -124,6 +140,60 @@ async function moodleGetSiteInfo(token: string): Promise<MoodleSiteInfo> {
   return moodleCallFunction<MoodleSiteInfo>(token, "core_webservice_get_site_info");
 }
 
+/** DB-backed rate limit for the NUST login/connect flow — both
+ * connectMoodleAccount and loginWithNustCredentials below are stateless
+ * createServerFn handlers with no reliable shared in-memory state across
+ * serverless invocations, so an in-memory counter wouldn't actually limit
+ * anything under real (multi-instance) load. Called before ever touching
+ * Moodle, so a rate-limited request never generates an outbound login
+ * attempt against NUST's own system.
+ *
+ * Keyed by student number — the concrete risk this closes is unlimited
+ * password guesses against one known account, laundered through this
+ * app's own server IP. It does not stop a distributed attacker spreading
+ * guesses across many different student numbers; that would need
+ * IP-based limiting at the edge/middleware layer instead, a separate,
+ * larger change. See 0031_moodle_login_rate_limit.sql. */
+async function checkAndRecordLoginAttempt(studentNumber: string): Promise<boolean> {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    console.error("Missing VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY for login rate limit");
+    // Fail open rather than blocking every login over missing config —
+    // same degrade-gracefully discipline as the rest of this file.
+    return true;
+  }
+  const admin = createClient(url, serviceRoleKey) as unknown as SupabaseClient<{
+    public: {
+      Tables: MoodleLoginAttemptsTable;
+      Views: Record<string, never>;
+      Functions: Record<string, never>;
+    };
+  }>;
+
+  const normalized = studentNumber.trim().toLowerCase();
+  const pruneBefore = new Date(
+    Date.now() - LOGIN_ATTEMPT_PRUNE_HOURS * 60 * 60 * 1000,
+  ).toISOString();
+  await admin.from("moodle_login_attempts").delete().lt("created_at", pruneBefore);
+
+  const windowStart = new Date(Date.now() - LOGIN_ATTEMPT_WINDOW_MINUTES * 60 * 1000).toISOString();
+  const { count, error } = await admin
+    .from("moodle_login_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("student_number", normalized)
+    .gte("created_at", windowStart);
+  if (error) {
+    console.error("Failed to check login attempt count", error);
+    return true; // fail open — same reasoning as the missing-config case above
+  }
+  if ((count ?? 0) >= LOGIN_ATTEMPT_MAX) {
+    return false;
+  }
+  await admin.from("moodle_login_attempts").insert({ student_number: normalized });
+  return true;
+}
+
 /** Runs the exact same per-connection sync the scheduled cron job uses
  * (syncOneConnection, moodle-cron-handler.ts) right after a successful
  * connect/login, instead of making the student wait up to
@@ -164,7 +234,10 @@ async function runImmediateMoodleSync(userId: string): Promise<void> {
 type ConnectInput = { studentNumber: string; password: string; accessToken: string };
 type ConnectResult =
   | { connected: true; fullName: string }
-  | { connected: false; reason: "invalid_credentials" | "service_unavailable" | "unexpected" };
+  | {
+      connected: false;
+      reason: "invalid_credentials" | "service_unavailable" | "unexpected" | "rate_limited";
+    };
 
 /** The one and only place the student's NUST password exists — a local
  * variable inside this handler's own scope, passed straight into the
@@ -177,6 +250,10 @@ export const connectMoodleAccount = createServerFn({ method: "POST" })
   .validator((data: ConnectInput) => data)
   .handler(async ({ data }): Promise<ConnectResult> => {
     const { studentNumber, password, accessToken } = data;
+
+    if (!(await checkAndRecordLoginAttempt(studentNumber))) {
+      return { connected: false, reason: "rate_limited" };
+    }
 
     let token: string;
     let siteInfo: MoodleSiteInfo;
@@ -261,7 +338,7 @@ function studentNumberToEmail(studentNumber: string): string {
 type NustLoginInput = { studentNumber: string; password: string };
 type NustLoginResult =
   | { ok: true; email: string; loginPassword: string; fullName: string }
-  | { ok: false; reason: "invalid_credentials" | "unexpected" };
+  | { ok: false; reason: "invalid_credentials" | "unexpected" | "rate_limited" };
 
 /** Logs a student in with only their real NUST student number + password —
  * no separate eLearn signup, no separate "connect Moodle" step in
@@ -293,6 +370,10 @@ export const loginWithNustCredentials = createServerFn({ method: "POST" })
   .validator((data: NustLoginInput) => data)
   .handler(async ({ data }): Promise<NustLoginResult> => {
     const { studentNumber, password } = data;
+
+    if (!(await checkAndRecordLoginAttempt(studentNumber))) {
+      return { ok: false, reason: "rate_limited" };
+    }
 
     let token: string;
     let siteInfo: MoodleSiteInfo;
