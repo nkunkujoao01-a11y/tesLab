@@ -88,6 +88,23 @@ export function pickQuizQuestionCount(): number {
 // including just to pad the deck.
 const MIN_BACK_CHARS = 60;
 
+// Real, reported bug: a heading with only a handful of subheadings between
+// it and the *next* real heading (or none at all) swept every bullet/body
+// block in that whole span onto one card's back with no cap — for a
+// document that's mostly a long flat list under a sparse heading (e.g. a
+// requirements/checklist-style document), that produced a single "answer"
+// that was really a dozen unrelated bullets concatenated into one wall of
+// text, defeating the point of a flashcard (a quick, reviewable fact, not
+// a re-read of a whole section). Truncated rather than dropped — a
+// shortened real answer is still useful; excluding the card entirely would
+// lose a genuinely fine question over a source-structure quirk.
+const MAX_BACK_CHARS = 500;
+
+function truncateBack(back: string): string {
+  if (back.length <= MAX_BACK_CHARS) return back;
+  return `${back.slice(0, MAX_BACK_CHARS).trimEnd()}…`;
+}
+
 // A numbered/lettered heading prefix ("11. Software Requirements Skill
 // Area", "A. Contributors") reads awkwardly once wrapped in a question —
 // stripped before building the front, real heading text kept as-is.
@@ -128,9 +145,13 @@ export function generateFlashcards(text: string): Flashcard[] {
   let backParts: string[] = [];
 
   const flush = () => {
-    const back = backParts.join(" ");
+    // Joined with newlines, not spaces — a heading followed by several
+    // bullets is a list, not one run-on sentence, and rendering it as
+    // separate lines (see QuizFlashcards.tsx's `whitespace-pre-line`) is
+    // what actually makes a multi-part answer readable at a glance.
+    const back = backParts.join("\n");
     if (front && back.length >= MIN_BACK_CHARS) {
-      cards.push({ front, back });
+      cards.push({ front, back: truncateBack(back) });
     }
     backParts = [];
   };

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowLeft, Bot, Loader2, Send, Sparkles, Trash2, TriangleAlert, User } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
@@ -11,6 +11,7 @@ import {
 } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   useCollectionMessages,
   useSendCollectionMessage,
@@ -59,7 +60,6 @@ function DocumentChat() {
   const staleAiOperation = useStaleAiOperationWarning();
   const { clearConversation } = useClearCollectionConversation(docId);
   const [draft, setDraft] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   // See assistant.tsx's identical comment.
   const { connected: cloudConnected } = useCloudAiKey();
@@ -68,12 +68,11 @@ function DocumentChat() {
   const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
   const chatReady = modelStatus === "ready" || cloudChatReady;
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, streamingText]);
+  const { sentinelRef, jumpToBottom } = useStickToBottom([messages, streamingText]);
 
   const handleSend = () => {
     if (!draft.trim() || sending) return;
+    jumpToBottom();
     void sendMessage(draft);
     setDraft("");
   };
@@ -211,7 +210,7 @@ function DocumentChat() {
                 </div>
               </div>
             )}
-            <div ref={scrollRef} />
+            <div ref={sentinelRef} />
           </div>
 
           <div className="fixed inset-x-0 bottom-20 z-20 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md lg:bottom-0 lg:ml-64">

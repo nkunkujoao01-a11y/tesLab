@@ -131,7 +131,7 @@ export function FlashcardDeck({
         <p className="text-[9px] font-semibold uppercase tracking-widest text-prestige-mid/70">
           {flipped ? "Answer" : "Question"} · tap to flip
         </p>
-        <p className="mt-3 text-base leading-relaxed text-prestige-deep">
+        <p className="mt-3 whitespace-pre-line text-base leading-relaxed text-prestige-deep">
           {flipped ? card.back : card.front}
         </p>
         {cardRating !== undefined && (

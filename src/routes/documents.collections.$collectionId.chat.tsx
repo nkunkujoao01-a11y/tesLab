@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   Bot,
@@ -21,6 +21,7 @@ import {
 } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   useCollectionMessages,
   useSendCollectionMessage,
@@ -63,7 +64,6 @@ function CollectionChat() {
   const staleAiOperation = useStaleAiOperationWarning();
   const { clearConversation } = useClearCollectionConversation(collectionId);
   const [draft, setDraft] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   // See assistant.tsx's identical comment — a connected, enabled cloud key
   // with real internet can serve this chat too, without the on-device
@@ -74,12 +74,11 @@ function CollectionChat() {
   const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
   const chatReady = modelStatus === "ready" || cloudChatReady;
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, streamingText]);
+  const { sentinelRef, jumpToBottom } = useStickToBottom([messages, streamingText]);
 
   const handleSend = () => {
     if (!draft.trim() || sending) return;
+    jumpToBottom();
     void sendMessage(draft);
     setDraft("");
   };
@@ -238,7 +237,7 @@ function CollectionChat() {
                 </div>
               </div>
             )}
-            <div ref={scrollRef} />
+            <div ref={sentinelRef} />
           </div>
 
           <div className="fixed inset-x-0 bottom-20 z-20 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md lg:bottom-0 lg:ml-64">

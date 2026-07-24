@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bot,
@@ -23,6 +23,7 @@ import {
 } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   useCollectionMessages,
   useSendCollectionMessage,
@@ -89,7 +90,6 @@ function MaterialChat() {
   const staleAiOperation = useStaleAiOperationWarning();
   const { clearConversation } = useClearCollectionConversation(key);
   const [draft, setDraft] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   // See assistant.tsx's identical comment.
   const { connected: cloudConnected } = useCloudAiKey();
@@ -98,12 +98,11 @@ function MaterialChat() {
   const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
   const chatReady = modelStatus === "ready" || cloudChatReady;
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, streamingText]);
+  const { sentinelRef, jumpToBottom } = useStickToBottom([messages, streamingText]);
 
   const handleSend = () => {
     if (!draft.trim() || sending) return;
+    jumpToBottom();
     void sendMessage(draft);
     setDraft("");
   };
@@ -255,7 +254,7 @@ function MaterialChat() {
                 </div>
               </div>
             )}
-            <div ref={scrollRef} />
+            <div ref={sentinelRef} />
           </div>
 
           <div className="fixed inset-x-0 bottom-20 z-20 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md lg:bottom-0 lg:ml-64">
