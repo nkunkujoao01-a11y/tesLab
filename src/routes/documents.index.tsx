@@ -150,7 +150,7 @@ function DocumentsIndex() {
              * PDFs" even though a real PDF was picked. Any unsupported
              * file that slips through already gets a clear, specific
              * error from extractPdfText (pdf-extract.ts) or
-             * extractDocxText (admin-content-extract.ts) instead. */}
+             * extractDocxStructuredText (docx-extract.ts) instead. */}
             <input
               id="documents-pdf-upload"
               type="file"

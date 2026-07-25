@@ -8,7 +8,7 @@ import {
   type DocumentCollection,
 } from "@/lib/db";
 import { extractPdfText, PdfExtractionError, type ExtractProgress } from "@/lib/pdf-extract";
-import { extractDocxText } from "@/lib/admin-content-extract";
+import { extractDocxStructuredText, detectDocumentTitle } from "@/lib/docx-extract";
 import {
   markPdfExtractionStarted,
   markPdfExtractionFinished,
@@ -128,11 +128,10 @@ function isDocxFile(file: File): boolean {
  * .docx). Rejects oversized files before even trying to parse them (a
  * generous cap — this is text extraction, not a document archive) and
  * surfaces each format's real failure modes with an actionable message
- * instead of a generic failure. Word documents reuse extractDocxText
- * (admin-content-extract.ts, originally built for the admin "add a
- * material" form) — the same mammoth-based flat-text extraction, since
- * there's nothing format-specific about turning a docx into readable
- * text for a student vs an admin. */
+ * instead of a generic failure. Word documents use extractDocxStructuredText
+ * (docx-extract.ts) — real heading/list/table structure via mammoth's
+ * HTML conversion, the same `#`/`##`/`- `/`| |` markup pdf-extract.ts
+ * produces, not a flat unstructured dump. */
 export function useUploadDocument() {
   const { user } = useAuth();
   const [status, setStatus] = useState<UploadStatus>("idle");
@@ -162,10 +161,7 @@ export function useUploadDocument() {
         let text: string;
         let pageCount: number;
         if (isDocx) {
-          text = await extractDocxText(file);
-          // mammoth has no page concept — same "1" placeholder the
-          // admin-content-extract.ts docx path already uses.
-          pageCount = 1;
+          ({ text, pageCount } = await extractDocxStructuredText(file));
           if (!text.trim()) {
             throw new PdfExtractionError(
               "No text could be extracted from this Word document. It may be empty, or saved in an unsupported format.",
@@ -176,9 +172,15 @@ export function useUploadDocument() {
           ({ text, pageCount } = await extractPdfText(file, setProgress));
         }
         const now = Date.now();
+        // Prefers the document's own detected title (its first real
+        // heading) over the raw filename — a thesis/assignment upload's
+        // filename is very often a meaningless student-number/submission
+        // id, not anything the student would recognize as the title.
+        // Best-effort, see detectDocumentTitle's own comment.
+        const detectedTitle = detectDocumentTitle(text);
         const doc: PersonalDocument = {
           id: crypto.randomUUID(),
-          title: file.name.replace(/\.(pdf|docx)$/i, ""),
+          title: detectedTitle || file.name.replace(/\.(pdf|docx)$/i, ""),
           pageCount,
           sizeMb,
           text,

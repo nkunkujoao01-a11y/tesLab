@@ -7,6 +7,7 @@
 // *storage* convention for the same kind of editorial structure a personal
 // document already gets derived for it at read time.
 import { extractPdfText } from "@/lib/pdf-extract";
+import { extractDocxStructuredText } from "@/lib/docx-extract";
 import { ocrImageFile } from "@/lib/pdf-ocr";
 import { deriveDocumentLead } from "@/lib/document-lead";
 
@@ -28,30 +29,17 @@ function stripBlockMarker(block: string): string {
 const DOCX_EXTENSION = /\.docx$/i;
 const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif|bmp)$/i;
 
-/** Extracts plain text from a .docx file via mammoth — dynamically
- * imported (browser-only, same "keep it out of the SSR bundle" reasoning
- * as pdf-extract.ts's own dynamic imports). Only `extractRawText`, not
- * `convertToHtml`: this app's own `#`/`##`/`- ` structure convention
- * isn't something mammoth produces either way, so there's nothing extra
- * to gain from its richer HTML output here — same flat-text degrade as
- * OCR output below, left for the admin to add real structure to by hand
- * if the source document had any worth preserving. */
-export async function extractDocxText(file: File): Promise<string> {
-  const mammoth = await import("mammoth");
-  const arrayBuffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer });
-  return result.value;
-}
-
 /** Reads raw text from a PDF, Word document, image, Markdown, or
  * plain-text file. Markdown/text files are read as-is — a `.md` file
  * already uses the same `#`/`##`/`- ` convention pdf-extract.ts produces,
  * so no separate parser is needed; a `.txt` file just has no structure
  * markers, which the fallbacks below handle the same way a heading-less
- * PDF page would. Word documents and images (a photographed handout, a
- * scanned page) both come back as flat, unstructured prose — an honest
- * degrade, not a lesser version of the same structure detection PDFs get
- * (see extractDocxText/ocrImageFile's own comments for why). */
+ * PDF page would. Word documents get real structure via
+ * extractDocxStructuredText (docx-extract.ts) — the same convention PDFs
+ * get. Only a scanned/photographed image still comes back as flat,
+ * unstructured prose (OCR has no font-size/style signal to derive
+ * structure from at all), an honest degrade rather than a lesser version
+ * of the same structure detection (see ocrImageFile's own comment). */
 async function readRawText(file: File): Promise<{ text: string; pageCount: number }> {
   const name = file.name.toLowerCase();
   const isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
@@ -60,8 +48,7 @@ async function readRawText(file: File): Promise<{ text: string; pageCount: numbe
     return { text, pageCount };
   }
   if (DOCX_EXTENSION.test(name)) {
-    const text = await extractDocxText(file);
-    return { text, pageCount: 1 };
+    return extractDocxStructuredText(file);
   }
   if (file.type.startsWith("image/") || IMAGE_EXTENSION.test(name)) {
     const text = await ocrImageFile(file);
