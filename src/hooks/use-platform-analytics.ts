@@ -1,12 +1,10 @@
 // Platform-wide analytics for the super admin overview — same real-data
 // pattern as use-module-analytics.ts (reads activity_events/read_materials
 // directly rather than a separate reporting table), just without a
-// moduleId/roster scope. No new instrumentation: only what
-// activity_events (download/read/summary/quiz/flashcard),
-// read_materials, feedback, and the research tables already record. Time
-// spent and device/platform signals do not exist anywhere server-side —
-// deliberately not faked here; the overview page surfaces that as a known
-// gap instead.
+// moduleId/roster scope. Device/platform breakdown and session-duration
+// data come from study_sessions (0040_study_sessions.sql,
+// use-session-tracking.ts) — real "tab open and visible" time, not
+// focused-study precision (see that hook's own comment on the tradeoff).
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { ActivityType } from "@/lib/db";
@@ -31,6 +29,8 @@ export type PlatformAnalytics = {
   researchConsentCount: number;
   researchConsentAgreedCount: number;
   researchSurveyResponseCount: number;
+  deviceBreakdown: Record<"mobile" | "tablet" | "desktop", number>;
+  avgSessionMinutes: number | null;
 };
 
 function countDistinctUsers(rows: { user_id: string }[]): number {
@@ -77,6 +77,7 @@ export function usePlatformAnalytics(): {
       supabase.from("feedback").select("rating"),
       supabase.from("research_consent").select("agreed"),
       supabase.from("research_survey_responses").select("id", { count: "exact", head: true }),
+      supabase.from("study_sessions").select("user_id, device_type, duration_seconds, updated_at"),
     ]).then(
       ([
         studentsRes,
@@ -87,6 +88,7 @@ export function usePlatformAnalytics(): {
         feedbackRes,
         consentRes,
         surveyRes,
+        sessionsRes,
       ]) => {
         if (cancelled) return;
 
@@ -100,6 +102,34 @@ export function usePlatformAnalytics(): {
         const ratings = (feedbackRes.data ?? [])
           .map((f) => f.rating)
           .filter((r): r is number => r !== null);
+
+        if (sessionsRes.error) console.error("Failed to load study sessions", sessionsRes.error);
+        // Each distinct student's most recent session decides their
+        // device bucket — a student who studies on both phone and laptop
+        // still counts once, under whichever they used last.
+        const latestSessionByUser = new Map<string, NonNullable<typeof sessionsRes.data>[number]>();
+        for (const row of sessionsRes.data ?? []) {
+          const existing = latestSessionByUser.get(row.user_id);
+          if (!existing || row.updated_at > existing.updated_at) {
+            latestSessionByUser.set(row.user_id, row);
+          }
+        }
+        const deviceBreakdown = { mobile: 0, tablet: 0, desktop: 0 };
+        for (const session of latestSessionByUser.values()) {
+          deviceBreakdown[session.device_type] += 1;
+        }
+        // Excludes 0-duration sessions — a session that just started and
+        // never had a chance to accumulate any visible time would
+        // otherwise skew the average toward 0 unfairly.
+        const nonZeroDurations = (sessionsRes.data ?? [])
+          .map((s) => s.duration_seconds)
+          .filter((d) => d > 0);
+        const avgSessionMinutes =
+          nonZeroDurations.length > 0
+            ? Math.round(
+                (nonZeroDurations.reduce((a, b) => a + b, 0) / nonZeroDurations.length / 60) * 10,
+              ) / 10
+            : null;
 
         setData({
           totalStudents: studentsRes.count ?? 0,
@@ -119,6 +149,8 @@ export function usePlatformAnalytics(): {
           researchConsentCount: consentRes.data?.length ?? 0,
           researchConsentAgreedCount: (consentRes.data ?? []).filter((c) => c.agreed).length,
           researchSurveyResponseCount: surveyRes.count ?? 0,
+          deviceBreakdown,
+          avgSessionMinutes,
         });
         setLoading(false);
       },

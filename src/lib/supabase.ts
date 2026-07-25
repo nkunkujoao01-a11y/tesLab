@@ -195,6 +195,20 @@ export type AnonymousSuggestionRow = {
   submitted_at: string;
 };
 
+// 0040_study_sessions.sql — see use-session-tracking.ts. One row per app
+// session, upserted repeatedly as duration_seconds grows; super-admin-only
+// read (not is_lecturer()), platform-health telemetry rather than
+// per-module pedagogical data.
+export type StudySessionRow = {
+  id: string;
+  user_id: string;
+  started_at: string;
+  updated_at: string;
+  duration_seconds: number;
+  device_type: "mobile" | "tablet" | "desktop";
+  platform: string;
+};
+
 // An admin-authored quiz question for a module — see Feature 57. Distinct
 // from the client-generated, per-student quizzes in `db.ts`; this is
 // shared catalog content, same access model as `materials`.
@@ -311,6 +325,14 @@ export type Database = {
         Row: AnonymousSuggestionRow;
         Insert: AnonymousSuggestionRow;
         Update: never;
+        Relationships: [];
+      };
+      study_sessions: {
+        Row: StudySessionRow;
+        Insert: StudySessionRow;
+        // Only these two ever change on a repeat upsert of the same
+        // session id (see use-session-tracking.ts's periodic flush).
+        Update: Partial<Pick<StudySessionRow, "updated_at" | "duration_seconds">>;
         Relationships: [];
       };
       module_grades: {

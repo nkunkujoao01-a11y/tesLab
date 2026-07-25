@@ -1,8 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Download, BookOpenText, Sparkles, ListChecks, Layers, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  Download,
+  BookOpenText,
+  Sparkles,
+  ListChecks,
+  Layers,
+  Info,
+  Smartphone,
+  Tablet,
+  Monitor,
+} from "lucide-react";
 import { usePlatformAnalytics } from "@/hooks/use-platform-analytics";
 import type { ActivityType } from "@/lib/db";
+
+const DEVICE_ICONS = { mobile: Smartphone, tablet: Tablet, desktop: Monitor } as const;
+const DEVICE_LABELS = { mobile: "Mobile", tablet: "Tablet", desktop: "Desktop" } as const;
 
 export const Route = createFileRoute("/admin/super/")({
   component: SuperAdminOverviewPage,
@@ -145,18 +157,44 @@ function SuperAdminOverviewPage() {
             </div>
           </div>
 
-          <div
-            className={cn(
-              "animate-rise rounded-2xl bg-card p-4 ring-1 ring-border/60",
-              "flex gap-2.5",
-            )}
-          >
-            <Info className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-            <p className="text-[11.5px] leading-relaxed text-muted-foreground">
-              Not yet tracked: time spent per session and mobile-vs-desktop breakdown — no device or
-              duration signal is recorded anywhere today. "Active" above means at least one recorded
-              action in that window, not time-on-task.
-            </p>
+          <div className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
+            <div className="border-b border-border/60 px-4 py-3.5">
+              <p className="text-sm font-medium text-prestige-deep">Device & sessions</p>
+              <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                Avg {data?.avgSessionMinutes ?? "—"} min/session
+              </p>
+            </div>
+            <div>
+              {(Object.keys(DEVICE_LABELS) as (keyof typeof DEVICE_LABELS)[]).map((device) => {
+                const Icon = DEVICE_ICONS[device];
+                return (
+                  <div
+                    key={device}
+                    className="flex items-center gap-2.5 border-b border-border/60 px-4 py-3 last:border-none"
+                  >
+                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </div>
+                    <p className="min-w-0 flex-1 truncate text-xs text-foreground/90">
+                      {DEVICE_LABELS[device]}
+                    </p>
+                    <span className="shrink-0 text-xs font-medium tabular-nums text-prestige-deep">
+                      {data?.deviceBreakdown[device] ?? 0}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-start gap-2 border-t border-border/60 px-4 py-3">
+              <Info
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                strokeWidth={1.75}
+              />
+              <p className="text-[10.5px] leading-relaxed text-muted-foreground">
+                Time the app was open and visible, not necessarily focused study time. By each
+                student's most recently used device.
+              </p>
+            </div>
           </div>
         </div>
       </div>

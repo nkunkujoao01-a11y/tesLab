@@ -19,6 +19,7 @@ import {
   useGoalReminder,
 } from "@/hooks/use-reminder-notifications";
 import { useServiceWorkerUpdateNotice } from "@/hooks/use-sw-update";
+import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { Toaster } from "@/components/ui/sonner";
 import { WelcomeTour } from "@/components/WelcomeTour";
 import { ByokPrompt } from "@/components/ByokPrompt";
@@ -177,6 +178,12 @@ function ReminderNotifications() {
   return null;
 }
 
+// Same shape again — see use-session-tracking.ts.
+function SessionTracking() {
+  useSessionTracking();
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -196,6 +203,7 @@ function RootComponent() {
         <AutoSync />
         <PrecacheRoutes />
         <ReminderNotifications />
+        <SessionTracking />
         <Outlet />
         <WelcomeTour />
         <ByokPrompt />
