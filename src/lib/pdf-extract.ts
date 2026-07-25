@@ -106,18 +106,34 @@ const COLUMN_MIN_GAP_RATIO = 0.06;
 const COLUMN_MIN_SIDE_FRACTION = 0.25;
 const COLUMN_MIN_LINE_COUNT = 8;
 
-function findColumnGutter(lines: RawLine[]): number | null {
-  if (lines.length < COLUMN_MIN_LINE_COUNT) return null;
+// Real, observed bug (swecom.pdf's References section): a hanging-indent
+// citation list has exactly two recurring start-x values — the marker
+// ("[Lapham 2006]...") at the left margin, its wrapped continuation a
+// short distance to the right — the same two-cluster shape a genuine
+// column split produces. The band/gap checks below used to be computed
+// against only these *lines'* own observed min/max x, not the real page —
+// for a hanging-indent list that never uses more than a sliver of the
+// page's actual width, that made the observed span itself artificially
+// tiny, so both checks passed trivially: the midpoint between the two
+// x's landed in the "middle 25%-75%" of that tiny observed span even
+// though it sits nowhere near the real page's horizontal center, and any
+// nonzero gap cleared 6% of a span that small. Anchoring both checks to
+// the real page width/left-edge (passed in from the caller, which has the
+// actual PDF page geometry) instead fixes this: on a normal page, an
+// 18-unit hanging indent sits nowhere near the true horizontal center and
+// is nowhere near 6% of true page width, so it's correctly rejected,
+// while a real two-column layout (TestDoc/"Git Cheat Sheet (2-column
+// test).pdf", the case this whole heuristic exists for) still spans a
+// real fraction of the actual page and still passes both checks exactly
+// as before.
+function findColumnGutter(lines: RawLine[], pageX0: number, pageWidth: number): number | null {
+  if (lines.length < COLUMN_MIN_LINE_COUNT || pageWidth <= 0) return null;
 
-  const minX = Math.min(...lines.map((l) => l.x));
-  const maxX = Math.max(...lines.map((l) => l.x));
-  const spanWidth = maxX - minX;
-  if (spanWidth <= 0) return null;
-
-  // Only consider a gutter roughly in the middle of the page — a gap near
-  // either edge is just how many lines happen to start, not a column break.
-  const bandStart = minX + spanWidth * 0.25;
-  const bandEnd = minX + spanWidth * 0.75;
+  // Only consider a gutter roughly in the middle of the real page — a gap
+  // near either edge is just how many lines happen to start, not a column
+  // break.
+  const bandStart = pageX0 + pageWidth * 0.25;
+  const bandEnd = pageX0 + pageWidth * 0.75;
 
   const starts = [...new Set(lines.map((l) => l.x))].sort((a, b) => a - b);
   let bestGapWidth = 0;
@@ -141,15 +157,15 @@ function findColumnGutter(lines: RawLine[]): number | null {
     }
   }
 
-  if (bestSplit === null || bestGapWidth < spanWidth * COLUMN_MIN_GAP_RATIO) return null;
+  if (bestSplit === null || bestGapWidth < pageWidth * COLUMN_MIN_GAP_RATIO) return null;
   return bestSplit;
 }
 
 /** Reorders a page's lines to read the left column fully (top to bottom),
  * then the right column fully — see findColumnGutter for the detection
  * heuristic and its safety margins. */
-function orderLinesForReading(lines: RawLine[]): RawLine[] {
-  const gutter = findColumnGutter(lines);
+function orderLinesForReading(lines: RawLine[], pageX0: number, pageWidth: number): RawLine[] {
+  const gutter = findColumnGutter(lines, pageX0, pageWidth);
   if (gutter === null) {
     return [...lines].sort((a, b) => b.y - a.y);
   }
@@ -470,6 +486,25 @@ function stripBulletPrefix(text: string): string {
   return text.replace(BULLET_PATTERN, "").replace(NUMBERED_PATTERN, "").trim();
 }
 
+// Real gap (found via real testing across TestDoc's own numbered-list-heavy
+// slide decks, e.g. "1ASD810S.pdf"'s numbered course sections): stripping a
+// numbered marker the same way as a plain bullet glyph loses the one thing
+// that actually made it numbered instead of bulleted — its sequence. A
+// student reading "Prerequisites / Delivery Mode / Assessments" back with no
+// numbers at all can no longer tell it was originally an ordered list of
+// steps rather than an unordered set of options. Only the bullet-glyph
+// prefix is stripped here; a numbered/lettered marker (`3.`, `b)`, `(iv)`)
+// stays in the item's own text, so StructuredText (see its own
+// ORDERED_ITEM_PATTERN) can recognize it and render a real `<ol>` instead of
+// a plain disc bullet. Every other consumer of this file's `- `-prefixed
+// list-item convention (quiz-gen.ts, summarize-structured.ts,
+// document-lead.ts, structured-export.ts) still sees an ordinary `- `-led
+// block either way — none of them need to know or care that this
+// particular item happens to carry its own visible number.
+function stripGlyphBulletPrefix(text: string): string {
+  return text.replace(BULLET_PATTERN, "").trim();
+}
+
 // Real, observed bug (TestDoc/"1-Week5A PRS821 Domains of Security-S1.pdf"):
 // a hanging-indent bullet list's own *wrapped continuation* line — e.g.
 // "Firewalls – Hardware or software that monitors incoming and outgoing
@@ -562,7 +597,37 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
   // completing it. Same discipline as headingBuffer: keep absorbing
   // "body"-classified lines into the open bullet until its text-so-far
   // already looks like a complete sentence, or a non-"body" line arrives.
-  let bulletBuffer: string[] | null = null;
+  // `startedWithMarker` records whether the *opening* line had a real
+  // marker character (bullet glyph, number, citation bracket) — see
+  // bulletBufferShouldAbsorb below for why that matters beyond just this
+  // buffer's own contents.
+  let bulletBuffer: { startedWithMarker: boolean; lines: string[] } | null = null;
+
+  // Real, observed bug (swecom.pdf's References section): a hanging-indent
+  // citation like "[Babich 1986] Wayne A. Babich, Software Configuration"
+  // wraps onto "Management: Coordination for Team Productivity, Addison-"
+  // — a continuation line that starts with a capitalized title word, not
+  // lowercase mid-sentence text. looksLikeContinuationLine's
+  // capitalization check (see its own comment) was written for a
+  // *markerless* list (indentation-fallback only, e.g. "Inductive
+  // Reasoning" / "Deductive Reasoning") where capitalization is the only
+  // available signal for "new item vs. continuation" — but a citation
+  // entry that already opened with an explicit, unambiguous marker
+  // ("[Babich 1986]") has no such ambiguity: nothing but a *new* explicit
+  // marker or a genuinely complete (sentence-terminal) buffer should ever
+  // end it, regardless of what case the wrapped continuation happens to
+  // start with. Font-size/bold quirks on a wrapped continuation line can
+  // also make it *look* like a heading to classifyLine (this is the
+  // "narrower, harder case" flagged as open in this file's own history) —
+  // this same "was the open item started by an explicit marker"
+  // signal is what lets a heading-shaped line still be recognized as
+  // that citation's own continuation instead.
+  function bulletBufferShouldAbsorb(text: string): boolean {
+    if (!bulletBuffer || hasExplicitBulletMarker(text)) return false;
+    const bufferedSoFar = joinParagraphLines(bulletBuffer.lines);
+    if (SENTENCE_TERMINAL.test(bufferedSoFar)) return false;
+    return bulletBuffer.startedWithMarker || looksLikeContinuationLine(text);
+  }
 
   const flushParagraph = () => {
     if (paragraphBuffer.length > 0) {
@@ -581,7 +646,7 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
 
   const flushBullet = () => {
     if (bulletBuffer) {
-      blocks.push(`- ${joinParagraphLines(bulletBuffer)}`);
+      blocks.push(`- ${joinParagraphLines(bulletBuffer.lines)}`);
       bulletBuffer = null;
     }
   };
@@ -612,8 +677,15 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
     switch (line.kind) {
       case "heading":
       case "subheading": {
-        flushParagraph();
         const trimmed = line.text.trim();
+        // Must be checked before treating this as a real heading — see
+        // bulletBufferShouldAbsorb's own comment for the real swecom.pdf
+        // citation-list bug this closes.
+        if (bulletBufferShouldAbsorb(line.text)) {
+          bulletBuffer!.lines.push(trimmed);
+          break;
+        }
+        flushParagraph();
         if (headingBuffer && headingBuffer.kind === line.kind) {
           const bufferedSoFar = joinParagraphLines(headingBuffer.lines);
           if (!SENTENCE_TERMINAL.test(bufferedSoFar)) {
@@ -627,40 +699,32 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
       }
       case "bullet": {
         // A line classified "bullet" purely by indentation (no real marker
-        // character) *and* starting lowercase — genuinely mid-sentence —
-        // might be a wrapped continuation of the bullet already open, not
-        // a new item. Both conditions matter: hasExplicitBulletMarker alone
-        // isn't enough, since a real sequence of short, independent,
-        // Title Case items with no marker of their own (found via swecom.pdf
-        // real testing) would otherwise all get merged into one run-on
-        // "bullet" — looksLikeContinuationLine's own comment has the full
-        // reasoning for why capitalization is the reliable tell here. A
-        // line with an explicit marker is never ambiguous either way; it
-        // always starts a new item.
-        if (
-          !hasExplicitBulletMarker(line.text) &&
-          looksLikeContinuationLine(line.text) &&
-          bulletBuffer
-        ) {
-          const bufferedSoFar = joinParagraphLines(bulletBuffer);
-          if (!SENTENCE_TERMINAL.test(bufferedSoFar)) {
-            bulletBuffer.push(line.text.trim());
-            break;
-          }
+        // character) might be a wrapped continuation of the bullet already
+        // open, not a new item — see bulletBufferShouldAbsorb for the two
+        // signals that can establish that (either the open item already
+        // has its own explicit marker, so nothing but a new marker can end
+        // it, or — for a markerless, indentation-only item — this line
+        // starting lowercase, genuinely mid-sentence).
+        if (bulletBufferShouldAbsorb(line.text)) {
+          bulletBuffer!.lines.push(line.text.trim());
+          break;
         }
         flushParagraph();
         flushHeading();
         flushBullet();
-        bulletBuffer = [stripBulletPrefix(line.text)];
+        bulletBuffer = {
+          startedWithMarker: hasExplicitBulletMarker(line.text),
+          lines: [stripGlyphBulletPrefix(line.text)],
+        };
         break;
       }
       case "body": {
         flushHeading();
         const trimmed = line.text.trim();
         if (bulletBuffer) {
-          const bufferedSoFar = joinParagraphLines(bulletBuffer);
+          const bufferedSoFar = joinParagraphLines(bulletBuffer.lines);
           if (!SENTENCE_TERMINAL.test(bufferedSoFar)) {
-            bulletBuffer.push(trimmed);
+            bulletBuffer.lines.push(trimmed);
             break;
           }
           flushBullet();
@@ -809,7 +873,12 @@ async function extractPdfTextViaPdfJs(
     // layout (see its own comment). mergeAdjacentTableCells runs after,
     // since it needs lines already in real top-to-bottom reading order to
     // find a genuine row-by-row alternation.
-    pageLines.push(mergeAdjacentTableCells(orderLinesForReading(lines)));
+    // `page.view` ([x0, y0, x1, y1], the same coordinate space
+    // item.transform's x/y already use) is the real page geometry —
+    // findColumnGutter needs the actual page width, not just whatever
+    // range these particular lines happen to span, see its own comment.
+    const [pageX0, , pageX1] = page.view;
+    pageLines.push(mergeAdjacentTableCells(orderLinesForReading(lines, pageX0, pageX1 - pageX0)));
     onProgress?.({ page: i, totalPages: doc.numPages, stage: "reading" });
   }
 
@@ -931,25 +1000,31 @@ async function extractPdfTextViaPdfJs(
   // one chapter's short page span, not across the entire document.
   const NOISE_MIN_PAGE_COUNT = 3;
   const NOISE_MAX_LINE_LENGTH = 100;
-  // A running header is styled distinctly from body text often enough
-  // (bold, a touch larger) that classifyLine reads it as "subheading" —
-  // found via real testing on swecom.pdf, whose chapter-name running
-  // footer ("Software Requirements Skill Area 27") survived a body-only
-  // check for exactly this reason. Subheading-kind repeats are only
-  // treated as noise when they additionally *cluster* within a narrow page
-  // span: a running header repeats throughout one short chapter, while a
-  // real repeated section title (this same document's "References"
-  // heading appears in all 11 skill-area chapters) recurs once every
-  // several dozen pages, spread across the whole document — a real
-  // heading, not noise, even though it also repeats 3+ times. "bullet" is
-  // treated the same as "body" (no clustering needed, a real bullet list
-  // item essentially never repeats verbatim 3+ times across separate
-  // pages) — also found via real testing: the same running-footer caption
-  // above alternated between "body" and "bullet" classification from page
-  // to page (a stray leading-character quirk), which split its already-few
-  // occurrences across two kinds and let it slip under the threshold
-  // before this was accounted for.
-  const NOISE_SUBHEADING_MAX_CLUSTER_SPAN = 15;
+  // Real, observed bug (swecom.pdf): this document's core bibliography is
+  // genuinely cited — verbatim, down to the exact same physical line
+  // wrapping — from *multiple, widely separated* chapter reference lists
+  // (its own "References" section heading already does the same thing,
+  // per the comment above; individual citation lines inherit the exact
+  // same shape). A page-index-span check alone can't tell that apart from
+  // a real running header/footer, since both repeat 3+ times: a shared
+  // citation's occurrences are scattered many dozens of pages apart, same
+  // as a legitimately-repeated section heading. What a real running
+  // header/footer has that a repeated citation doesn't: the *template*
+  // places it at the exact same physical position on every page it
+  // appears on, since it's the same header/footer box each time — a
+  // citation, by contrast, lands wherever that page's natural paragraph
+  // flow happens to put it, which varies with how much text precedes it,
+  // essentially never landing on the same y twice. Requiring every
+  // occurrence to share a tight y-position (not just a kind or a page
+  // span) is a direct test of *that*, and replaces the old kind-based
+  // "body/bullet never need clustering, subheading does" split entirely —
+  // a real running header/footer is caught by y-consistency regardless of
+  // which kind classifyLine happens to give it (the same footer was found
+  // to alternate between "body" and "bullet" classification page to page,
+  // which the y-check is immune to), while a repeated citation's
+  // scattered, varying y lets it through untouched even though it repeats
+  // just as many times.
+  const NOISE_Y_TOLERANCE = 6;
 
   function normalizeForNoiseDetection(text: string): string {
     return text.replace(/\d+/g, "#").replace(/\s+/g, " ").trim().toLowerCase();
@@ -957,19 +1032,18 @@ async function extractPdfTextViaPdfJs(
 
   function classifyPageLines(
     lines: RawLine[],
-  ): { kind: LineKind; text: string; cells?: string[] }[] {
+  ): { kind: LineKind; text: string; y: number; cells?: string[] }[] {
     const tableFlags = detectTableRows(lines);
     return lines.map((line, i) =>
       tableFlags[i]
-        ? { kind: "table-row" as const, text: line.text, cells: line.cells }
-        : { kind: classifyLine(line, bodySize, bodyX, bodyFontName), text: line.text },
+        ? { kind: "table-row" as const, text: line.text, y: line.y, cells: line.cells }
+        : { kind: classifyLine(line, bodySize, bodyX, bodyFontName), text: line.text, y: line.y },
     );
   }
 
   const NOISE_ELIGIBLE_KINDS = new Set<LineKind>(["body", "bullet", "subheading"]);
-  const NOISE_UNCLUSTERED_KINDS = new Set<LineKind>(["body", "bullet"]);
 
-  const lineOccurrences = new Map<string, { kinds: Set<LineKind>; pages: Set<number> }>();
+  const lineOccurrences = new Map<string, { minY: number; maxY: number; pages: Set<number> }>();
   pageLines.forEach((lines, pageIdx) => {
     for (const line of classifyPageLines(lines)) {
       if (!NOISE_ELIGIBLE_KINDS.has(line.kind)) continue;
@@ -979,21 +1053,19 @@ async function extractPdfTextViaPdfJs(
       if (!norm) continue;
       const existing = lineOccurrences.get(norm);
       if (existing) {
-        existing.kinds.add(line.kind);
+        existing.minY = Math.min(existing.minY, line.y);
+        existing.maxY = Math.max(existing.maxY, line.y);
         existing.pages.add(pageIdx);
       } else {
-        lineOccurrences.set(norm, { kinds: new Set([line.kind]), pages: new Set([pageIdx]) });
+        lineOccurrences.set(norm, { minY: line.y, maxY: line.y, pages: new Set([pageIdx]) });
       }
     }
   });
   const noiseNormalizedTexts = new Set(
     [...lineOccurrences.entries()]
-      .filter(([, { kinds, pages }]) => {
+      .filter(([, { minY, maxY, pages }]) => {
         if (pages.size < NOISE_MIN_PAGE_COUNT) return false;
-        if ([...kinds].some((k) => NOISE_UNCLUSTERED_KINDS.has(k))) return true;
-        const sorted = [...pages].sort((a, b) => a - b);
-        const span = sorted[sorted.length - 1] - sorted[0];
-        return span <= NOISE_SUBHEADING_MAX_CLUSTER_SPAN;
+        return maxY - minY <= NOISE_Y_TOLERANCE;
       })
       .map(([norm]) => norm),
   );

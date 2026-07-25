@@ -71,10 +71,24 @@ function walkDocxHtml(html: string): string {
       const text = textOf(el);
       if (text) blocks.push(`## ${text}`);
     } else if (tag === "ul" || tag === "ol") {
+      // Word's real numbering (1. / a) / i.) is applied by the app itself
+      // at render time from list metadata (numPr), not stored as visible
+      // text in the paragraph — mammoth's <li> content is bare ("Introduce
+      // the topic", no "1." in front), the same way a browser auto-numbers
+      // a real <ol>. Reconstructing *a* sequential number here (rather than
+      // just dropping the distinction the way the previous flat-dump
+      // extractor did) is what lets StructuredText's own ORDERED_ITEM_PATTERN
+      // recognize this as a real ordered list and render it as one instead
+      // of a plain disc bullet — see pdf-extract.ts's identical
+      // stripGlyphBulletPrefix comment for why an ordered item's own
+      // sequence is worth keeping visible, not just its content.
+      let ordinal = 0;
       for (const li of Array.from(el.children)) {
         if (li.tagName !== "LI") continue;
         const text = textOf(li);
-        if (text) blocks.push(`- ${text}`);
+        if (!text) continue;
+        ordinal++;
+        blocks.push(tag === "ol" ? `- ${ordinal}. ${text}` : `- ${text}`);
       }
     } else if (tag === "table") {
       const rows = Array.from(el.querySelectorAll("tr")).map((tr) =>
@@ -86,12 +100,20 @@ function walkDocxHtml(html: string): string {
         const tableRows = [header, separator, ...rest];
         blocks.push(tableRows.map((row) => `| ${row.join(" | ")} |`).join("\n"));
       }
+    } else if (tag === "blockquote") {
+      // "Quote"/"Intense Quote"-styled paragraphs are mapped to a real
+      // `<blockquote>` below (rather than left as an ordinary paragraph,
+      // this file's previous behavior) so a document's actual quotations
+      // read as visually distinct quotes instead of blending into regular
+      // body prose — the same `> `-prefix convention Markdown itself uses,
+      // recognized by StructuredText's own blockquote rendering.
+      const text = textOf(el);
+      if (text) blocks.push(`> ${text}`);
     } else {
-      // Everything else (an ordinary paragraph, a "Quote"-styled
-      // paragraph mapped below, a stray wrapper element) reads as plain
-      // prose — an honest, still fully readable degrade, same as a PDF
-      // page whose styling is too uniform for the classifier to read
-      // any real structure out of.
+      // Everything else (an ordinary paragraph, a stray wrapper element)
+      // reads as plain prose — an honest, still fully readable degrade,
+      // same as a PDF page whose styling is too uniform for the classifier
+      // to read any real structure out of.
       const text = textOf(el);
       if (text) blocks.push(text);
     }
@@ -113,13 +135,13 @@ export async function extractDocxStructuredText(
     { arrayBuffer },
     {
       // mammoth's own default style map already handles "Heading 1"
-      // through "Heading 6" → h1-h6; these three add the common cover-
+      // through "Heading 6" → h1-h6; these four add the common cover-
       // page/quotation styles it doesn't map by default.
       styleMap: [
         "p[style-name='Title'] => h1:fresh",
         "p[style-name='Subtitle'] => h2:fresh",
-        "p[style-name='Quote'] => p:fresh",
-        "p[style-name='Intense Quote'] => p:fresh",
+        "p[style-name='Quote'] => blockquote:fresh",
+        "p[style-name='Intense Quote'] => blockquote:fresh",
       ],
     },
   );

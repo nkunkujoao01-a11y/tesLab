@@ -54,12 +54,30 @@ function parseTableBlock(block: string): { header: string[]; rows: string[][] } 
   return { header: header ?? [], rows };
 }
 
+// A `- `-prefixed list item whose own text still starts with a numbered/
+// lettered marker (`3. `, `b) `, `(iv) `) came from a real ordered list in
+// the source document — pdf-extract.ts and docx-extract.ts both
+// deliberately keep that marker inside the item's text (rather than
+// stripping it the way a plain bullet glyph is stripped) specifically so
+// this component can tell the two apart. Every other consumer of the
+// shared `- ` convention (quiz-gen.ts, summarize-structured.ts,
+// document-lead.ts, structured-export.ts) never needs to make this
+// distinction — they only care "is this list-like, not prose" — so the
+// marker riding along inside the text is invisible to them, not a shape
+// change they need to handle.
+const ORDERED_ITEM_PATTERN = /^(\d+[.)]|[a-zA-Z][.)]|\([a-zA-Z0-9]+\))\s+/;
+
+function stripOrderedMarker(text: string): string {
+  return text.replace(ORDERED_ITEM_PATTERN, "");
+}
+
 /** Renders extracted document text with the lightweight Markdown-style
  * structure `src/lib/pdf-extract.ts` produces — `#`/`##` become real
- * headings, consecutive `-` blocks become one real bullet list, a
- * `|`-prefixed block becomes a real `<table>` (see parseTableBlock),
- * everything else stays a paragraph. Plain string matching, not a Markdown
- * library:
+ * headings, consecutive `-` blocks become one real bullet list (a real
+ * `<ol>` instead when every item in that run is itself numbered/lettered —
+ * see ORDERED_ITEM_PATTERN), a `|`-prefixed block becomes a real `<table>`
+ * (see parseTableBlock), everything else stays a paragraph. Plain string
+ * matching, not a Markdown library:
  * the extractor only ever emits this one small, known vocabulary, so a
  * full parser would be unused surface area, not extra safety. Falls back
  * to plain paragraphs for any text that has none of these prefixes (older
@@ -70,22 +88,36 @@ export function StructuredText({ text, className }: StructuredTextProps) {
   const blocks = text.split(/\n\n+/).filter((b) => b.trim());
   const elements: React.ReactNode[] = [];
   let bulletBuffer: string[] = [];
+  let bulletBufferOrdered = false;
 
   const flushBullets = () => {
     if (bulletBuffer.length === 0) return;
+    const ListTag = bulletBufferOrdered ? "ol" : "ul";
+    const listClass = bulletBufferOrdered
+      ? "list-decimal space-y-1.5 pl-5"
+      : "list-disc space-y-1.5 pl-5";
     elements.push(
-      <ul key={`ul-${elements.length}`} className="list-disc space-y-1.5 pl-5">
+      <ListTag key={`list-${elements.length}`} className={listClass}>
         {bulletBuffer.map((item, i) => (
-          <li key={i}>{renderInline(item)}</li>
+          <li key={i}>{renderInline(bulletBufferOrdered ? stripOrderedMarker(item) : item)}</li>
         ))}
-      </ul>,
+      </ListTag>,
     );
     bulletBuffer = [];
   };
 
   for (const block of blocks) {
     if (block.startsWith("- ")) {
-      bulletBuffer.push(block.slice(2));
+      const item = block.slice(2);
+      const isOrdered = ORDERED_ITEM_PATTERN.test(item);
+      // A run of list items switching between ordered and unordered
+      // (rare, but not impossible right at a boundary) starts a fresh
+      // list container rather than mixing both kinds under one tag.
+      if (bulletBuffer.length > 0 && isOrdered !== bulletBufferOrdered) {
+        flushBullets();
+      }
+      bulletBufferOrdered = isOrdered;
+      bulletBuffer.push(item);
       continue;
     }
     if (block.startsWith("| ")) {
@@ -140,6 +172,15 @@ export function StructuredText({ text, className }: StructuredTextProps) {
         >
           {renderInline(block.slice(2))}
         </h2>,
+      );
+    } else if (block.startsWith("> ")) {
+      elements.push(
+        <blockquote
+          key={elements.length}
+          className="border-l-2 border-prestige-deep/30 pl-4 italic text-foreground/85"
+        >
+          {renderInline(block.slice(2))}
+        </blockquote>,
       );
     } else {
       elements.push(<p key={elements.length}>{renderInline(block)}</p>);
