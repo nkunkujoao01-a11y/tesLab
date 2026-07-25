@@ -253,3 +253,63 @@
 @utility animate-rise {
   animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Ambient, continuous animations for the landing/onboarding page
+   (index.tsx) — slow drifting background glows, a staggered pop-in for
+   grid-like content, a one-shot shimmer sweep, and a soft pulsing glow
+   for a call-to-action. Guarded by prefers-reduced-motion below since
+   these (unlike animate-rise, a one-shot entrance) loop indefinitely. */
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4%, -5%) scale(1.08); }
+}
+
+@keyframes drift-reverse {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-5%, 4%) scale(1.06); }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer-sweep {
+  from { transform: translateX(-130%) skewX(-12deg); }
+  to { transform: translateX(230%) skewX(-12deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--prestige-gold) 45%, transparent); }
+  50% { box-shadow: 0 0 0 12px color-mix(in oklab, var(--prestige-gold) 0%, transparent); }
+}
+
+@utility animate-drift {
+  animation: drift 9s ease-in-out infinite;
+}
+
+@utility animate-drift-reverse {
+  animation: drift-reverse 12s ease-in-out infinite;
+}
+
+@utility animate-pop-in {
+  animation: pop-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-shimmer-sweep {
+  animation: shimmer-sweep 2.4s ease-in-out 1;
+}
+
+@utility animate-glow-pulse {
+  animation: glow-pulse 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-drift,
+  .animate-drift-reverse,
+  .animate-glow-pulse,
+  .animate-shimmer-sweep,
+  .animate-pop-in {
+    animation: none !important;
+  }
+}

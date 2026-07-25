@@ -28,17 +28,34 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     eyebrow: "Chapter one",
-    title: "Study anywhere, even without internet.",
-    body: "Download your modules on campus Wi-Fi and open them later, on the taxi, at home, on the veld. The library travels with you.",
+    title: "Study anywhere. Even off the grid.",
+    body: "Download your modules on campus Wi-Fi and open them later, on the taxi, at home, on the veld. The library travels with you, no signal required.",
     icon: CloudDownload,
     motif: () => (
       <div className="relative h-full w-full">
         <div className="absolute inset-0 rounded-3xl bg-prestige-deep" />
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-3xl opacity-70"
+          style={{
+            background:
+              "radial-gradient(60% 45% at 80% 15%, color-mix(in oklab, var(--prestige-gold) 30%, transparent), transparent 70%)",
+          }}
+        />
         <div className="absolute inset-4 rounded-2xl border border-prestige-gold/40" />
         <div className="absolute inset-x-10 top-14 space-y-3">
-          <div className="h-2 w-24 rounded-full bg-prestige-gold/70" />
-          <div className="h-2 w-40 rounded-full bg-prestige-cream/20" />
-          <div className="h-2 w-32 rounded-full bg-prestige-cream/20" />
+          <div
+            className="animate-pop-in h-2 w-24 rounded-full bg-prestige-gold/70"
+            style={{ animationDelay: "80ms" }}
+          />
+          <div
+            className="animate-pop-in h-2 w-40 rounded-full bg-prestige-cream/20"
+            style={{ animationDelay: "180ms" }}
+          />
+          <div
+            className="animate-pop-in h-2 w-32 rounded-full bg-prestige-cream/20"
+            style={{ animationDelay: "280ms" }}
+          />
         </div>
         <div className="absolute inset-x-10 bottom-14">
           <div className="mb-3 h-px w-full bg-prestige-cream/15" />
@@ -60,22 +77,38 @@ const SLIDES: Slide[] = [
   },
   {
     eyebrow: "Chapter two",
-    title: "Turn a lecture into a page you can hold.",
-    body: "The on-device model reads your slides and gives you a clean summary. No internet needed to write it, no waiting.",
+    title: "Watch a lecture become a page you can hold.",
+    body: "The on-device model reads your slides and writes a clean summary right here, no internet needed to generate it, no waiting on a server.",
     icon: Sparkles,
     motif: () => (
-      <div className="relative h-full w-full">
+      <div className="relative h-full w-full overflow-hidden">
         <div className="absolute inset-0 rounded-3xl bg-prestige-cream" />
-        <div className="absolute inset-6 rounded-2xl border border-prestige-deep/10 bg-white/60 p-6">
+        <div className="absolute inset-6 overflow-hidden rounded-2xl border border-prestige-deep/10 bg-white/60 p-6">
+          <div
+            aria-hidden
+            className="animate-shimmer-sweep pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-prestige-gold/25 to-transparent"
+          />
           <p className="eyebrow">AI summary</p>
           <div className="mt-3 space-y-2">
-            <div className="h-2 w-full rounded-full bg-prestige-deep/10" />
-            <div className="h-2 w-5/6 rounded-full bg-prestige-deep/10" />
-            <div className="h-2 w-4/6 rounded-full bg-prestige-deep/10" />
-            <div className="h-2 w-3/6 rounded-full bg-prestige-deep/10" />
+            <div
+              className="animate-pop-in h-2 w-full origin-left rounded-full bg-prestige-deep/10"
+              style={{ animationDelay: "60ms" }}
+            />
+            <div
+              className="animate-pop-in h-2 w-5/6 origin-left rounded-full bg-prestige-deep/10"
+              style={{ animationDelay: "150ms" }}
+            />
+            <div
+              className="animate-pop-in h-2 w-4/6 origin-left rounded-full bg-prestige-deep/10"
+              style={{ animationDelay: "240ms" }}
+            />
+            <div
+              className="animate-pop-in h-2 w-3/6 origin-left rounded-full bg-prestige-deep/10"
+              style={{ animationDelay: "330ms" }}
+            />
           </div>
           <div className="mt-5 h-px w-full bg-prestige-deep/5" />
-          <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-prestige-gold">
+          <div className="animate-glow-pulse mt-4 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-prestige-gold">
             Regenerate
           </div>
         </div>
@@ -84,12 +117,20 @@ const SLIDES: Slide[] = [
   },
   {
     eyebrow: "Chapter three",
-    title: "Never lose track of a single week.",
-    body: "A quiet record of the reading you actually did: modules, chapters, streaks, and the rank of your effort.",
+    title: "Watch a real streak build, week by week.",
+    body: "A quiet, honest record of the reading you actually did: modules, chapters, streaks, and the rank of your own effort. No fake numbers.",
     icon: Compass,
     motif: () => (
       <div className="relative h-full w-full">
         <div className="absolute inset-0 rounded-3xl bg-prestige-deep" />
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-3xl opacity-60"
+          style={{
+            background:
+              "radial-gradient(50% 40% at 20% 85%, color-mix(in oklab, var(--prestige-gold) 25%, transparent), transparent 70%)",
+          }}
+        />
         <div className="absolute inset-6 rounded-2xl bg-prestige-mid/25 p-6">
           <p className="eyebrow text-prestige-gold">Twelve weeks</p>
           <div className="mt-4 grid grid-cols-12 gap-1.5">
@@ -103,7 +144,13 @@ const SLIDES: Slide[] = [
                     : intensity === 2
                       ? "bg-prestige-gold/55"
                       : "bg-prestige-gold";
-              return <div key={i} className={cn("aspect-square rounded-[3px]", shade)} />;
+              return (
+                <div
+                  key={i}
+                  className={cn("animate-pop-in aspect-square rounded-[3px]", shade)}
+                  style={{ animationDelay: `${(i % 12) * 22 + Math.floor(i / 12) * 30}ms` }}
+                />
+              );
             })}
           </div>
         </div>
@@ -124,15 +171,40 @@ function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen w-full max-w-[440px] flex-col px-6 pt-12 pb-10 lg:max-w-[520px] lg:px-10 lg:pt-16">
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      {/* Ambient background glows — slow, continuous drift for a sense of
+          depth/life behind the content, not tied to any slide's own motif
+          (which fully remounts on every step change). Purely decorative:
+          aria-hidden, and disabled entirely under prefers-reduced-motion
+          (see styles.css). */}
+      <div
+        aria-hidden
+        className="animate-drift pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full opacity-50 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(closest-side, color-mix(in oklab, var(--prestige-gold) 55%, transparent), transparent)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="animate-drift-reverse pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full opacity-40 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(closest-side, color-mix(in oklab, var(--prestige-mid) 55%, transparent), transparent)",
+        }}
+      />
+
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[440px] flex-col px-6 pt-12 pb-10 lg:max-w-[520px] lg:px-10 lg:pt-16">
         {/* Wordmark */}
         <div className="flex items-center justify-between">
           <div>
             <p className="eyebrow">Namibia University of Science and Technology</p>
             <p className="mt-1 font-display text-xl font-medium tracking-tight">
               eLearn
-              <span className="ml-1 inline-block h-1.5 w-1.5 translate-y-[-6px] rounded-full bg-prestige-gold" />
+              <span
+                className="animate-glow-pulse ml-1 inline-block h-1.5 w-1.5 translate-y-[-6px] rounded-full bg-prestige-gold"
+                aria-hidden
+              />
             </p>
           </div>
           <button
@@ -144,7 +216,11 @@ function Onboarding() {
         </div>
 
         {/* Motif */}
-        <div key={step} className="animate-rise mt-10 aspect-[4/5] w-full">
+        <div
+          key={step}
+          className="animate-rise mt-10 aspect-[4/5] w-full drop-shadow-xl"
+          style={{ animationDuration: "0.6s" }}
+        >
           {slide.motif()}
         </div>
 
@@ -168,7 +244,7 @@ function Onboarding() {
                 onClick={() => setStep(i)}
                 aria-label={`Go to slide ${i + 1}`}
                 className={cn(
-                  "h-1 rounded-full transition-all",
+                  "h-1 rounded-full transition-all duration-300",
                   i === step ? "w-8 bg-prestige-deep" : "w-4 bg-prestige-deep/15",
                 )}
               />
@@ -176,7 +252,10 @@ function Onboarding() {
           </div>
           <button
             onClick={next}
-            className="group inline-flex items-center gap-2 rounded-full bg-prestige-deep px-5 py-3 text-sm font-medium text-prestige-cream shadow-lg shadow-prestige-deep/20 transition-transform active:scale-[0.97]"
+            className={cn(
+              "group inline-flex items-center gap-2 rounded-full bg-prestige-deep px-5 py-3 text-sm font-medium text-prestige-cream shadow-lg shadow-prestige-deep/20 transition-transform active:scale-[0.97]",
+              last && "animate-glow-pulse",
+            )}
           >
             <span>{last ? "Enter library" : "Continue"}</span>
             <ChevronRight
