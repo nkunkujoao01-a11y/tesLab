@@ -184,6 +184,26 @@ function orderLinesForReading(lines: RawLine[], pageX0: number, pageWidth: numbe
 // recognized bullet glyph now, not treated as part of the item's text.
 const BULLET_PATTERN = /^[•●▪◦‣∙·☐☑☒□-]\s+|^\*\s+/;
 const NUMBERED_PATTERN = /^(\d+[.)]|[a-zA-Z][.)]|\([a-zA-Z0-9]+\))\s+/;
+// A PowerPoint export's own numbered-list glyph can render as a bare digit
+// with no trailing punctuation at all ("2 Tricky installation...", not
+// "2. Tricky installation...") — found via real testing on TestDoc/"PG-
+// Slides-RIT-2023- Mr Peter.pdf". NUMBERED_PATTERN requires a `.`/`)` after
+// the digit, so this slipped through unmarked exactly like the swecom.pdf
+// citation-list bug above: its own wrapped continuation line ("machine",
+// on its own hanging-indent line) had nothing marking the numbered item as
+// unambiguous, so findAlternatingCellRun paired it into a fake two-cell
+// table instead of recognizing it as this list's own wrap. Also folded into
+// classifyLine's own hasListMarker below — without that, the same document
+// showed a second, worse symptom: since neither NUMBERED_PATTERN nor the
+// indentation fallback (its indent turned out too shallow to clear
+// LIST_INDENT_THRESHOLD) recognized these lines as list items at all, two
+// entirely separate numbered lists on the same slide read as one giant
+// run-on paragraph. Requiring the digit be followed by a capitalized word
+// (not just any text) is what keeps this from also matching an ordinary
+// sentence that happens to start with a bare
+// number ("2 apples were left on the table," which continues lowercase) —
+// the same distinguishing signal looksLikeContinuationLine already uses.
+const BARE_NUMBER_MARKER_PATTERN = /^\d+\s+(?=\p{Lu})/u;
 // A reference-list entry ("[24] S. Lujan..." or IEEE-style "[Abran 2010]
 // Alain Abran...") starts with a bracketed marker — square brackets
 // aren't matched by BULLET_PATTERN (bullet glyphs) or NUMBERED_PATTERN
@@ -434,7 +454,10 @@ function classifyLine(
     trimmed.split(/\s+/).length <= MAX_HEADING_WORDS;
   const hasCitationMarker = CITATION_MARKER_PATTERN.test(line.text);
   const hasListMarker =
-    BULLET_PATTERN.test(line.text) || NUMBERED_PATTERN.test(line.text) || hasCitationMarker;
+    BULLET_PATTERN.test(line.text) ||
+    NUMBERED_PATTERN.test(line.text) ||
+    hasCitationMarker ||
+    BARE_NUMBER_MARKER_PATTERN.test(line.text);
   // Fallback signal for documents (Google Docs PDF exports, real-world
   // example: TestDoc/"1-Week5A PRS821 Domains of Security-S1.pdf") where
   // every font resolves through pdf.js to the same generic family with no
@@ -521,7 +544,10 @@ function stripGlyphBulletPrefix(text: string): string {
 // of starting fresh.
 function hasExplicitBulletMarker(text: string): boolean {
   return (
-    BULLET_PATTERN.test(text) || NUMBERED_PATTERN.test(text) || CITATION_MARKER_PATTERN.test(text)
+    BULLET_PATTERN.test(text) ||
+    NUMBERED_PATTERN.test(text) ||
+    CITATION_MARKER_PATTERN.test(text) ||
+    BARE_NUMBER_MARKER_PATTERN.test(text)
   );
 }
 
@@ -574,7 +600,9 @@ function joinParagraphLines(lines: string[]): string {
  * a future rendered view) can treat structure as a bonus without needing
  * to understand a bespoke schema — plain text readers just see the raw
  * `#`/`-` characters, which still reads fine unrendered. */
-function formatStructuredText(lines: { kind: LineKind; text: string; cells?: string[] }[]): string {
+function formatStructuredText(
+  lines: { kind: LineKind; text: string; x: number; cells?: string[] }[],
+): string {
   const blocks: string[] = [];
   let paragraphBuffer: string[] = [];
   let tableBuffer: string[][] = [];
@@ -600,8 +628,31 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
   // `startedWithMarker` records whether the *opening* line had a real
   // marker character (bullet glyph, number, citation bracket) — see
   // bulletBufferShouldAbsorb below for why that matters beyond just this
-  // buffer's own contents.
-  let bulletBuffer: { startedWithMarker: boolean; lines: string[] } | null = null;
+  // buffer's own contents. `markerX` is that opening line's own left edge —
+  // see bulletBufferShouldAbsorb's own comment for the second, separate
+  // real bug this closes.
+  let bulletBuffer: { startedWithMarker: boolean; markerX: number; lines: string[] } | null = null;
+
+  // A genuine continuation line (hanging-indented further right, or at
+  // least as far right as the item's own opening marker) is never *less*
+  // indented than where the item itself started — found via real testing
+  // on TestDoc/"PG-Slides-RIT-2023- Mr Peter.pdf": a numbered list item
+  // with no trailing punctuation at all ("4 Manufacturing faults or
+  // marketing tricks irrelevant", a terse slide-bullet style with no
+  // period) left `bulletBufferShouldAbsorb` with no way to tell it was
+  // actually complete — the very next line, an unrelated subheading
+  // returning to the slide's own base left margin ("Steep learning
+  // curve:"), got wrongly absorbed as if it were this item's own
+  // continuation, purely because `startedWithMarker` alone said "keep
+  // absorbing until sentence-terminal punctuation shows up," which this
+  // document's own bullet style never provides. Indentation is the
+  // signal that actually distinguishes the two cases here: a real
+  // continuation of item 4 stays at (or right of) item 4's own x=42,
+  // while the interrupting subheading sits at x=33 — clearly back at the
+  // document's base margin, not a continuation of anything. A small
+  // tolerance absorbs ordinary rounding noise between fragments on
+  // (nominally) the same visual column.
+  const LIST_CONTINUATION_MIN_X_TOLERANCE = 5;
 
   // Real, observed bug (swecom.pdf's References section): a hanging-indent
   // citation like "[Babich 1986] Wayne A. Babich, Software Configuration"
@@ -622,8 +673,9 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
   // this same "was the open item started by an explicit marker"
   // signal is what lets a heading-shaped line still be recognized as
   // that citation's own continuation instead.
-  function bulletBufferShouldAbsorb(text: string): boolean {
+  function bulletBufferShouldAbsorb(text: string, x: number): boolean {
     if (!bulletBuffer || hasExplicitBulletMarker(text)) return false;
+    if (x < bulletBuffer.markerX - LIST_CONTINUATION_MIN_X_TOLERANCE) return false;
     const bufferedSoFar = joinParagraphLines(bulletBuffer.lines);
     if (SENTENCE_TERMINAL.test(bufferedSoFar)) return false;
     return bulletBuffer.startedWithMarker || looksLikeContinuationLine(text);
@@ -681,10 +733,19 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
         // Must be checked before treating this as a real heading — see
         // bulletBufferShouldAbsorb's own comment for the real swecom.pdf
         // citation-list bug this closes.
-        if (bulletBufferShouldAbsorb(line.text)) {
+        if (bulletBufferShouldAbsorb(line.text, line.x)) {
           bulletBuffer!.lines.push(trimmed);
           break;
         }
+        // A rejected absorb above still leaves a real, complete bullet
+        // sitting open — found via real testing on TestDoc/"PG-Slides-
+        // RIT-2023- Mr Peter.pdf": without this, that bullet's content
+        // stayed pending (this case never used to flush it at all) until
+        // whatever *later* line finally called flushBullet() — which
+        // pushed it to `blocks` well after this heading had already been
+        // pushed, reading as if the two had swapped places even though
+        // they were classified in the correct order the whole time.
+        flushBullet();
         flushParagraph();
         if (headingBuffer && headingBuffer.kind === line.kind) {
           const bufferedSoFar = joinParagraphLines(headingBuffer.lines);
@@ -705,7 +766,7 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
         // has its own explicit marker, so nothing but a new marker can end
         // it, or — for a markerless, indentation-only item — this line
         // starting lowercase, genuinely mid-sentence).
-        if (bulletBufferShouldAbsorb(line.text)) {
+        if (bulletBufferShouldAbsorb(line.text, line.x)) {
           bulletBuffer!.lines.push(line.text.trim());
           break;
         }
@@ -714,6 +775,7 @@ function formatStructuredText(lines: { kind: LineKind; text: string; cells?: str
         flushBullet();
         bulletBuffer = {
           startedWithMarker: hasExplicitBulletMarker(line.text),
+          markerX: line.x,
           lines: [stripGlyphBulletPrefix(line.text)],
         };
         break;
@@ -1032,12 +1094,17 @@ async function extractPdfTextViaPdfJs(
 
   function classifyPageLines(
     lines: RawLine[],
-  ): { kind: LineKind; text: string; y: number; cells?: string[] }[] {
+  ): { kind: LineKind; text: string; x: number; y: number; cells?: string[] }[] {
     const tableFlags = detectTableRows(lines);
     return lines.map((line, i) =>
       tableFlags[i]
-        ? { kind: "table-row" as const, text: line.text, y: line.y, cells: line.cells }
-        : { kind: classifyLine(line, bodySize, bodyX, bodyFontName), text: line.text, y: line.y },
+        ? { kind: "table-row" as const, text: line.text, x: line.x, y: line.y, cells: line.cells }
+        : {
+            kind: classifyLine(line, bodySize, bodyX, bodyFontName),
+            text: line.text,
+            x: line.x,
+            y: line.y,
+          },
     );
   }
 
