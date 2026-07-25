@@ -19,6 +19,7 @@ import {
 import { MobileShell } from "@/components/MobileShell";
 import { StructuredText } from "@/components/StructuredText";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
+import { ScrollJumpButtons } from "@/components/ScrollJumpButtons";
 import { formatMb } from "@/lib/mock-data";
 import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 import { buildSummaryExportText } from "@/lib/summarize-structured";
@@ -359,6 +360,8 @@ function DocumentDetail() {
           <ArrowUpRight className="h-3.5 w-3.5 text-prestige-mid" strokeWidth={1.75} />
         </Link>
       </article>
+
+      <ScrollJumpButtons bottomClassName="bottom-[164px] lg:bottom-24" />
 
       {/* bottom-20 + lg:bottom-0 lg:ml-64: this page renders inside
        * MobileShell, whose own mobile bottom nav is *also* fixed at

@@ -36,6 +36,7 @@ import { useChatModelStatus } from "@/hooks/use-ai-chat";
 import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
 import { useOnlineStatus, useCanShareFiles } from "@/hooks/use-online-status";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
+import { ScrollJumpButtons } from "@/components/ScrollJumpButtons";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
 import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 
@@ -366,6 +367,8 @@ function Reader() {
           </p>
         )}
       </article>
+
+      {content && <ScrollJumpButtons bottomClassName="bottom-28" />}
 
       {/* Floating actions */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 backdrop-blur-md">
