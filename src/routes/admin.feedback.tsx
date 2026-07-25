@@ -1,12 +1,42 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { MessageSquareText } from "lucide-react";
+import { MessageSquareText, ImageOff } from "lucide-react";
 import { fetchAdminFeedback, type AdminFeedbackItem } from "@/lib/admin-console-api";
 import { formatRelative } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/admin/feedback")({
   component: AdminFeedbackPage,
 });
+
+/** The underlying storage object can go missing (deleted, or never
+ * actually finished uploading) even though the feedback row's own
+ * image_paths still references it — a signed URL for a missing object
+ * still gets minted successfully, so the failure only shows up when the
+ * browser actually tries to load it. Shows a plain placeholder instead of
+ * a broken image icon in that case, rather than leaving a raw failed
+ * `<img>` for the lecturer/admin to puzzle over. */
+function FeedbackImage({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-secondary/60 ring-1 ring-border/60">
+        <ImageOff className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
+      </div>
+    );
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer">
+      <img
+        src={url}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-20 w-20 rounded-lg object-cover ring-1 ring-border/60"
+      />
+    </a>
+  );
+}
 
 function AdminFeedbackPage() {
   const [items, setItems] = useState<AdminFeedbackItem[] | null>(null);
@@ -63,13 +93,7 @@ function AdminFeedbackPage() {
             {item.imageUrls.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {item.imageUrls.map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noreferrer">
-                    <img
-                      src={url}
-                      alt=""
-                      className="h-20 w-20 rounded-lg object-cover ring-1 ring-border/60"
-                    />
-                  </a>
+                  <FeedbackImage key={i} url={url} />
                 ))}
               </div>
             )}

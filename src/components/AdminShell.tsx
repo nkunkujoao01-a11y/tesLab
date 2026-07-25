@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   UsersRound,
   ClipboardList,
+  ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -141,6 +142,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
+        <div className="px-3 pb-3">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground/80 transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <ArrowLeftRight className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+            <span>Back to student view</span>
+          </Link>
+        </div>
+
         <div className="flex items-center gap-3 border-t border-border/60 px-6 py-5">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep font-display text-xs font-semibold text-prestige-cream">
             {initials}
@@ -172,6 +183,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <NavItem to="/admin/super/research" icon={ClipboardList} label="" />
             </>
           )}
+          <Link
+            to="/dashboard"
+            aria-label="Back to student view"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-foreground/80 transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <ArrowLeftRight className="h-4 w-4" strokeWidth={1.75} />
+          </Link>
         </nav>
       </div>
 
