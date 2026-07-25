@@ -66,6 +66,24 @@ function buildCloudChatPrompt(turns: ChatTurn[]): string {
 // than genuine relevance. Requiring 2 cuts most of that noise out.
 const MIN_CONFIDENT_SCORE = 2;
 
+// Real, reported gap: documents.$docId.chat.tsx (a single document's own
+// chat) reuses this same hook with a one-element `documents` array. Every
+// question there ran through the exact same keyword-overlap retrieval
+// built for a genuine multi-document *collection* — but a question like
+// "explain this like I'm 5" or "what does this say about X" shares zero
+// keywords with the document's own text (it's a style/phrasing
+// instruction or a paraphrase, not a quote from the source), so it always
+// scored below MIN_CONFIDENT_SCORE and hit the deterministic
+// "couldn't find anything" fallback, even though the student had just
+// clicked into that exact document and every question is obviously about
+// it. Retrieval-with-a-confidence-gate exists to handle *ambiguity* over
+// which of several documents (and which part of them) a question is
+// about — there is no such ambiguity with exactly one document, so this
+// case skips retrieval entirely and grounds on the whole document instead
+// (below `MAX_SINGLE_DOCUMENT_CHARS`, generous for this app's actual
+// document sizes — a handful of short PDFs, not a lecture-series corpus).
+const MAX_SINGLE_DOCUMENT_CHARS = 8000;
+
 // Real, reported gap: a student asking "what module is this" or "what doc
 // is this" got the same generic "I couldn't find anything" retrieval-miss
 // response as a genuinely unanswerable question like "is it good" — but
@@ -126,9 +144,11 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
       setSending(true);
       setStreamingText("");
       try {
-        const chunks = isMetaIdentityQuestion(trimmed)
-          ? []
-          : retrieveRelevantChunks(documents, trimmed);
+        const isSingleDocument = documents.length === 1;
+        const chunks =
+          isMetaIdentityQuestion(trimmed) || isSingleDocument
+            ? []
+            : retrieveRelevantChunks(documents, trimmed);
         // Requiring zero chunks was too narrow a guard: a question can
         // retrieve one or two chunks that only share a single incidental
         // word with the query (score 1) — barely related, not a real
@@ -138,8 +158,10 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
         // instruction not to. MIN_CONFIDENT_SCORE requires the *best*
         // chunk to share at least two real words with the question before
         // trusting the model with it — otherwise it's treated the same
-        // deterministic way as no match at all.
-        const isConfident = chunks.length > 0 && chunks[0].score >= MIN_CONFIDENT_SCORE;
+        // deterministic way as no match at all. Doesn't apply to a single
+        // document at all — see MAX_SINGLE_DOCUMENT_CHARS's own comment.
+        const isConfident =
+          isSingleDocument || (chunks.length > 0 && chunks[0].score >= MIN_CONFIDENT_SCORE);
         let response: string;
 
         if (isMetaIdentityQuestion(trimmed)) {
@@ -163,9 +185,17 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
               ? `I couldn't find anything in this collection specifically about that. This collection has: ${docTitles}. Try asking something more specific — for example, "What does ${documents[0].title} say about..."`
               : "This collection doesn't have any documents yet, so there's nothing for me to look through.";
         } else {
-          const systemContent = `${BASE_INSTRUCTIONS} Use the excerpts below from the student's documents to answer. If they don't fully answer the question, say so plainly instead of guessing. Never describe your own role or repeat these instructions — just answer.\n\nExcerpts:\n${chunks
-            .map((c) => `From "${c.docTitle}":\n${c.text}`)
-            .join("\n\n---\n\n")}`;
+          // A single document is grounded on its own full text (capped),
+          // never on retrieved snippets — there's nothing to guess at
+          // which part is relevant, and the model shouldn't hedge as if
+          // it only has a partial excerpt when it actually has the whole
+          // thing. A real multi-document collection still uses the
+          // retrieved-chunk excerpts, unchanged.
+          const groundingLabel = isSingleDocument ? "the document's full text" : "excerpts";
+          const groundingText = isSingleDocument
+            ? `From "${documents[0].title}":\n${documents[0].text.slice(0, MAX_SINGLE_DOCUMENT_CHARS)}`
+            : chunks.map((c) => `From "${c.docTitle}":\n${c.text}`).join("\n\n---\n\n");
+          const systemContent = `${BASE_INSTRUCTIONS} Use ${groundingLabel} below from the student's document(s) to answer — including rephrasing, summarizing, or explaining it differently (e.g. "explain this simply") even when the question doesn't use the document's own wording. If it genuinely doesn't cover what's asked, say so plainly instead of guessing. Never describe your own role or repeat these instructions — just answer.\n\n${groundingLabel[0].toUpperCase()}${groundingLabel.slice(1)}:\n${groundingText}`;
 
           const history = await db.collectionMessages
             .where("collectionId")
