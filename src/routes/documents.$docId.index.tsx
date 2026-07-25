@@ -205,14 +205,23 @@ function DocumentDetail() {
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {originalFile && (
             <>
-              <Link
-                to="/documents/$docId/view"
-                params={{ docId }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-prestige-deep px-3 py-1.5 text-[11px] font-semibold text-prestige-cream transition-transform active:scale-[0.97]"
-              >
-                <FileText className="h-3.5 w-3.5" strokeWidth={1.75} />
-                View PDF
-              </Link>
+              {/* The original-file viewer (documents.$docId.view.tsx) is a
+               * bare <iframe src={blobUrl}> — browsers render a PDF blob
+               * natively that way, but not a .docx one, which would just
+               * show a blank frame or force a download prompt. Only
+               * offering "View" for an actual PDF avoids that dead end;
+               * Word documents still get the full reading experience
+               * below via their extracted text, just not this raw-file view. */}
+              {originalFile.mimeType === "application/pdf" && (
+                <Link
+                  to="/documents/$docId/view"
+                  params={{ docId }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-prestige-deep px-3 py-1.5 text-[11px] font-semibold text-prestige-cream transition-transform active:scale-[0.97]"
+                >
+                  <FileText className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  View PDF
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={downloadOriginal}
@@ -223,7 +232,7 @@ function DocumentDetail() {
                 ) : (
                   <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
                 )}
-                {canShare ? "Share original PDF" : "Download original PDF"}
+                {canShare ? "Share original file" : "Download original file"}
               </button>
             </>
           )}

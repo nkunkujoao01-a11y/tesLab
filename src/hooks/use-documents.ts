@@ -8,6 +8,7 @@ import {
   type DocumentCollection,
 } from "@/lib/db";
 import { extractPdfText, PdfExtractionError, type ExtractProgress } from "@/lib/pdf-extract";
+import { extractDocxText } from "@/lib/admin-content-extract";
 import {
   markPdfExtractionStarted,
   markPdfExtractionFinished,
@@ -116,11 +117,22 @@ export async function updateDocumentReadProgress(
 
 export type UploadStatus = "idle" | "extracting" | "error";
 
-/** Real client-side PDF upload + extraction (FR22-26). Rejects oversized
- * files before even trying to parse them (a generous cap — this is
- * text extraction, not a document archive) and surfaces pdf.js's real
- * failure modes (password-protected, invalid, or no extractable text)
- * with an actionable message instead of a generic failure. */
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const DOCX_EXTENSION = /\.docx$/i;
+
+function isDocxFile(file: File): boolean {
+  return file.type === DOCX_MIME || DOCX_EXTENSION.test(file.name);
+}
+
+/** Real client-side PDF/Word upload + extraction (FR22-26, extended to
+ * .docx). Rejects oversized files before even trying to parse them (a
+ * generous cap — this is text extraction, not a document archive) and
+ * surfaces each format's real failure modes with an actionable message
+ * instead of a generic failure. Word documents reuse extractDocxText
+ * (admin-content-extract.ts, originally built for the admin "add a
+ * material" form) — the same mammoth-based flat-text extraction, since
+ * there's nothing format-specific about turning a docx into readable
+ * text for a student vs an admin. */
 export function useUploadDocument() {
   const { user } = useAuth();
   const [status, setStatus] = useState<UploadStatus>("idle");
@@ -132,27 +144,41 @@ export function useUploadDocument() {
       const sizeMb = file.size / (1024 * 1024);
       if (sizeMb > MAX_UPLOAD_MB) {
         toast.error(
-          `That PDF is too large (${sizeMb.toFixed(1)} MB). The limit is ${MAX_UPLOAD_MB} MB.`,
+          `That file is too large (${sizeMb.toFixed(1)} MB). The limit is ${MAX_UPLOAD_MB} MB.`,
         );
         return;
       }
+      const isDocx = isDocxFile(file);
       setStatus("extracting");
       setProgress(null);
-      // A genuine hard tab crash (a real risk on lower-RAM Android devices
-      // loading a large PDF into memory) happens below where JS can react
-      // at all — no error is ever thrown, so the catch block below can't
-      // see it either. This marker, mirroring ai-crash-breadcrumb.ts's
-      // exact pattern, is the one honest signal available for that
-      // specific case: if it's still here on next load, this extraction
-      // never got to clean up after itself, consistent with (not proof
-      // of) a crash.
-      await markPdfExtractionStarted(file.name);
+      // The crash-breadcrumb marker below is specific to pdf.js's own
+      // in-memory parsing (a real risk on lower-RAM Android devices) — a
+      // genuine hard tab crash that happens where JS can't react at all,
+      // so the catch block below can't see it either. mammoth's docx
+      // path has shown no equivalent hard-crash failure mode, so it's
+      // only armed for the PDF path.
+      if (!isDocx) await markPdfExtractionStarted(file.name);
       try {
-        const { text, pageCount } = await extractPdfText(file, setProgress);
+        let text: string;
+        let pageCount: number;
+        if (isDocx) {
+          text = await extractDocxText(file);
+          // mammoth has no page concept — same "1" placeholder the
+          // admin-content-extract.ts docx path already uses.
+          pageCount = 1;
+          if (!text.trim()) {
+            throw new PdfExtractionError(
+              "No text could be extracted from this Word document. It may be empty, or saved in an unsupported format.",
+              "empty",
+            );
+          }
+        } else {
+          ({ text, pageCount } = await extractPdfText(file, setProgress));
+        }
         const now = Date.now();
         const doc: PersonalDocument = {
           id: crypto.randomUUID(),
-          title: file.name.replace(/\.pdf$/i, ""),
+          title: file.name.replace(/\.(pdf|docx)$/i, ""),
           pageCount,
           sizeMb,
           text,
@@ -172,27 +198,27 @@ export function useUploadDocument() {
             docId: doc.id,
             blob: file,
             fileName: file.name,
-            mimeType: file.type || "application/pdf",
+            mimeType: file.type || (isDocx ? DOCX_MIME : "application/pdf"),
             sizeMb,
             storedAt: now,
           });
         } catch (err) {
-          console.error("Failed to store original PDF file", err);
+          console.error("Failed to store original file", err);
         }
         void logActivity(user.id, "download");
         setStatus("idle");
         return doc;
       } catch (err) {
-        console.error("Failed to extract PDF", err);
+        console.error("Failed to extract document", err);
         const message =
           err instanceof PdfExtractionError
             ? err.message
-            : `Couldn't process this PDF (${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}). Try a different file.`;
+            : `Couldn't process this file (${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}). Try a different file.`;
         toast.error(message);
         setStatus("error");
       } finally {
         setProgress(null);
-        void markPdfExtractionFinished();
+        if (!isDocx) void markPdfExtractionFinished();
       }
     },
     [user],

@@ -41,7 +41,7 @@ const STEPS: Step[] = [
     icon: FileText,
     eyebrow: "Step 3",
     title: "Upload your own PDFs",
-    body: "Got lecture notes or readings as PDFs already? Upload them under My documents in the Library. Text is extracted right on your device and can be summarised the same way.",
+    body: "Got lecture notes or readings as PDFs or Word documents already? Upload them under My documents in the Library. Text is extracted right on your device and can be summarised the same way.",
   },
   {
     icon: LineChart,

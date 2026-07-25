@@ -46,7 +46,8 @@ export const Route = createFileRoute("/documents/")({
       { title: "My documents - eLearn" },
       {
         name: "description",
-        content: "Upload your own PDFs, extracted and summarised entirely on this device.",
+        content:
+          "Upload your own PDFs and Word documents, extracted and summarised entirely on this device.",
       },
     ],
   }),
@@ -139,16 +140,17 @@ function DocumentsIndex() {
       </div>
       <PageHeader
         eyebrow="My documents"
-        title="Your own PDFs, extracted on-device"
+        title="Your own PDFs & Word docs, extracted on-device"
         action={
           <div>
             {/* No `accept` filter — real Android testing found it can hide
              * or block genuine PDFs from the native picker entirely
              * (some storage providers don't report a MIME type the
              * filter recognizes), which reads as "the app doesn't accept
-             * PDFs" even though a real PDF was picked. Any non-PDF that
-             * slips through already gets a clear, specific error from
-             * extractPdfText (pdf-extract.ts) instead. */}
+             * PDFs" even though a real PDF was picked. Any unsupported
+             * file that slips through already gets a clear, specific
+             * error from extractPdfText (pdf-extract.ts) or
+             * extractDocxText (admin-content-extract.ts) instead. */}
             <input
               id="documents-pdf-upload"
               type="file"
@@ -178,7 +180,7 @@ function DocumentsIndex() {
                 ? progress
                   ? `Extracting ${progress.page}/${progress.totalPages}…`
                   : "Reading…"
-                : "Upload PDF"}
+                : "Upload file"}
             </label>
           </div>
         }
@@ -197,9 +199,9 @@ function DocumentsIndex() {
           </div>
         )}
         <p className="mb-6 max-w-[52ch] text-sm text-muted-foreground">
-          Upload lecture notes or readings you already have as PDFs. Text is extracted right on this
-          device, nothing is sent anywhere except your own account's storage, and it works offline
-          once uploaded.
+          Upload lecture notes or readings you already have as PDFs or Word documents (.docx). Text
+          is extracted right on this device, nothing is sent anywhere except your own account's
+          storage, and it works offline once uploaded.
         </p>
 
         {/* Collections */}
@@ -246,8 +248,8 @@ function DocumentsIndex() {
             <FileText className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No documents yet</p>
             <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-              Upload a PDF to get started. It'll show up here, fully readable and summarisable
-              offline.
+              Upload a PDF or Word document to get started. It'll show up here, fully readable and
+              summarisable offline.
             </p>
           </div>
         ) : (
@@ -299,7 +301,7 @@ function DocumentsIndex() {
                             <AlertDialogTitle>Delete this document?</AlertDialogTitle>
                             <AlertDialogDescription>
                               {doc.title} and its extracted text will be permanently removed. This
-                              can't be undone; you'd need to upload the PDF again.
+                              can't be undone; you'd need to upload the file again.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

@@ -36,7 +36,7 @@ const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif|bmp)$/i;
  * to gain from its richer HTML output here — same flat-text degrade as
  * OCR output below, left for the admin to add real structure to by hand
  * if the source document had any worth preserving. */
-async function extractDocxText(file: File): Promise<string> {
+export async function extractDocxText(file: File): Promise<string> {
   const mammoth = await import("mammoth");
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });

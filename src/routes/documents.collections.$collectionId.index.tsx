@@ -318,7 +318,7 @@ function CollectionDetail() {
               ? progress
                 ? `Extracting ${progress.page}/${progress.totalPages}…`
                 : "Reading…"
-              : "Upload PDF here"}
+              : "Upload file here"}
           </label>
           <AddDocumentsDialog collectionId={collectionId} />
           {members.length > 0 && (
@@ -409,7 +409,8 @@ function CollectionDetail() {
               <FileText className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
               <p className="mt-4 font-display text-lg text-prestige-deep">No documents yet</p>
               <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-                Upload a new PDF straight into this collection, or add one you've already uploaded.
+                Upload a new PDF or Word document straight into this collection, or add one you've
+                already uploaded.
               </p>
             </div>
           ) : (
