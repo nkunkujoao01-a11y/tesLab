@@ -55,7 +55,7 @@ let closedThisLoad = false;
  * declined — either answer counts as "responded") loads the app. */
 export function useResearchConsentGate(): {
   shouldShow: boolean;
-  respond: (agreed: boolean) => Promise<void>;
+  respond: (agreed: boolean, stayAnonymous: boolean) => Promise<void>;
 } {
   const { user } = useAuth();
   const [responded, setResponded] = useState<boolean | null>(null);
@@ -71,10 +71,10 @@ export function useResearchConsentGate(): {
   }, [user]);
 
   const respond = useCallback(
-    async (agreed: boolean) => {
+    async (agreed: boolean, stayAnonymous: boolean) => {
       if (!user) return;
       try {
-        await submitResearchConsent(agreed);
+        await submitResearchConsent(agreed, stayAnonymous);
       } catch (err) {
         console.error("Failed to submit research consent", err);
         // Recorded locally either way (see the block below) — a failed

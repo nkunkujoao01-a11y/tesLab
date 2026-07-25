@@ -2147,6 +2147,24 @@ The user asked what happened to the super-admin analytics they'd expected — a 
 
 ---
 
+## Feature 73: the research study now identifies a respondent by real name by default, with anonymity kept as an explicit opt-out
+
+The user asked for a real, deliberate change to how the ethics-approved usability study (Feature "research_study", 0025_research_study.sql) collects data: a signed-in respondent should be identified by their real name by default, with the option to stay anonymous still available if they choose it. This directly contradicts that study's original consent text ("No personal information that can identify you... will be collected") — flagged this plainly before writing any code, since a substantive change to what an ethics-approved study actually collects is the kind of decision that may need the researcher's own supervisor/ethics-board sign-off, not something to silently ship. The user confirmed the intended behavior explicitly (identified by default; anonymous is the opt-out, chosen at consent time).
+
+**Schema** (0042_research_optional_identity.sql): added nullable `user_id`/`full_name` to both `research_consent` and `research_survey_responses` — both null together whenever a respondent chooses to stay anonymous, with `anonymous_id` (unchanged, still required) as the only identifier in that case, exactly as before this migration. `full_name` is a point-in-time snapshot copied from `profiles.full_name` at submission time, not a live join, so a later profile-name change never retroactively rewrites what a past research record says a respondent's name was. The insert RLS policies were tightened from a bare `with check (true)` to `user_id is null or user_id = auth.uid()` — a client can no longer claim an identity that isn't its own.
+
+**One choice, not two**: the consent-time anonymity choice is remembered locally (`research-study.ts`'s `STAY_ANONYMOUS_KEY`) so the survey submitted later automatically follows the same choice without asking again — the consent gate and the survey are presented as one flow, matching how a student actually experiences them.
+
+**Consent text updated to accurately disclose the new default** — informed consent means describing what's actually collected, regardless of which option a given student ends up picking. `ResearchConsentGate.tsx` gained a "Keep my response anonymous" checkbox, unchecked by default, with the confidentiality section's own wording rewritten to match.
+
+**Admin-side surfacing**: `/admin/super/research` now shows a respondent's real name (falling back to the anonymous id when none was recorded) and the CSV export gained a `full_name` column — both blank exactly when a respondent chose to stay anonymous, never inferred or backfilled.
+
+### How it was validated
+
+`npx tsc --noEmit`, `prettier --write` across every touched file. The updated consent screen (checkbox + rewritten confidentiality text) was visually verified with a real headless-browser screenshot (a temporary preview route, removed after) — reads cleanly, consistent with the rest of the gate's existing design. The new migration can't be applied or exercised against a live database from this environment (no Supabase credentials here, same constraint noted for every prior migration in this log) — needs to be run for real before this behavior takes effect.
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.

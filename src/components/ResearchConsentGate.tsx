@@ -2,8 +2,13 @@
 // usability study this app is part of — shown once, immediately after a
 // signed-in student's first load, before the rest of the app. See
 // use-research-study.ts's useResearchConsentGate for exactly when this
-// mounts and what "responding" means, and 0025_research_study.sql for why
-// nothing submitted here carries any real identity.
+// mounts and what "responding" means. Originally fully anonymous
+// (0025_research_study.sql); a respondent is now identified (real name)
+// by default, with anonymity kept as an explicit opt-out a student
+// chooses right here — see 0042_research_optional_identity.sql. The
+// consent text below discloses this choice plainly, since an accurate
+// description of what's actually collected is what informed consent
+// means, regardless of which option a given student ends up picking.
 //
 // Styled distinctly from this app's everyday utilitarian cards on
 // purpose — a consent form is read once and needs to feel like a real,
@@ -33,12 +38,16 @@ function ConsentSection({ title, children }: { title: string; children: React.Re
 export function ResearchConsentGate() {
   const { shouldShow, respond } = useResearchConsentGate();
   const [submitting, setSubmitting] = useState<"agree" | "decline" | null>(null);
+  // Unchecked by default — a respondent is identified (real name) unless
+  // they explicitly choose otherwise here, matching this study's current
+  // design (0042_research_optional_identity.sql).
+  const [stayAnonymous, setStayAnonymous] = useState(false);
 
   if (!shouldShow) return null;
 
   const handleRespond = async (agreed: boolean) => {
     setSubmitting(agreed ? "agree" : "decline");
-    await respond(agreed);
+    await respond(agreed, stayAnonymous);
     setSubmitting(null);
   };
 
@@ -99,8 +108,10 @@ export function ResearchConsentGate() {
               Any data collected (questionnaire answers and system logs) will be kept confidential.
             </p>
             <p>
-              No personal information that can identify you, like your name or student number, will
-              be collected.
+              By default, your name is recorded alongside your responses, so the researcher can
+              follow up with you if needed. If you'd prefer not to be identified, check "Keep my
+              response anonymous" below — no name or other identifying information will be collected
+              for you in that case.
             </p>
             <p>
               All data will be stored on a password-protected computer accessible only to the
@@ -132,7 +143,19 @@ export function ResearchConsentGate() {
           </ConsentSection>
         </div>
 
-        <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <label className="mt-6 flex items-start gap-3 rounded-xl bg-prestige-cream/5 p-4 ring-1 ring-prestige-cream/10">
+          <input
+            type="checkbox"
+            checked={stayAnonymous}
+            onChange={(e) => setStayAnonymous(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-prestige-cream/30 bg-transparent accent-prestige-gold"
+          />
+          <span className="text-[13px] leading-relaxed text-prestige-cream/85">
+            Keep my response anonymous — don't record my name with my consent or survey answers.
+          </span>
+        </label>
+
+        <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             disabled={submitting !== null}

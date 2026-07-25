@@ -248,6 +248,11 @@ export function usePlatformAnalytics(): {
 
 export type ResearchSubmission = {
   anonymousId: string;
+  // Null whenever the student chose "keep my response anonymous" — see
+  // 0042_research_optional_identity.sql. Not a display nicety on top of
+  // anonymousId: this is the real identity, present only when a
+  // respondent actually chose to be identified.
+  fullName: string | null;
   consent: { agreed: boolean; respondedAt: string } | null;
   survey: ResearchSurveyAnswers | null;
   surveySubmittedAt: string | null;
@@ -274,11 +279,11 @@ export function useResearchSubmissions(): {
     void Promise.all([
       supabase
         .from("research_consent")
-        .select("anonymous_id, agreed, responded_at")
+        .select("anonymous_id, agreed, responded_at, full_name")
         .order("responded_at", { ascending: false }),
       supabase
         .from("research_survey_responses")
-        .select("anonymous_id, answers, submitted_at")
+        .select("anonymous_id, answers, submitted_at, full_name")
         .order("submitted_at", { ascending: false }),
     ]).then(([consentRes, surveyRes]) => {
       if (cancelled) return;
@@ -291,6 +296,7 @@ export function useResearchSubmissions(): {
       for (const row of consentRes.data ?? []) {
         byId.set(row.anonymous_id, {
           anonymousId: row.anonymous_id,
+          fullName: row.full_name,
           consent: { agreed: row.agreed, respondedAt: row.responded_at },
           survey: null,
           surveySubmittedAt: null,
@@ -301,9 +307,11 @@ export function useResearchSubmissions(): {
         if (existing) {
           existing.survey = row.answers;
           existing.surveySubmittedAt = row.submitted_at;
+          existing.fullName = existing.fullName ?? row.full_name;
         } else {
           byId.set(row.anonymous_id, {
             anonymousId: row.anonymous_id,
+            fullName: row.full_name,
             consent: null,
             survey: row.answers,
             surveySubmittedAt: row.submitted_at,

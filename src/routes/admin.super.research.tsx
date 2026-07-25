@@ -59,6 +59,10 @@ const OPEN_NUMS = [22, 23, 24];
 function exportSubmissionsCsv(submissions: ResearchSubmission[]) {
   const headers = [
     "anonymous_id",
+    // Blank whenever the respondent chose to stay anonymous — see
+    // ResearchSubmission's own comment. Real name only when they
+    // genuinely opted to be identified.
+    "full_name",
     "consent_agreed",
     "consent_responded_at",
     "survey_submitted_at",
@@ -70,6 +74,7 @@ function exportSubmissionsCsv(submissions: ResearchSubmission[]) {
   ];
   const rows = submissions.map((s) => [
     s.anonymousId,
+    s.fullName ?? "",
     s.consent ? (s.consent.agreed ? "yes" : "no") : "",
     s.consent?.respondedAt ?? "",
     s.surveySubmittedAt ?? "",
@@ -113,10 +118,11 @@ function SuperAdminResearchPage() {
         </button>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        NUST ethics-approved usability study. Collected anonymously, grouped below by a per-device
-        random id ("User_XXXX"), not a real identity. Two students sharing a device could
-        coincidentally share one id, so this pairing is best-effort, not a guaranteed one-to-one
-        match. There is no name/email column here; none exists to show.
+        NUST ethics-approved usability study. Grouped below by a per-device random id ("User_XXXX")
+        — two students sharing a device could coincidentally share one id, so this pairing is
+        best-effort, not a guaranteed one-to-one match. A respondent's real name shows here only
+        when they chose to be identified rather than stay anonymous; it's blank whenever they picked
+        "Keep my response anonymous" at consent time.
       </p>
 
       <div className="mb-6 mt-5 grid grid-cols-3 gap-3">
@@ -152,7 +158,14 @@ function SuperAdminResearchPage() {
             className="border-b border-border/60 px-4 py-3.5 last:border-none"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium text-prestige-deep">{s.anonymousId}</p>
+              <p className="text-sm font-medium text-prestige-deep">
+                {s.fullName ?? s.anonymousId}
+                {s.fullName && (
+                  <span className="ml-1.5 font-normal text-muted-foreground">
+                    ({s.anonymousId})
+                  </span>
+                )}
+              </p>
               {s.consent && (
                 <span
                   className={

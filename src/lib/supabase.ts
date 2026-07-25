@@ -154,13 +154,18 @@ export type ModuleGradeRow = {
 };
 
 // 0025_research_study.sql — see research-study.ts for the full reasoning.
-// Deliberately no user_id/email on either row: `anonymous_id` is a random
-// per-device id, never derived from or joined back to the real account.
+// `user_id`/`full_name` (0042_research_optional_identity.sql) are both
+// null together whenever a student chooses to stay anonymous —
+// `anonymous_id` (a random per-device id, never itself derived from the
+// real account) remains the only identifier in that case, exactly as
+// before that migration.
 export type ResearchConsentRow = {
   id: string;
   anonymous_id: string;
   agreed: boolean;
   responded_at: string;
+  user_id: string | null;
+  full_name: string | null;
 };
 
 export type ResearchSurveyAnswers = {
@@ -182,6 +187,8 @@ export type ResearchSurveyResponseRow = {
   anonymous_id: string;
   answers: ResearchSurveyAnswers;
   submitted_at: string;
+  user_id: string | null;
+  full_name: string | null;
 };
 
 // 0039_anonymous_suggestions.sql — same anonymous-by-design shape as

@@ -1,12 +1,19 @@
 // Supports the NUST ethics-approved usability study this app is part of
 // (researcher Joao Ndongala Nkunku, supervisor Dr Tendai Mataranyika) — a
 // consent record, then a post-task System Usability Scale/TAM-UTAUT/
-// data-efficiency questionnaire. See 0025_research_study.sql for the full
-// reasoning on why neither submitted row carries any real identity.
+// data-efficiency questionnaire. See 0025_research_study.sql for the
+// original anonymous-only design, and 0042_research_optional_identity.sql
+// for why a signed-in respondent is now identified (real name) by
+// default, with anonymity kept as an explicit opt-out.
 import { supabase, type ResearchSurveyAnswers } from "@/lib/supabase";
 import { deviceDb } from "@/lib/db";
 
 const ANONYMOUS_ID_KEY = "research_anonymous_id";
+// The consent-time anonymity choice, remembered so the *survey* submitted
+// later doesn't need to ask again — one choice governs both submissions,
+// matching how the consent gate and the survey are presented as one flow,
+// not two independent decisions.
+const STAY_ANONYMOUS_KEY = "research_stay_anonymous";
 
 /** A random, non-identifying id (e.g. "User_4821") — generated once and
  * persisted device-wide (not per-account: the consent text's own promise
@@ -25,24 +32,64 @@ export async function getAnonymousId(): Promise<string> {
   return id;
 }
 
-export async function submitResearchConsent(agreed: boolean): Promise<void> {
+/** Resolves the real identity to attach to a submission — `null`/`null`
+ * whenever the student chose to stay anonymous, matching this study's
+ * still-honored anonymous option. `full_name` is read from `profiles` at
+ * submission time (a snapshot, not a live join) so a later profile-name
+ * change never retroactively rewrites what a past research record says a
+ * respondent's name was. */
+async function resolveIdentity(
+  stayAnonymous: boolean,
+): Promise<{ userId: string | null; fullName: string | null }> {
+  if (stayAnonymous) return { userId: null, fullName: null };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { userId: null, fullName: null };
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+  return { userId: user.id, fullName: profile?.full_name ?? null };
+}
+
+export async function submitResearchConsent(
+  agreed: boolean,
+  stayAnonymous: boolean,
+): Promise<void> {
+  await deviceDb.appSettings.put({
+    key: STAY_ANONYMOUS_KEY,
+    value: stayAnonymous ? "true" : "false",
+  });
   const anonymousId = await getAnonymousId();
+  const { userId, fullName } = await resolveIdentity(stayAnonymous);
   const { error } = await supabase.from("research_consent").insert({
     id: crypto.randomUUID(),
     anonymous_id: anonymousId,
     agreed,
     responded_at: new Date().toISOString(),
+    user_id: userId,
+    full_name: fullName,
   });
   if (error) throw error;
 }
 
 export async function submitResearchSurvey(answers: ResearchSurveyAnswers): Promise<void> {
   const anonymousId = await getAnonymousId();
+  // Reuses the same choice made at consent time (above) — the survey
+  // never asks again, it's presented as one flow, not two independent
+  // decisions.
+  const stored = await deviceDb.appSettings.get(STAY_ANONYMOUS_KEY);
+  const stayAnonymous = stored?.value === "true";
+  const { userId, fullName } = await resolveIdentity(stayAnonymous);
   const { error } = await supabase.from("research_survey_responses").insert({
     id: crypto.randomUUID(),
     anonymous_id: anonymousId,
     answers,
     submitted_at: new Date().toISOString(),
+    user_id: userId,
+    full_name: fullName,
   });
   if (error) throw error;
 }
