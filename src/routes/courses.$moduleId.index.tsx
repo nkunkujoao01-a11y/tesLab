@@ -60,7 +60,7 @@ export const Route = createFileRoute("/courses/$moduleId/")({
   head: ({ loaderData }) => ({
     meta: [
       {
-        title: loaderData ? `${loaderData.module.title} — eLearn` : "Module — eLearn",
+        title: loaderData ? `${loaderData.module.title} - eLearn` : "Module - eLearn",
       },
       {
         name: "description",

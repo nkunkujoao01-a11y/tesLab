@@ -138,7 +138,7 @@ function Profile() {
     }
     const oversized = files.find((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
     if (oversized) {
-      toast.error(`${oversized.name} is too large — the limit is ${MAX_IMAGE_MB} MB per image.`);
+      toast.error(`${oversized.name} is too large. The limit is ${MAX_IMAGE_MB} MB per image.`);
       return;
     }
     setFeedbackImages((prev) => [...prev, ...files.slice(0, room).map(makeFeedbackImage)]);
@@ -166,7 +166,7 @@ function Profile() {
     setInstalling(true);
     try {
       const accepted = await promptInstall();
-      if (!accepted) toast.message("Install dismissed — you can try again anytime here.");
+      if (!accepted) toast.message("Install dismissed. You can try again anytime here.");
     } finally {
       setInstalling(false);
     }

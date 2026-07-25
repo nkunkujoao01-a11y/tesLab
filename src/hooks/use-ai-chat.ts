@@ -233,7 +233,8 @@ export function useAssistantMessages(): AssistantMessage[] {
 // cloud model).
 const SYSTEM_PROMPT =
   "You are a helpful study assistant for university students. Answer clearly and concisely. " +
-  'When it genuinely helps (multi-part answers, steps, comparisons, several examples), structure your answer with a line starting "# " for a heading, "## " for a sub-heading, and "- " for a bullet point, each block separated by a blank line. Don\'t force this structure onto a short, simple answer that reads fine as plain text.';
+  'When it genuinely helps (multi-part answers, steps, comparisons, several examples), structure your answer with a line starting "# " for a heading, "## " for a sub-heading, and "- " for a bullet point, each block separated by a blank line. Don\'t force this structure onto a short, simple answer that reads fine as plain text. ' +
+  'Never use an em dash (—); use a comma, a period, or "and"/"but" instead.';
 
 // A small on-device model has a limited practical context window and gets
 // slower with every extra token — cap how much history rides along on

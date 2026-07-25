@@ -53,7 +53,7 @@ export const Route = createFileRoute("/courses/$moduleId/chat/$docId")({
   head: ({ loaderData }) => ({
     meta: [
       {
-        title: loaderData ? `Ask AI — ${loaderData.doc.title}` : "Ask AI about this — eLearn",
+        title: loaderData ? `Ask AI - ${loaderData.doc.title}` : "Ask AI about this - eLearn",
       },
       { name: "description", content: "Ask questions grounded in this material's actual text." },
     ],

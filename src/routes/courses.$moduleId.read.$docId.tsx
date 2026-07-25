@@ -50,7 +50,7 @@ export const Route = createFileRoute("/courses/$moduleId/read/$docId")({
   head: ({ loaderData }) => ({
     meta: [
       {
-        title: loaderData ? `${loaderData.doc.title} — eLearn Reader` : "Reader — eLearn",
+        title: loaderData ? `${loaderData.doc.title} - eLearn Reader` : "Reader - eLearn",
       },
       {
         name: "description",
@@ -155,11 +155,11 @@ function Reader() {
     const text = summary.sections
       ? buildSummaryExportText(summary.body, summary.sections)
       : summary.body;
-    const html = buildStructuredExportHtml(`${doc.title} — Summary`, text);
+    const html = buildStructuredExportHtml(`${doc.title} - Summary`, text);
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${doc.title} — Summary.html`,
-      `${doc.title} — Summary`,
+      `${doc.title} - Summary.html`,
+      `${doc.title} - Summary`,
     );
   };
   if (authLoading) {

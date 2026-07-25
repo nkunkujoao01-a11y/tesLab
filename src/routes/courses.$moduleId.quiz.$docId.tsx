@@ -29,7 +29,7 @@ export const Route = createFileRoute("/courses/$moduleId/quiz/$docId")({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: loaderData ? `${loaderData.doc.title} — Quiz` : "Quiz — eLearn" },
+      { title: loaderData ? `${loaderData.doc.title} - Quiz` : "Quiz - eLearn" },
       { name: "description", content: "An AI-generated quiz for this material." },
     ],
   }),
@@ -63,13 +63,13 @@ function MaterialQuizPage() {
   const download = () => {
     if (!quiz) return;
     const html = buildStructuredExportHtml(
-      `${doc.title} — Quiz`,
+      `${doc.title} - Quiz`,
       buildQuizExportText(quiz.questions),
     );
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${doc.title} — Quiz.html`,
-      `${doc.title} — Quiz`,
+      `${doc.title} - Quiz.html`,
+      `${doc.title} - Quiz`,
     );
   };
 

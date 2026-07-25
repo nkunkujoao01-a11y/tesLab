@@ -41,7 +41,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/documents/$docId/")({
   head: ({ params }) => ({
-    meta: [{ title: `Document — eLearn` }, { name: "description", content: params.docId }],
+    meta: [{ title: `Document - eLearn` }, { name: "description", content: params.docId }],
   }),
   component: DocumentDetail,
 });
@@ -138,11 +138,11 @@ function DocumentDetail() {
     const text = doc.summarySections
       ? buildSummaryExportText(doc.summary, doc.summarySections)
       : doc.summary;
-    const html = buildStructuredExportHtml(`${doc.title} — Summary`, text);
+    const html = buildStructuredExportHtml(`${doc.title} - Summary`, text);
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${doc.title} — Summary.html`,
-      `${doc.title} — Summary`,
+      `${doc.title} - Summary.html`,
+      `${doc.title} - Summary`,
     );
   };
 

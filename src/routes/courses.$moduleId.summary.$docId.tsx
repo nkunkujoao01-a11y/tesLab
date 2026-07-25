@@ -15,7 +15,7 @@ export const Route = createFileRoute("/courses/$moduleId/summary/$docId")({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: loaderData ? `${loaderData.doc.title} — Summary` : "Summary — eLearn" },
+      { title: loaderData ? `${loaderData.doc.title} - Summary` : "Summary - eLearn" },
       { name: "description", content: "A structured, section-by-section AI summary." },
     ],
   }),
@@ -34,9 +34,7 @@ function MaterialSummaryPage() {
   const [copied, setCopied] = useState(false);
 
   const fullText = summary
-    ? [summary.body, ...(summary.sections ?? []).map((s) => `${s.heading}\n${s.body}`)].join(
-        "\n\n",
-      )
+    ? [summary.body, ...(summary.sections ?? []).map((s) => `${s.heading}\n${s.body}`)].join("\n\n")
     : "";
 
   const copyAll = () => {
@@ -88,7 +86,9 @@ function MaterialSummaryPage() {
           </div>
         ) : (
           <>
-            <p className="eyebrow">{module.code} · {module.chapter}</p>
+            <p className="eyebrow">
+              {module.code} · {module.chapter}
+            </p>
             <h1 className="mt-3 font-display text-3xl font-medium leading-[1.15] tracking-tight text-prestige-deep lg:text-4xl">
               {doc.title}
             </h1>

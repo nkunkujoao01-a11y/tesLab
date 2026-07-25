@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase, type ProfileRow } from "@/lib/supabase";
 
@@ -36,9 +30,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       setSessionLoading(false);
+      // "SIGNED_IN" fires only for a genuine new sign-in action (password,
+      // Google OAuth, or the NUST student-number flow — all end in
+      // signInWithPassword under the hood) — never for the page-load
+      // restore of an already-existing session, which Supabase reports as
+      // its own separate "INITIAL_SESSION" event. That distinction is
+      // exactly why this is safe to fire here and won't happen every time
+      // the app is merely reopened. Caps concurrent logins to one real
+      // session per account: signing in on a new device signs this
+      // account out everywhere else, rather than leaving an old session
+      // (e.g. a lost or shared phone) silently valid indefinitely.
+      if (event === "SIGNED_IN") {
+        void supabase.auth.signOut({ scope: "others" }).catch((err) => {
+          console.error("Failed to sign out other sessions", err);
+        });
+      }
     });
 
     return () => {

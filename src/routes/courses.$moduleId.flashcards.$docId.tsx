@@ -32,7 +32,7 @@ export const Route = createFileRoute("/courses/$moduleId/flashcards/$docId")({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: loaderData ? `${loaderData.doc.title} — Flashcards` : "Flashcards — eLearn" },
+      { title: loaderData ? `${loaderData.doc.title} - Flashcards` : "Flashcards - eLearn" },
       { name: "description", content: "AI-generated flashcards for this material." },
     ],
   }),
@@ -63,13 +63,13 @@ function MaterialFlashcardsPage() {
   const download = () => {
     if (!flashcardSet) return;
     const html = buildStructuredExportHtml(
-      `${doc.title} — Flashcards`,
+      `${doc.title} - Flashcards`,
       buildFlashcardsExportText(flashcardSet.cards),
     );
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${doc.title} — Flashcards.html`,
-      `${doc.title} — Flashcards`,
+      `${doc.title} - Flashcards.html`,
+      `${doc.title} - Flashcards`,
     );
   };
 

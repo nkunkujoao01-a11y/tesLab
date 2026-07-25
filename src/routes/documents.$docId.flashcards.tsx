@@ -50,13 +50,13 @@ function DocumentFlashcardsPage() {
   const download = () => {
     if (!flashcardSet) return;
     const html = buildStructuredExportHtml(
-      `${doc.title} — Flashcards`,
+      `${doc.title} - Flashcards`,
       buildFlashcardsExportText(flashcardSet.cards),
     );
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${doc.title} — Flashcards.html`,
-      `${doc.title} — Flashcards`,
+      `${doc.title} - Flashcards.html`,
+      `${doc.title} - Flashcards`,
     );
   };
 

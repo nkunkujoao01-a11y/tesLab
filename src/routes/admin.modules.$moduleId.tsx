@@ -221,7 +221,7 @@ function AdminModuleDetailPage() {
       setPull(fields.pull);
       setMatPages(String(fields.pageCount));
       setMatSizeMb(String(fields.sizeMb));
-      toast.success("Extracted — review the fields below before adding.");
+      toast.success("Extracted. Review the fields below before adding.");
     } catch (err) {
       console.error("Failed to extract material content from file", err);
       toast.error(

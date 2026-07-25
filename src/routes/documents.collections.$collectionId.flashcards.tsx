@@ -60,13 +60,13 @@ function CollectionFlashcardsPage() {
   const download = () => {
     if (!flashcardSet) return;
     const html = buildStructuredExportHtml(
-      `${title} — Flashcards`,
+      `${title} - Flashcards`,
       buildFlashcardsExportText(flashcardSet.cards),
     );
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${title} — Flashcards.html`,
-      `${title} — Flashcards`,
+      `${title} - Flashcards.html`,
+      `${title} - Flashcards`,
     );
   };
 

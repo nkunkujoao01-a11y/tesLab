@@ -228,7 +228,7 @@ function Dashboard() {
                       disabled={isPending || !isOnline}
                       aria-disabled={!isOnline}
                       aria-label={`Download ${item.title}`}
-                      title={!isOnline ? "You're offline — reconnect to download" : undefined}
+                      title={!isOnline ? "You're offline, reconnect to download" : undefined}
                       onClick={() => void downloadModule(item.id, item.sizeMb)}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40 disabled:active:scale-100"
                     >

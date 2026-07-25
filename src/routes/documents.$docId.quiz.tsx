@@ -54,13 +54,13 @@ function DocumentQuizPage() {
   const download = () => {
     if (!quiz) return;
     const html = buildStructuredExportHtml(
-      `${doc.title} — Quiz`,
+      `${doc.title} - Quiz`,
       buildQuizExportText(quiz.questions),
     );
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${doc.title} — Quiz.html`,
-      `${doc.title} — Quiz`,
+      `${doc.title} - Quiz.html`,
+      `${doc.title} - Quiz`,
     );
   };
 

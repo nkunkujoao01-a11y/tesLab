@@ -40,11 +40,11 @@ function DocumentNotesPage() {
   // shareOrDownloadBlob path as those, not a new pattern.
   const downloadNotes = () => {
     if (!doc.aiNotes) return;
-    const html = buildStructuredExportHtml(`${doc.title} — Notes`, doc.aiNotes);
+    const html = buildStructuredExportHtml(`${doc.title} - Notes`, doc.aiNotes);
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${doc.title} — Notes.html`,
-      `${doc.title} — Notes`,
+      `${doc.title} - Notes.html`,
+      `${doc.title} - Notes`,
     );
   };
 
@@ -130,7 +130,7 @@ function DocumentNotesPage() {
               <button
                 type="button"
                 disabled={isGenerating}
-                title="Replaces these notes with a new version — share or download first to keep a copy"
+                title="Replaces these notes with a new version, share or download first to keep a copy"
                 onClick={() => void generateNotes(docId, doc.text)}
                 className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold text-prestige-deep ring-1 ring-border/70 transition-all active:scale-[0.97] disabled:opacity-60"
               >

@@ -42,7 +42,8 @@ export function useCollectionMessages(collectionId: string): CollectionMessage[]
 // (falls back to plain paragraphs), a real readability gain when it is.
 const BASE_INSTRUCTIONS =
   "You are a study assistant helping a student understand their own documents in this collection. " +
-  'When it genuinely helps (multi-part answers, steps, comparisons, several examples), structure your answer with a line starting "# " for a heading, "## " for a sub-heading, and "- " for a bullet point, each block separated by a blank line. Don\'t force this structure onto a short, simple answer that reads fine as plain text.';
+  'When it genuinely helps (multi-part answers, steps, comparisons, several examples), structure your answer with a line starting "# " for a heading, "## " for a sub-heading, and "- " for a bullet point, each block separated by a blank line. Don\'t force this structure onto a short, simple answer that reads fine as plain text. ' +
+  'Never use an em dash (—); use a comma, a period, or "and"/"but" instead.';
 
 // Same reasoning as useSendAssistantMessage — a small on-device model has
 // a limited practical context window and gets slower with every extra

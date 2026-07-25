@@ -62,11 +62,11 @@ function CollectionQuizPage() {
 
   const download = () => {
     if (!quiz) return;
-    const html = buildStructuredExportHtml(`${title} — Quiz`, buildQuizExportText(quiz.questions));
+    const html = buildStructuredExportHtml(`${title} - Quiz`, buildQuizExportText(quiz.questions));
     void shareOrDownloadBlob(
       new Blob([html], { type: "text/html" }),
-      `${title} — Quiz.html`,
-      `${title} — Quiz`,
+      `${title} - Quiz.html`,
+      `${title} - Quiz`,
     );
   };
 
