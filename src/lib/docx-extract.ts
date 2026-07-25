@@ -27,6 +27,25 @@ function textOf(el: Element): string {
   return (el.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
+// A real, found-via-testing gap: a table cell often contains several
+// separate paragraphs (a form's field labels crammed into one wide
+// cell, e.g. "NAME:", "ADDRESS:", "TEL:" each on their own line inside
+// the same cell) — plain textContent flattens every one of those
+// paragraph breaks into a single run-on line with no separator at all,
+// since whitespace-only differences collapse under textOf's own
+// whitespace normalization. A markdown table row can't contain a real
+// newline (it would break the `| |` row format), so joining each
+// paragraph with "; " instead is the closest readable equivalent. An
+// ordinary single-paragraph cell (the overwhelmingly common case — a
+// glossary term, a single data value) is completely unaffected: one
+// paragraph in, one paragraph out, no separator added.
+function cellTextOf(cell: Element): string {
+  const paragraphs = Array.from(cell.querySelectorAll("p"))
+    .map((p) => textOf(p))
+    .filter(Boolean);
+  return paragraphs.length > 0 ? paragraphs.join("; ") : textOf(cell);
+}
+
 /** Walks mammoth's HTML output into this app's own lightweight markup.
  * Deliberately collapses Word's real h1-h6 hierarchy down to this app's
  * existing two-level heading/subheading convention (h1 → "# ", h2-h6 →
@@ -59,7 +78,7 @@ function walkDocxHtml(html: string): string {
       }
     } else if (tag === "table") {
       const rows = Array.from(el.querySelectorAll("tr")).map((tr) =>
-        Array.from(tr.querySelectorAll("td, th")).map((cell) => escapeTableCell(textOf(cell))),
+        Array.from(tr.querySelectorAll("td, th")).map((cell) => escapeTableCell(cellTextOf(cell))),
       );
       if (rows.length > 0) {
         const [header, ...rest] = rows;

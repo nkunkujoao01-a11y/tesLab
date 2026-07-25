@@ -289,6 +289,17 @@ function findAlternatingCellRun(lines: RawLine[], start: number): number {
   let colAX: number | null = null;
   let colBX: number | null = null;
   while (end < lines.length && lines[end].cells.length === 1) {
+    // A line with its own explicit bullet/numbered/citation marker is
+    // never ambiguous — it's unambiguously the start of a new list item,
+    // not a table cell fragment. Found via real testing on swecom.pdf:
+    // a wrapped two-line IEEE citation ("[IEEE 829-2008] IEEE Std....
+    // Software" / "and System Test Documentation, IEEE, 2008.") has a
+    // genuine hanging indent that made its own first line and its
+    // wrapped continuation alternate between two consistent x-positions
+    // across a long run of consecutive references, exactly the same
+    // shape a real two-column table produces — without this check, a
+    // whole references section got shredded into fake two-cell rows.
+    if (hasExplicitBulletMarker(lines[end].text)) break;
     const x = lines[end].x;
     const isColA = (end - start) % 2 === 0;
     if (isColA) {
@@ -405,10 +416,9 @@ function classifyLine(
     /\p{L}/u.test(trimmed) &&
     !SENTENCE_TERMINAL.test(trimmed) &&
     trimmed.split(/\s+/).length <= MAX_HEADING_WORDS;
+  const hasCitationMarker = CITATION_MARKER_PATTERN.test(line.text);
   const hasListMarker =
-    BULLET_PATTERN.test(line.text) ||
-    NUMBERED_PATTERN.test(line.text) ||
-    CITATION_MARKER_PATTERN.test(line.text);
+    BULLET_PATTERN.test(line.text) || NUMBERED_PATTERN.test(line.text) || hasCitationMarker;
   // Fallback signal for documents (Google Docs PDF exports, real-world
   // example: TestDoc/"1-Week5A PRS821 Domains of Security-S1.pdf") where
   // every font resolves through pdf.js to the same generic family with no
@@ -434,8 +444,19 @@ function classifyLine(
   const offBodyFontRatio = line.charCount > 0 ? 1 - bodyFontChars / line.charCount : 0;
   const usesDistinctFont =
     !hasListMarker && ratio >= 0.95 && ratio <= 1.15 && offBodyFontRatio >= BOLD_MAJORITY_RATIO;
-  if (ratio >= 1.4 && looksLikeHeadingText) return "heading";
+  // A citation marker ("[IEEE 829-2008] ...") is never a real heading —
+  // unlike a numbered heading ("1. Introduction", which NUMBERED_PATTERN
+  // also matches and must still be allowed to classify as a heading
+  // below), no real document titles a section "[something] Heading
+  // Text." Found via real testing on swecom.pdf: a references section
+  // set in a bold or larger font (common for emphasis) let several
+  // citations slip past the heading/subheading checks below despite
+  // having an unambiguous marker, which also fused multiple separate
+  // citations into one heading block via formatStructuredText's own
+  // multi-line-heading buffering.
+  if (!hasCitationMarker && ratio >= 1.4 && looksLikeHeadingText) return "heading";
   if (
+    !hasCitationMarker &&
     (ratio >= 1.15 || (boldRatio >= BOLD_MAJORITY_RATIO && ratio >= 0.95) || usesDistinctFont) &&
     looksLikeHeadingText
   )
