@@ -6,6 +6,7 @@ import { askChatModel, type ChatTurn } from "@/lib/ai-chat";
 import { retrieveRelevantChunks, type RetrievableDocument } from "@/lib/retrieval";
 import { useAuth } from "@/hooks/use-auth";
 import { callGeminiWithPrompt, CloudUnavailableError } from "@/lib/ai-cloud";
+import { stripEmDash } from "@/lib/text-clean";
 
 function collectionMessageKey(collectionId: string, id: string): string {
   return `${collectionId}::${id}`;
@@ -222,6 +223,14 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
             cloudResponse ??
             (await askChatModel(turns, (piece) => setStreamingText((prev) => prev + piece)));
         }
+
+        // Deterministic backstop for whichever path produced the response
+        // (on-device models follow the system prompt's "no em dash"
+        // instruction far less reliably than Gemini) — see use-ai-chat.ts's
+        // identical comment. The cloud path is already stripped inside
+        // callGeminiWithPrompt; this is a harmless no-op for it.
+        response = stripEmDash(response);
+        setStreamingText(response);
 
         const assistantMessageId = crypto.randomUUID();
         await db.collectionMessages.put({

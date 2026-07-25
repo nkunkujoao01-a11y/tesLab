@@ -17,6 +17,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { deviceDb, getUserDb } from "@/lib/db";
+import { stripEmDash } from "@/lib/text-clean";
 
 // Typed locally rather than added to supabase.ts's shared Database type —
 // see that file's own comment on Functions for why: populating the shared
@@ -239,7 +240,12 @@ export async function callGeminiWithPrompt(prompt: string, userId: string): Prom
   if (typeof text !== "string" || !text.trim()) {
     throw new CloudUnavailableError("Gemini returned no usable content");
   }
-  return text.trim();
+  // A deterministic safety net, not a replacement for the prompt-level
+  // instructions callers already give it (see text-clean.ts) — Gemini
+  // mostly follows a "don't use em dashes" instruction but not always,
+  // and this is the one choke point every cloud-generated string (chat,
+  // quiz, flashcards, notes, summary) passes through.
+  return stripEmDash(text.trim());
 }
 
 /** The common case: one of this app's own standard prompts (see PROMPTS

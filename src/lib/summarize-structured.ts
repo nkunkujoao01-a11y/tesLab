@@ -18,6 +18,7 @@ import { deviceDb, type SummarySection } from "@/lib/db";
 import { summarizeText } from "@/lib/summarize";
 import { summarizeWithModel } from "@/lib/ai-model";
 import { callGeminiWithPrompt, CloudUnavailableError, stripJsonFence } from "@/lib/ai-cloud";
+import { stripEmDash } from "@/lib/text-clean";
 
 // Cloud models handle far more context per call than the small on-device
 // summarizer's MODEL_INPUT_BUDGET below — this is a generous but still
@@ -265,7 +266,11 @@ export async function generateStructuredSummary(
     }
     sections.push({
       heading: section.heading,
-      body: chunkSummaries.join(" "),
+      // Deterministic "no em dash" backstop, same as the AI chat paths —
+      // neither the neural summarizer nor the extractive fallback take a
+      // natural-language instruction, so this is the only lever available
+      // for this feature's output, shown to the student labeled "AI summary".
+      body: stripEmDash(chunkSummaries.join(" ")),
       keyPoints: section.keyPoints.length > 0 ? section.keyPoints : undefined,
     });
   }
@@ -284,5 +289,5 @@ export async function generateStructuredSummary(
     overview = summarizeText(combined, 3);
   }
 
-  return { overview, sections, method };
+  return { overview: stripEmDash(overview), sections, method };
 }

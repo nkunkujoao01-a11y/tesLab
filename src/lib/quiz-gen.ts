@@ -22,6 +22,7 @@
 // since a cloud model's JSON-formatting compliance isn't any more
 // guaranteed than the on-device model's own format compliance was.
 import { stripJsonFence } from "@/lib/ai-cloud";
+import { stripEmDash } from "@/lib/text-clean";
 
 export type Flashcard = { front: string; back: string };
 
@@ -272,7 +273,16 @@ export function parseQuizResponse(raw: string): QuizQuestion[] {
     }
 
     if (question && options.length === 4 && correctIndex >= 0 && correctIndex < 4) {
-      questions.push({ question, options, correctIndex });
+      // The on-device chat model gets the same "no em dash" style
+      // elsewhere but has no per-call system-prompt slot for it here
+      // (this is a plain completion prompt, not a chat turn) — strip as
+      // a deterministic backstop, same reasoning as text-clean.ts's own
+      // comment.
+      questions.push({
+        question: stripEmDash(question),
+        options: options.map(stripEmDash),
+        correctIndex,
+      });
     }
   }
   return questions;

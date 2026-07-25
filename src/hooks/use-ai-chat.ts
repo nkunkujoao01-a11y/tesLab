@@ -22,6 +22,7 @@ import {
   type StaleAiBreadcrumb,
 } from "@/lib/ai-crash-breadcrumb";
 import { callGeminiWithPrompt, CloudUnavailableError } from "@/lib/ai-cloud";
+import { stripEmDash } from "@/lib/text-clean";
 
 const SETTING_KEY = "ai_chat_model_downloaded";
 // Separate from SETTING_KEY: whether the download actually persisted for
@@ -299,6 +300,14 @@ export function useSendAssistantMessage() {
         if (response === undefined) {
           response = await askChatModel(turns, (piece) => setStreamingText((prev) => prev + piece));
         }
+        // The on-device model gets the same "no em dash" instruction in
+        // its own system prompt above, but a small model follows it far
+        // less reliably than Gemini does — this is the deterministic
+        // backstop for whichever path actually produced the response
+        // (the cloud path is already stripped inside callGeminiWithPrompt,
+        // this call is a harmless no-op for it).
+        response = stripEmDash(response);
+        setStreamingText(response);
         await db.assistantMessages.put({
           id: crypto.randomUUID(),
           role: "assistant",
