@@ -263,6 +263,94 @@ function escapeTableCell(text: string): string {
   return text.trim().replace(/\|/g, "\\|");
 }
 
+// Some PDF table exports (found via a real two-column "Abbreviation | Full
+// Form" glossary/definition table) render each row's two cells with enough
+// vertical offset between them that the same-line y-tolerance above (the
+// `< 3` unit check in the fragment-grouping loop) never merges them onto
+// one RawLine — the abbreviation and its definition extract as two
+// separate single-cell lines instead of one two-cell row, so
+// detectTableRows (which requires `cells.length >= 2` just to consider a
+// line at all) never even looks at them; each cell ends up as its own
+// orphaned paragraph in the output instead of a real table row. This is a
+// second, more lenient reconstruction pass, run before detectTableRows:
+// when a long run of consecutive single-cell lines strictly alternates
+// between two consistent x-positions (column A, column B, column A, column
+// B...), pair them up into synthetic two-cell rows. Conservative on
+// purpose — it only fires on a clean run at least MIN_ALTERNATING_PAIRS
+// pairs long, which ordinary prose essentially never produces (a real
+// two-column *page* layout, as opposed to a table, is caught separately by
+// findColumnGutter/orderLinesForReading above, which runs first and
+// already reorders left-column-then-right-column instead of leaving them
+// interleaved the way a table's rows need to stay).
+const MIN_ALTERNATING_PAIRS = MIN_TABLE_ROWS;
+
+function findAlternatingCellRun(lines: RawLine[], start: number): number {
+  let end = start;
+  let colAX: number | null = null;
+  let colBX: number | null = null;
+  while (end < lines.length && lines[end].cells.length === 1) {
+    const x = lines[end].x;
+    const isColA = (end - start) % 2 === 0;
+    if (isColA) {
+      if (colAX === null) {
+        colAX = x;
+      } else if (Math.abs(x - colAX) > CELL_X_TOLERANCE) {
+        break;
+      }
+    } else if (colBX === null) {
+      // Require clear separation from column A before accepting this as a
+      // genuine second column, not just coincidental repetition.
+      if (colAX !== null && x - colAX < CELL_X_TOLERANCE) break;
+      colBX = x;
+    } else if (Math.abs(x - colBX) > CELL_X_TOLERANCE) {
+      break;
+    }
+    end++;
+  }
+  return end;
+}
+
+/** Reconstructs rows a PDF split across two separate lines per cell — see
+ * this function's own comment block above for why. Only ever adds cells to
+ * an already single-cell line; a line that already has 2+ cells (a real
+ * same-y table row, handled by the ordinary fragment-grouping above) is
+ * left completely untouched. */
+function mergeAdjacentTableCells(lines: RawLine[]): RawLine[] {
+  const result: RawLine[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].cells.length !== 1) {
+      result.push(lines[i]);
+      i++;
+      continue;
+    }
+    const runEnd = findAlternatingCellRun(lines, i);
+    const runLength = runEnd - i;
+    if (runLength >= MIN_ALTERNATING_PAIRS * 2) {
+      const pairedEnd = i + runLength - (runLength % 2);
+      for (let j = i; j < pairedEnd; j += 2) {
+        const a = lines[j];
+        const b = lines[j + 1];
+        result.push({
+          ...a,
+          text: `${a.text} ${b.text}`,
+          endX: Math.max(a.endX, b.endX),
+          cells: [a.text.trim(), b.text.trim()],
+          cellX: [a.x, b.x],
+        });
+      }
+      // An odd leftover line (this run's length wasn't even) falls through
+      // to the normal single-line path below, unmerged.
+      for (let j = pairedEnd; j < runEnd; j++) result.push(lines[j]);
+      i = runEnd;
+      continue;
+    }
+    result.push(lines[i]);
+    i++;
+  }
+  return result;
+}
+
 // A real heading essentially never ends in sentence-terminal punctuation
 // — found via real testing on swecom.pdf, where several ordinary
 // sentence tail-ends ("included in an appendix.", "...analogous elements
@@ -697,8 +785,10 @@ async function extractPdfTextViaPdfJs(
     // pdf.js's y-axis grows upward (origin bottom-left), so the first
     // line on the page has the largest y — orderLinesForReading falls
     // back to exactly this plain sort unless it detects a real two-column
-    // layout (see its own comment).
-    pageLines.push(orderLinesForReading(lines));
+    // layout (see its own comment). mergeAdjacentTableCells runs after,
+    // since it needs lines already in real top-to-bottom reading order to
+    // find a genuine row-by-row alternation.
+    pageLines.push(mergeAdjacentTableCells(orderLinesForReading(lines)));
     onProgress?.({ page: i, totalPages: doc.numPages, stage: "reading" });
   }
 

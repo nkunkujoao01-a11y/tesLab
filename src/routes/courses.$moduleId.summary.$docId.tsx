@@ -51,12 +51,12 @@ function MaterialSummaryPage() {
           <Link
             to="/courses/$moduleId/read/$docId"
             params={{ moduleId: module.id, docId: doc.id }}
-            className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
+            className="inline-flex min-w-0 items-start gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
           >
-            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-            {doc.title}
+            <ArrowLeft className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+            <span className="break-words">{doc.title}</span>
           </Link>
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-prestige-gold">
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-prestige-gold">
             <Sparkles className="h-3 w-3" strokeWidth={2} />
             {summary?.method === "cloud"
               ? "Cloud AI"

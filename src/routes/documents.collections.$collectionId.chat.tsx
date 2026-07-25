@@ -97,10 +97,10 @@ function CollectionChat() {
           <Link
             to="/documents/collections/$collectionId"
             params={{ collectionId }}
-            className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
+            className="inline-flex min-w-0 items-start gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
           >
-            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-            {collection.name}
+            <ArrowLeft className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+            <span className="break-words">{collection.name}</span>
           </Link>
           <h1 className="mt-3 font-display text-2xl font-medium tracking-tight text-balance text-prestige-deep lg:text-3xl">
             Ask this collection

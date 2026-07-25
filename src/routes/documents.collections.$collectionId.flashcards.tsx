@@ -77,13 +77,13 @@ function CollectionFlashcardsPage() {
           <Link
             to="/documents/collections/$collectionId"
             params={{ collectionId }}
-            className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
+            className="inline-flex min-w-0 items-start gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
           >
-            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-            {title}
+            <ArrowLeft className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+            <span className="break-words">{title}</span>
           </Link>
           {flashcardSet && (
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-prestige-gold">
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-prestige-gold">
               <Layers className="h-3 w-3" strokeWidth={2} />
               {flashcardSet.method === "cloud" ? "Cloud AI" : "On-device"}
             </span>

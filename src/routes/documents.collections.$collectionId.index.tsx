@@ -278,8 +278,8 @@ function CollectionDetail() {
       </div>
 
       <div className="px-6 pt-6 lg:px-10 lg:pb-16">
-        <div className="flex items-center gap-2">
-          <h1 className="min-w-0 truncate font-display text-3xl font-medium leading-[1.15] tracking-tight text-prestige-deep lg:text-4xl">
+        <div className="flex items-start gap-2">
+          <h1 className="min-w-0 break-words font-display text-3xl font-medium leading-[1.15] tracking-tight text-prestige-deep lg:text-4xl">
             {collection.name}
           </h1>
           <RenameCollectionDialog collectionId={collectionId} currentName={collection.name} />
