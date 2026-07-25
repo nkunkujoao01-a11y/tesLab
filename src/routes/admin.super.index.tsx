@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import {
   Download,
   BookOpenText,
@@ -9,12 +10,33 @@ import {
   Smartphone,
   Tablet,
   Monitor,
+  TrendingUp,
 } from "lucide-react";
 import { usePlatformAnalytics } from "@/hooks/use-platform-analytics";
 import type { ActivityType } from "@/lib/db";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 
 const DEVICE_ICONS = { mobile: Smartphone, tablet: Tablet, desktop: Monitor } as const;
 const DEVICE_LABELS = { mobile: "Mobile", tablet: "Tablet", desktop: "Desktop" } as const;
+
+// Same single-series gold bar already used for progress.tsx's own "actions
+// per day" chart — this is the same kind of magnitude-over-time chart, just
+// bucketed by hour of day instead of by day, so it should read as the same
+// visual language rather than introducing a second chart style.
+const HOURLY_CHART_CONFIG: ChartConfig = {
+  count: { label: "Actions", color: "var(--prestige-gold)" },
+};
+
+function formatHourLabel(hour: number): string {
+  const period = hour < 12 ? "am" : "pm";
+  const twelveHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${twelveHour}${period}`;
+}
 
 export const Route = createFileRoute("/admin/super/")({
   component: SuperAdminOverviewPage,
@@ -196,6 +218,80 @@ function SuperAdminOverviewPage() {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* What's actually popular, and when real usage happens — the two
+       * concrete "how do I improve this from real customer behavior"
+       * questions the platform overview didn't answer before: which
+       * modules get read the most (real read_materials rows, not a
+       * guess), and what time of day students actually study. */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+        <div className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
+          <div className="border-b border-border/60 px-4 py-3.5">
+            <p className="text-sm font-medium text-prestige-deep">Most popular modules</p>
+            <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+              By real materials-read count
+            </p>
+          </div>
+          {data && data.topModules.length === 0 ? (
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+              No reading activity recorded yet.
+            </p>
+          ) : (
+            <div>
+              {(data?.topModules ?? []).map((module, i) => (
+                <div
+                  key={module.moduleId}
+                  className="flex items-center gap-2.5 border-b border-border/60 px-4 py-3 last:border-none"
+                >
+                  <span className="w-4 shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">
+                    {i + 1}
+                  </span>
+                  <p className="min-w-0 flex-1 truncate text-xs text-foreground/90">
+                    {module.title}
+                  </p>
+                  <span className="shrink-0 text-xs font-medium tabular-nums text-prestige-deep">
+                    {module.readCount}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="animate-rise overflow-hidden rounded-2xl bg-card p-4 ring-1 ring-border/60 lg:p-6">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-3.5 w-3.5 text-prestige-mid" strokeWidth={1.75} />
+            <p className="text-sm font-medium text-prestige-deep">When students study</p>
+          </div>
+          <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+            Real activity by hour of day, last 90 days
+          </p>
+          <ChartContainer config={HOURLY_CHART_CONFIG} className="mt-4 h-[180px] w-full">
+            <BarChart data={data?.activityByHour ?? []}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="hour"
+                tickFormatter={formatHourLabel}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                interval={2}
+              />
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    labelKey="hour"
+                    labelFormatter={(_, payload) => formatHourLabel(payload[0]?.payload.hour ?? 0)}
+                    indicator="line"
+                  />
+                }
+              />
+              <Bar dataKey="count" fill="var(--color-count)" radius={4} animationDuration={600} />
+            </BarChart>
+          </ChartContainer>
         </div>
       </div>
 

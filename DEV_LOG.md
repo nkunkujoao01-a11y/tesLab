@@ -2131,6 +2131,22 @@ The user asked for a splash screen so the app reads as "eLearn" from the first f
 
 ---
 
+## Feature 72: two new real-usage insights on the super admin platform overview — most-popular modules and a real "when do students study" hourly breakdown
+
+The user asked what happened to the super-admin analytics they'd expected — a real "Platform overview" dashboard (`/admin/super`, `usePlatformAnalytics`) already existed (students, active users, feature-usage counts, feedback, device breakdown, avg session minutes), but two concrete things they specifically asked about — **what** content is actually popular, and **when** real usage happens — genuinely weren't there yet.
+
+**"What's popular"**: `read_materials` already stores real `module_id` per read (0004_progress_sync.sql), but `usePlatformAnalytics` only ever used it for a flat `count`, never grouped by module. Added a real ranking: fetches raw `module_id` rows (bounded, same `USAGE_SAMPLE_LIMIT` discipline as the existing `ACTIVE_USER_SAMPLE_LIMIT`) and `modules(id, title)` for real titles, aggregates client-side (no server-side `GROUP BY` through the Supabase JS client, same pattern `deviceBreakdown` already uses for `study_sessions`), and surfaces the top 8 modules by real read count.
+
+**"When it happens"**: nothing tracked time-of-day at all before this — only 7-day/30-day active-user *counts* existed, not a real usage-pattern shape. Added an hour-of-day breakdown: real `activity_events.event_at` rows from the last 90 days (a deliberately recent window — "when does real usage happen" is about current behavior, not the platform's whole history), bucketed into 24 hours and rendered as a bar chart using the exact same `ChartContainer`/`recharts` pattern and gold single-series color `progress.tsx`'s own "actions per day" chart already established, rather than inventing a second chart style.
+
+**Honest limitation, documented rather than hidden**: hour-of-day is computed in whichever timezone the browser *viewing* the dashboard is in — there's no stored per-student timezone anywhere in this schema. Since this platform's whole student base is Namibia-based in practice, an admin reviewing it from the same timezone reads it correctly as local time; it would only be wrong for an admin reviewing from a genuinely different timezone than their own students, a real but narrow edge case worth knowing about rather than silently assuming away.
+
+### How it was validated
+
+`npx tsc --noEmit`, `prettier --write`. The real Supabase queries can't be exercised directly without live super-admin credentials, so the new UI (module ranking list + hourly bar chart) was visually verified with a real headless-browser screenshot against representative sample data (a temporary preview route, removed after) — clean layout, no label collisions, correctly reads as the same visual language as the rest of the app's existing charts.
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.

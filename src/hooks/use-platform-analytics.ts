@@ -18,6 +18,19 @@ const ACTIVITY_TYPES: ActivityType[] = ["download", "read", "summary", "quiz", "
 // event in a long window is captured.
 const ACTIVE_USER_SAMPLE_LIMIT = 5000;
 
+// Same bounded-sample honesty as ACTIVE_USER_SAMPLE_LIMIT above, applied to
+// the two new real-usage breakdowns below (top modules, activity by hour) —
+// large enough to be a genuinely representative sample of recent real
+// behavior, not a claim of exhaustiveness over the platform's entire
+// history.
+const USAGE_SAMPLE_LIMIT = 5000;
+
+export type TopModule = {
+  moduleId: string;
+  title: string;
+  readCount: number;
+};
+
 export type PlatformAnalytics = {
   totalStudents: number;
   activeLast7Days: number;
@@ -31,6 +44,19 @@ export type PlatformAnalytics = {
   researchSurveyResponseCount: number;
   deviceBreakdown: Record<"mobile" | "tablet" | "desktop", number>;
   avgSessionMinutes: number | null;
+  // What's actually being used — real read_materials rows grouped by
+  // module and joined against the modules table for a real title, not
+  // just a raw id. See useModuleAnalytics (per-module admin pages) for
+  // the equivalent scoped-to-one-module breakdown; this is the
+  // platform-wide "what's popular" ranking that didn't exist before.
+  topModules: TopModule[];
+  // When real usage actually happens, by hour of day (0-23, in whichever
+  // timezone the browser viewing this dashboard is in) — this app has no
+  // stored per-student timezone, and its whole student base is Namibia-
+  // based in practice, so an admin viewing this from the same timezone
+  // reads it correctly as local time; genuinely wrong only for an admin
+  // reviewing from a different timezone than their own students.
+  activityByHour: { hour: number; count: number }[];
 };
 
 function countDistinctUsers(rows: { user_id: string }[]): number {
@@ -52,6 +78,12 @@ export function usePlatformAnalytics(): {
     const now = Date.now();
     const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
     const since30d = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+    // "When does real usage happen" is about current behavior, not the
+    // platform's entire history — a 90-day window is generous enough to
+    // smooth out a single unusual week while still reflecting how
+    // students actually use the app today, not a semester that ended
+    // long ago.
+    const since90d = new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString();
 
     void Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
@@ -78,6 +110,18 @@ export function usePlatformAnalytics(): {
       supabase.from("research_consent").select("agreed"),
       supabase.from("research_survey_responses").select("id", { count: "exact", head: true }),
       supabase.from("study_sessions").select("user_id, device_type, duration_seconds, updated_at"),
+      // Real per-module read counts — no server-side GROUP BY through the
+      // Supabase client, so this fetches raw module_id rows (bounded, same
+      // discipline as ACTIVE_USER_SAMPLE_LIMIT above) and aggregates
+      // client-side, same as deviceBreakdown/avgSessionMinutes already do
+      // for study_sessions below.
+      supabase.from("read_materials").select("module_id").limit(USAGE_SAMPLE_LIMIT),
+      supabase.from("modules").select("id, title"),
+      supabase
+        .from("activity_events")
+        .select("event_at")
+        .gte("event_at", since90d)
+        .limit(USAGE_SAMPLE_LIMIT),
     ]).then(
       ([
         studentsRes,
@@ -89,6 +133,9 @@ export function usePlatformAnalytics(): {
         consentRes,
         surveyRes,
         sessionsRes,
+        moduleReadsRes,
+        modulesRes,
+        recentEventsRes,
       ]) => {
         if (cancelled) return;
 
@@ -131,6 +178,39 @@ export function usePlatformAnalytics(): {
               ) / 10
             : null;
 
+        if (moduleReadsRes.error)
+          console.error("Failed to load read_materials for module ranking", moduleReadsRes.error);
+        if (modulesRes.error)
+          console.error("Failed to load modules for title lookup", modulesRes.error);
+        const moduleTitleById = new Map((modulesRes.data ?? []).map((m) => [m.id, m.title]));
+        const readCountByModule = new Map<string, number>();
+        for (const row of moduleReadsRes.data ?? []) {
+          readCountByModule.set(row.module_id, (readCountByModule.get(row.module_id) ?? 0) + 1);
+        }
+        // Top 8 is enough to answer "what's actually popular" at a glance
+        // without turning this into its own scrollable table — a student
+        // ever reading from dozens of modules evenly would show a flat
+        // ranking either way, which is itself an honest answer.
+        const topModules: TopModule[] = [...readCountByModule.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([moduleId, readCount]) => ({
+            moduleId,
+            title: moduleTitleById.get(moduleId) ?? moduleId,
+            readCount,
+          }));
+
+        if (recentEventsRes.error)
+          console.error(
+            "Failed to load recent activity for hourly breakdown",
+            recentEventsRes.error,
+          );
+        const hourCounts = new Array(24).fill(0) as number[];
+        for (const row of recentEventsRes.data ?? []) {
+          hourCounts[new Date(row.event_at).getHours()] += 1;
+        }
+        const activityByHour = hourCounts.map((count, hour) => ({ hour, count }));
+
         setData({
           totalStudents: studentsRes.count ?? 0,
           activeLast7Days: countDistinctUsers(active7dRes.data ?? []),
@@ -151,6 +231,8 @@ export function usePlatformAnalytics(): {
           researchSurveyResponseCount: surveyRes.count ?? 0,
           deviceBreakdown,
           avgSessionMinutes,
+          topModules,
+          activityByHour,
         });
         setLoading(false);
       },
