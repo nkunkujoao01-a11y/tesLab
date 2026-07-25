@@ -15,6 +15,7 @@ import {
   UserPlus,
   Award,
   MessageCircle,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
@@ -198,6 +199,7 @@ function ModuleDetail() {
   const {
     enrolled,
     loading: enrollmentLoading,
+    error: enrollmentError,
     toggling,
     toggle: toggleEnrollment,
   } = useModuleEnrollment(module.id);
@@ -205,7 +207,7 @@ function ModuleDetail() {
   // 0027_module_grades.sql) — no separate "is this actually mine" check
   // needed client-side, the same query just can never return anyone
   // else's grades.
-  const { grades } = useModuleGrades(module.id);
+  const { grades, error: gradesError } = useModuleGrades(module.id);
   const { user } = useAuth();
   const [messagesOpen, setMessagesOpen] = useState(false);
 
@@ -238,7 +240,19 @@ function ModuleDetail() {
               <span>{module.lecturer}</span>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              {!enrollmentLoading && (
+              {enrollmentLoading ? null : enrollmentError ? (
+                // A real fetch failure (most likely offline) — deliberately
+                // not defaulting to the "Enrol in this module" button here,
+                // which would falsely tell an already-enrolled student
+                // they aren't, see use-enrollment.ts's own comment.
+                <span
+                  title="Couldn't check your enrolment status — check your connection"
+                  className="inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold text-muted-foreground ring-1 ring-border/70"
+                >
+                  <TriangleAlert className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  Enrolment status unavailable
+                </span>
+              ) : (
                 <button
                   type="button"
                   disabled={toggling}
@@ -282,28 +296,42 @@ function ModuleDetail() {
 
           {/* Grades — only ever renders what RLS actually returned for
               this signed-in student, so an unenrolled/ungraded student
-              simply sees nothing here. */}
-          {grades.length > 0 && (
-            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60">
-              <div className="flex items-center gap-2.5">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                  <Award className="h-4 w-4" strokeWidth={1.75} />
+              simply sees nothing here. A genuine fetch failure (gradesError)
+              is shown explicitly instead — indistinguishable from "no
+              grades yet" otherwise, which would be misleading for a
+              student who actually has real grades recorded (see
+              use-grades.ts's own comment). */}
+          {gradesError ? (
+            <div className="animate-rise flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+              <p>Couldn't load your grades. Check your connection and reopen this module.</p>
+            </div>
+          ) : (
+            grades.length > 0 && (
+              <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60">
+                <div className="flex items-center gap-2.5">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                    <Award className="h-4 w-4" strokeWidth={1.75} />
+                  </div>
+                  <h2 className="font-display text-sm font-semibold text-prestige-deep">
+                    Your grades
+                  </h2>
                 </div>
-                <h2 className="font-display text-sm font-semibold text-prestige-deep">
-                  Your grades
-                </h2>
-              </div>
-              <ul className="mt-4 divide-y divide-border/60">
-                {grades.map((g) => (
-                  <li key={g.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                    <span className="min-w-0 truncate text-foreground/90">{g.label}</span>
-                    <span className="shrink-0 font-display text-sm font-medium text-prestige-deep">
-                      {g.score}/{g.maxScore}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+                <ul className="mt-4 divide-y divide-border/60">
+                  {grades.map((g) => (
+                    <li
+                      key={g.id}
+                      className="flex items-center justify-between gap-3 py-2.5 text-sm"
+                    >
+                      <span className="min-w-0 truncate text-foreground/90">{g.label}</span>
+                      <span className="shrink-0 font-display text-sm font-medium text-prestige-deep">
+                        {g.score}/{g.maxScore}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
           )}
 
           {/* Materials */}

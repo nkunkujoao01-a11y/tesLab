@@ -12,6 +12,8 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@fontsource/manrope": "^5.3.0",
+    "@fontsource/sora": "^5.3.0",
     "@hookform/resolvers": "^5.2.2",
     "@huggingface/transformers": "^4.2.0",
     "@hyzyla/pdfium": "^2.1.13",

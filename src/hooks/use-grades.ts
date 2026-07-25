@@ -27,11 +27,18 @@ export type ModuleGrade = {
 export function useModuleGrades(moduleId: string | null) {
   const [grades, setGrades] = useState<ModuleGrade[]>([]);
   const [loading, setLoading] = useState(false);
+  // A genuine fetch failure (offline, timeout, a real Supabase error) —
+  // kept separate from an honestly-empty `grades` array. Without this, a
+  // student with real recorded grades who opens this page offline sees
+  // exactly the same "no grades" rendering as a student who genuinely has
+  // none yet, which is actively misleading rather than just incomplete.
+  const [error, setError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!moduleId) {
       setGrades([]);
+      setError(false);
       return;
     }
     let cancelled = false;
@@ -41,20 +48,25 @@ export function useModuleGrades(moduleId: string | null) {
       .select("id, module_id, user_id, label, score, max_score, graded_at")
       .eq("module_id", moduleId)
       .order("graded_at", { ascending: false })
-      .then(({ data, error }) => {
+      .then(({ data, error: fetchError }) => {
         if (cancelled) return;
-        if (error) console.error("Failed to load grades", error);
-        setGrades(
-          (data ?? []).map((g) => ({
-            id: g.id,
-            moduleId: g.module_id,
-            userId: g.user_id,
-            label: g.label,
-            score: g.score,
-            maxScore: g.max_score,
-            gradedAt: g.graded_at,
-          })),
-        );
+        if (fetchError) {
+          console.error("Failed to load grades", fetchError);
+          setError(true);
+        } else {
+          setError(false);
+          setGrades(
+            (data ?? []).map((g) => ({
+              id: g.id,
+              moduleId: g.module_id,
+              userId: g.user_id,
+              label: g.label,
+              score: g.score,
+              maxScore: g.max_score,
+              gradedAt: g.graded_at,
+            })),
+          );
+        }
         setLoading(false);
       });
     return () => {
@@ -64,7 +76,7 @@ export function useModuleGrades(moduleId: string | null) {
 
   const refetch = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  return { grades, loading, refetch };
+  return { grades, loading, error, refetch };
 }
 
 export type NewGradeInput = {

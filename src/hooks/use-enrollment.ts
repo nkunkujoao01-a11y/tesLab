@@ -11,11 +11,22 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
 
-/** Whether the signed-in user is enrolled in `moduleId`, plus a toggle. */
+/** Whether the signed-in user is enrolled in `moduleId`, plus a toggle.
+ * `error` is true only for a genuine fetch failure (offline, timeout, a
+ * real Supabase error) — deliberately kept separate from `enrolled`
+ * itself (which stays a plain boolean from the last successful read).
+ * Membership is never cached in IndexedDB (see this file's own header
+ * comment: it needs to reflect reality across devices immediately, not
+ * a "might be stale" contract), but a fetch failure still shouldn't
+ * silently render as a confident "not enrolled" — that's actively
+ * misleading for a real, already-enrolled student who happens to open
+ * this page offline. Callers should show `error`'s own honest message
+ * instead of the toggle button while it's true. */
 export function useModuleEnrollment(moduleId: string) {
   const { user } = useAuth();
   const [enrolled, setEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
@@ -23,6 +34,7 @@ export function useModuleEnrollment(moduleId: string) {
     if (!user) {
       setEnrolled(false);
       setLoading(false);
+      setError(false);
       return;
     }
     setLoading(true);
@@ -32,10 +44,15 @@ export function useModuleEnrollment(moduleId: string) {
       .eq("user_id", user.id)
       .eq("module_id", moduleId)
       .maybeSingle()
-      .then(({ data, error }) => {
+      .then(({ data, error: fetchError }) => {
         if (cancelled) return;
-        if (error) console.error("Failed to read enrollment status", error);
-        setEnrolled(Boolean(data));
+        if (fetchError) {
+          console.error("Failed to read enrollment status", fetchError);
+          setError(true);
+        } else {
+          setError(false);
+          setEnrolled(Boolean(data));
+        }
         setLoading(false);
       });
     return () => {
@@ -75,7 +92,7 @@ export function useModuleEnrollment(moduleId: string) {
     }
   }, [user, moduleId, enrolled]);
 
-  return { enrolled, loading, toggling, toggle };
+  return { enrolled, loading, error, toggling, toggle };
 }
 
 export type RosterEntry = {

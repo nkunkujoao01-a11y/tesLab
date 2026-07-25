@@ -2,6 +2,26 @@
 @source "../src";
 @import "tw-animate-css";
 
+/* Self-hosted (not Google Fonts' CDN) — see __root.tsx's own removed
+   <link> tags. A live fonts.googleapis.com/fonts.gstatic.com fetch on
+   every fresh navigation-shell load is a real, if small, dependency this
+   app's own "nothing sent anywhere except your own account's storage"
+   design otherwise avoids everywhere else, and the service worker's
+   fetch handler only ever caches same-origin requests (sw.js), so those
+   two external requests were never actually covered offline either.
+   @fontsource ships the same font files as real npm-installed, bundled
+   assets instead. Latin-only subset (no unicode-range juggling needed,
+   no Cyrillic/Greek/etc. this English-language app never uses) at the
+   four weights the design system actually uses (400/500/600/700). */
+@import "@fontsource/sora/latin-400.css";
+@import "@fontsource/sora/latin-500.css";
+@import "@fontsource/sora/latin-600.css";
+@import "@fontsource/sora/latin-700.css";
+@import "@fontsource/manrope/latin-400.css";
+@import "@fontsource/manrope/latin-500.css";
+@import "@fontsource/manrope/latin-600.css";
+@import "@fontsource/manrope/latin-700.css";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
