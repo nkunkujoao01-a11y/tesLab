@@ -204,6 +204,44 @@ const NUMBERED_PATTERN = /^(\d+[.)]|[a-zA-Z][.)]|\([a-zA-Z0-9]+\))\s+/;
 // number ("2 apples were left on the table," which continues lowercase) —
 // the same distinguishing signal looksLikeContinuationLine already uses.
 const BARE_NUMBER_MARKER_PATTERN = /^\d+\s+(?=\p{Lu})/u;
+
+// A short (1-2 digit) row/question-number label sits in its own narrow left
+// column in some real forms and questionnaires (found via real testing,
+// TestDoc/"Client Risk Questionnaire-Joao.pdf": every number sits at x=50,
+// every question's own text starts at x=64) — a real, deliberate two-column
+// layout, not noise. Two distinct symptoms show up depending on whether
+// that number's y happens to land on the exact same y as one of its
+// question's several wrapped lines (the fragment-merge tolerance,
+// `Math.abs(dy) < 3`, only checks vertical closeness, never which column a
+// fragment is really in): landing on the *first* wrapped line reads as "N
+// Question text..." — already handled by BARE_NUMBER_MARKER_PATTERN. Landing
+// on a *later* wrapped line of a taller, multi-line question instead wedges
+// the digit mid-sentence ("...to put 8 towards this investment"); landing on
+// no wrapped line's y at all leaves it as its own tiny isolated line that
+// gets spliced into the middle of the same paragraph once wrapped lines are
+// joined back together. Both are recognized the same way: this line's own x
+// is meaningfully further left than the document's real body-text margin
+// (bodyX) — no ordinary sentence in a document like this starts that far
+// left. An isolated bare-digit line at that position is folded into
+// classifyLine's own `hasListMarker` (so it starts a fresh list item exactly
+// like a real marker would); a merged line whose digit prefix is followed by
+// a *lowercase* word (a digit followed by a capital is already the
+// BARE_NUMBER_MARKER_PATTERN case, correctly read as a real new item) has
+// that leading "N " read off and discarded before classification, since it's
+// a mid-sentence continuation the digit only accidentally landed next to.
+const ROW_NUMBER_COLUMN_MIN_GAP = 8;
+const ROW_NUMBER_PREFIX_PATTERN = /^(\d{1,2})\s+(?=[a-z])/;
+
+function isIsolatedRowNumber(text: string, x: number, bodyX: number): boolean {
+  return /^\d{1,2}$/.test(text.trim()) && bodyX > 0 && bodyX - x >= ROW_NUMBER_COLUMN_MIN_GAP;
+}
+
+function stripRowNumberContinuationPrefix(text: string, x: number, bodyX: number): string {
+  if (bodyX <= 0 || bodyX - x < ROW_NUMBER_COLUMN_MIN_GAP) return text;
+  const match = ROW_NUMBER_PREFIX_PATTERN.exec(text);
+  return match ? text.slice(match[0].length) : text;
+}
+
 // A reference-list entry ("[24] S. Lujan..." or IEEE-style "[Abran 2010]
 // Alain Abran...") starts with a bracketed marker — square brackets
 // aren't matched by BULLET_PATTERN (bullet glyphs) or NUMBERED_PATTERN
@@ -482,7 +520,8 @@ function classifyLine(
     BULLET_PATTERN.test(line.text) ||
     NUMBERED_PATTERN.test(line.text) ||
     hasCitationMarker ||
-    BARE_NUMBER_MARKER_PATTERN.test(line.text);
+    BARE_NUMBER_MARKER_PATTERN.test(line.text) ||
+    isIsolatedRowNumber(line.text, line.x, bodyX);
   // Fallback signal for documents (Google Docs PDF exports, real-world
   // example: TestDoc/"1-Week5A PRS821 Domains of Security-S1.pdf") where
   // every font resolves through pdf.js to the same generic family with no
@@ -627,6 +666,7 @@ function joinParagraphLines(lines: string[]): string {
  * `#`/`-` characters, which still reads fine unrendered. */
 function formatStructuredText(
   lines: { kind: LineKind; text: string; x: number; cells?: string[] }[],
+  bodyX: number,
 ): string {
   const blocks: string[] = [];
   let paragraphBuffer: string[] = [];
@@ -698,8 +738,16 @@ function formatStructuredText(
   // this same "was the open item started by an explicit marker"
   // signal is what lets a heading-shaped line still be recognized as
   // that citation's own continuation instead.
+  // An isolated bare row-number (see isIsolatedRowNumber's own comment) is
+  // just as unambiguous a marker as a real bullet glyph or citation
+  // bracket — nothing but a new one of these, or a genuinely complete
+  // buffer, should ever be read as that item's own continuation.
+  function isMarkerLine(text: string, x: number): boolean {
+    return hasExplicitBulletMarker(text) || isIsolatedRowNumber(text, x, bodyX);
+  }
+
   function bulletBufferShouldAbsorb(text: string, x: number): boolean {
-    if (!bulletBuffer || hasExplicitBulletMarker(text)) return false;
+    if (!bulletBuffer || isMarkerLine(text, x)) return false;
     if (x < bulletBuffer.markerX - LIST_CONTINUATION_MIN_X_TOLERANCE) return false;
     const bufferedSoFar = joinParagraphLines(bulletBuffer.lines);
     if (SENTENCE_TERMINAL.test(bufferedSoFar)) return false;
@@ -799,7 +847,7 @@ function formatStructuredText(
         flushHeading();
         flushBullet();
         bulletBuffer = {
-          startedWithMarker: hasExplicitBulletMarker(line.text),
+          startedWithMarker: isMarkerLine(line.text, line.x),
           markerX: line.x,
           lines: [stripGlyphBulletPrefix(line.text)],
         };
@@ -1121,16 +1169,30 @@ async function extractPdfTextViaPdfJs(
     lines: RawLine[],
   ): { kind: LineKind; text: string; x: number; y: number; cells?: string[] }[] {
     const tableFlags = detectTableRows(lines);
-    return lines.map((line, i) =>
-      tableFlags[i]
-        ? { kind: "table-row" as const, text: line.text, x: line.x, y: line.y, cells: line.cells }
-        : {
-            kind: classifyLine(line, bodySize, bodyX, bodyFontName),
-            text: reconstructOrphanedCellText(line),
-            x: line.x,
-            y: line.y,
-          },
-    );
+    return lines.map((line, i) => {
+      if (tableFlags[i]) {
+        return {
+          kind: "table-row" as const,
+          text: line.text,
+          x: line.x,
+          y: line.y,
+          cells: line.cells,
+        };
+      }
+      // See isIsolatedRowNumber/stripRowNumberContinuationPrefix's own
+      // comment — a stray row-number glued onto the front of an unrelated
+      // continuation line is read off before classification, not just
+      // before output, so it doesn't also throw off heading/bullet
+      // detection for the line it landed on.
+      const cleanedText = stripRowNumberContinuationPrefix(line.text, line.x, bodyX);
+      const effectiveLine = cleanedText === line.text ? line : { ...line, text: cleanedText };
+      return {
+        kind: classifyLine(effectiveLine, bodySize, bodyX, bodyFontName),
+        text: reconstructOrphanedCellText(effectiveLine),
+        x: line.x,
+        y: line.y,
+      };
+    });
   }
 
   const NOISE_ELIGIBLE_KINDS = new Set<LineKind>(["body", "bullet", "subheading"]);
@@ -1171,7 +1233,7 @@ async function extractPdfTextViaPdfJs(
       if (trimmed.length > NOISE_MAX_LINE_LENGTH) return true;
       return !noiseNormalizedTexts.has(normalizeForNoiseDetection(trimmed));
     });
-    return formatStructuredText(classified);
+    return formatStructuredText(classified, bodyX);
   });
 
   const joined = pageTexts.join("\n\n").trim();
