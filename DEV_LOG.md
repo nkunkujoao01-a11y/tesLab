@@ -2121,6 +2121,16 @@ The user provided several new real documents (a financial-advisory risk question
 
 ---
 
+## Feature 71: a real branded splash/loading screen instead of a bare spinner
+
+The user asked for a splash screen so the app reads as "eLearn" from the first frame, plus asked about the favicon/icon/logo generally — those already existed (a real icon set and manifest shipped in Feature 42: `/icon-192.png`, `/icon-512.png`, `/icon-512-maskable.png`, `favicon.ico`, `apple-touch-icon`), so the actual gap was `RoutePending.tsx` — this app's single `defaultPendingComponent` (`router.tsx`), which is what's on screen both for a genuine route-loader delay *and* for that first `defaultPendingMs` window right after a cold launch, before the first route's own data has loaded. It previously showed nothing but a bare spinner and "Loading…", unbranded. Added the same `/icon-192.png` mark plus the "eLearn" wordmark (in the app's own display font) above the spinner — kept on the app's ordinary `bg-background` rather than a full-bleed themed takeover (unlike `ResearchConsentGate`'s deliberate full-screen treatment), since this same component reappears on every ordinary route transition, not just the first cold launch, and a full theme change on every navigation would be jarring rather than reassuring.
+
+### How it was validated
+
+`npx tsc --noEmit`, `prettier --write`. Visually verified via a real headless-browser screenshot of the rendered component (a temporary preview route, removed after) — the icon mark, "eLearn" wordmark, and spinner all render cleanly together on the light background, consistent with the rest of the app's look.
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.
