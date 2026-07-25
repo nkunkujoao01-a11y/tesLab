@@ -80,6 +80,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
+  // Supabase's session (and every downloaded model/document this app
+  // caches offline) lives in localStorage/IndexedDB, which browsers are
+  // free to evict under storage pressure — and, on iOS Safari specifically,
+  // proactively clear entirely after 7 days with no top-level visit to the
+  // site (Intelligent Tracking Prevention), the most likely real cause of
+  // "got signed out just from being away a while" on iPhone. Requesting
+  // persistent storage once a real session exists asks the browser to
+  // exempt this origin from that eviction — best-effort only (the browser
+  // can still refuse, e.g. if the user has never interacted with the site
+  // enough to earn it), so this is a mitigation, not a guarantee, and
+  // never blocks anything if the Storage API isn't available at all.
+  useEffect(() => {
+    if (!user) return;
+    if (typeof navigator === "undefined" || !navigator.storage?.persist) return;
+    void navigator.storage.persist().catch(() => {
+      // Silently ignored — a refusal here just means the existing eviction
+      // risk is unchanged, not a new failure this app needs to surface.
+    });
+  }, [user]);
+
   // `loading` must stay true until the profile fetch also resolves — a
   // consumer like the /admin gate reads `!profile?.is_lecturer` the
   // instant `loading` flips, and profile fetching is a separate, later
