@@ -304,12 +304,42 @@
   animation: glow-pulse 2.6s ease-in-out infinite;
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.8); }
+  50% { opacity: 0.9; transform: scale(1.15); }
+}
+
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@utility animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+@utility animate-twinkle {
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+@utility animate-orbit-spin {
+  animation: orbit-spin 22s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-drift,
   .animate-drift-reverse,
   .animate-glow-pulse,
   .animate-shimmer-sweep,
-  .animate-pop-in {
+  .animate-pop-in,
+  .animate-float,
+  .animate-twinkle,
+  .animate-orbit-spin {
     animation: none !important;
   }
 }
