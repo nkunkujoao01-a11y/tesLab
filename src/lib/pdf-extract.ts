@@ -299,6 +299,31 @@ function escapeTableCell(text: string): string {
   return text.trim().replace(/\|/g, "\\|");
 }
 
+// A line with multiple detected cells (see CELL_GAP_RATIO below) that never
+// goes on to confirm as part of a real multi-row table — a single isolated
+// row of widely-spaced fragments, not a genuine table — still had its cells
+// flattened into one continuous string with nothing but an ordinary word-
+// sized space at each boundary, reading as one run-on blob instead of what
+// it visually is: several separate, unrelated short labels. Found via real
+// testing on TestDoc/"Problem Statement.pdf" and "Literature Review- March
+// 2023.pdf", both PowerPoint-style infographic exports whose side-by-side
+// callout-box titles ("Justify Need for Focus" / "Project Reference Point"
+// / "Clearly Define Solution Efforts for Alignment") sit on one visual row
+// with no repeating structure below them to ever confirm as a real table.
+// Rejoining with a clearly visual separator instead of the fragment layer's
+// plain space is what actually reads as "these are distinct items" — this
+// doesn't fix the underlying merge (each cell's own text is still whatever
+// the fragment-clustering pass already decided, so two labels sitting close
+// enough together to never register as separate cells at all are still an
+// open, harder problem), and only ever applies to a line detectTableRows
+// has already looked at and declined to confirm, so a genuine table
+// (rendered via its own separate `| |` markup) is completely unaffected.
+function reconstructOrphanedCellText(line: RawLine): string {
+  if (line.cells.length < 2) return line.text;
+  const cells = line.cells.map((c) => c.trim()).filter(Boolean);
+  return cells.length >= 2 ? cells.join(" — ") : line.text;
+}
+
 // Some PDF table exports (found via a real two-column "Abbreviation | Full
 // Form" glossary/definition table) render each row's two cells with enough
 // vertical offset between them that the same-line y-tolerance above (the
@@ -1101,7 +1126,7 @@ async function extractPdfTextViaPdfJs(
         ? { kind: "table-row" as const, text: line.text, x: line.x, y: line.y, cells: line.cells }
         : {
             kind: classifyLine(line, bodySize, bodyX, bodyFontName),
-            text: line.text,
+            text: reconstructOrphanedCellText(line),
             x: line.x,
             y: line.y,
           },
