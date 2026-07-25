@@ -95,7 +95,7 @@ function UserRow({
               <AlertDialogDescription>
                 {banned
                   ? "This restores their ability to sign in."
-                  : "This immediately blocks their account from signing in or refreshing an existing session. Reversible — you can unban them at any time."}
+                  : "This immediately blocks their account from signing in or refreshing an existing session. Reversible, you can unban them at any time."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -122,7 +122,7 @@ function UserRow({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {user.fullName}'s account?</AlertDialogTitle>
               <AlertDialogDescription>
-                This permanently deletes their account, profile, and everything linked to it —
+                This permanently deletes their account, profile, and everything linked to it:
                 materials read, grades, feedback, messages. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -158,7 +158,7 @@ function SuperAdminUsersPage() {
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {users.length} account{users.length === 1 ? "" : "s"}. Granting super admin access itself
-        stays database-only — there's no in-app control for that.
+        stays database-only; there's no in-app control for that.
       </p>
 
       <div className="mt-5">

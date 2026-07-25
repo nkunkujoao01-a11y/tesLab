@@ -9,7 +9,7 @@ import { useCanShareFiles } from "@/hooks/use-online-status";
 export const Route = createFileRoute("/documents/$docId/notes")({
   head: () => ({
     meta: [
-      { title: "AI notes — eLearn" },
+      { title: "AI notes - eLearn" },
       { name: "description", content: "Cloud-AI-generated study notes for this document." },
     ],
   }),
@@ -73,8 +73,8 @@ function DocumentNotesPage() {
             <NotebookPen className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">Connect free AI notes</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              AI notes use your own free Google AI key — takes about 30 seconds to connect, costs
-              you nothing.
+              AI notes use your own free Google AI key. Takes about 30 seconds to connect, costs you
+              nothing.
             </p>
             <Link
               to="/settings"
@@ -106,7 +106,7 @@ function DocumentNotesPage() {
           <>
             <p className="eyebrow">{doc.pageCount} pages</p>
             <h1 className="mt-3 font-display text-3xl font-medium leading-[1.15] tracking-tight text-prestige-deep lg:text-4xl">
-              {doc.title} — Notes
+              {doc.title} - Notes
             </h1>
 
             <StructuredText

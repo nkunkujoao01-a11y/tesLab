@@ -15,7 +15,7 @@ export const Route = createFileRoute("/admin/super/research")({
 
 function scaleAverage(answers: Record<number, number>): string {
   const values = Object.values(answers);
-  if (values.length === 0) return "—";
+  if (values.length === 0) return "N/A";
   return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
 }
 
@@ -85,10 +85,10 @@ function SuperAdminResearchPage() {
         </button>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        NUST ethics-approved usability study. Collected anonymously — grouped below by a per-device
+        NUST ethics-approved usability study. Collected anonymously, grouped below by a per-device
         random id ("User_XXXX"), not a real identity. Two students sharing a device could
         coincidentally share one id, so this pairing is best-effort, not a guaranteed one-to-one
-        match. There is no name/email column here — none exists to show.
+        match. There is no name/email column here; none exists to show.
       </p>
 
       <div className="mb-6 mt-5 grid grid-cols-3 gap-3">

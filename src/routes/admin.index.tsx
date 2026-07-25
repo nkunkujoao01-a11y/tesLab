@@ -191,7 +191,7 @@ function AdminOverviewPage() {
           <div className="mt-8 flex items-center justify-between border-t border-border/60 pt-4 text-[10.5px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <MessageSquareText className="h-3 w-3" strokeWidth={1.75} />
-              eLearn Admin Console — internal tool, not visible to students
+              eLearn Admin Console: internal tool, not visible to students
             </span>
           </div>
         </>

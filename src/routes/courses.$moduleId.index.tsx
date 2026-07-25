@@ -333,7 +333,7 @@ function ModuleDetail() {
                       <AlertDialogTitle>Remove this download?</AlertDialogTitle>
                       <AlertDialogDescription>
                         {module.title} and all of its downloaded materials will be removed from this
-                        device. You can download it again anytime — nothing is deleted from your
+                        device. You can download it again anytime; nothing is deleted from your
                         account.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -424,8 +424,8 @@ function ModuleDetail() {
                   <>
                     <p className="mt-5 text-sm leading-relaxed text-prestige-cream/70">
                       {module.materials.length > 0
-                        ? "No AI summary yet. Open a material and generate one — it'll show up here."
-                        : "No materials yet — a summary will show up here once one's added and opened."}
+                        ? "No AI summary yet. Open a material and generate one. It'll show up here."
+                        : "No materials yet. A summary will show up here once one's added and opened."}
                     </p>
                     {module.materials.length > 0 && (
                       <div className="mt-6">

@@ -10,7 +10,7 @@ import { isDisposableEmail } from "@/lib/disposable-email-domains";
 export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
-      { title: "Create account — eLearn" },
+      { title: "Create account - eLearn" },
       { name: "description", content: "Create your eLearn account." },
     ],
   }),
@@ -53,7 +53,7 @@ function Signup() {
     setError(null);
     if (isDisposableEmail(email)) {
       setError(
-        "That looks like a temporary/disposable email address — please use a real one you can actually check.",
+        "That looks like a temporary/disposable email address. Please use a real one you can actually check.",
       );
       return;
     }

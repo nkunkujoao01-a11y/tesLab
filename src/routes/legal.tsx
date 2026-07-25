@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 export const Route = createFileRoute("/legal")({
   head: () => ({
     meta: [
-      { title: "Terms & Privacy — eLearn" },
+      { title: "Terms & Privacy - eLearn" },
       { name: "description", content: "Terms of use and privacy policy for eLearn." },
     ],
   }),
@@ -46,7 +46,7 @@ function LegalPage() {
         <Section title="What this app is">
           <p>
             eLearn is a study platform built for Namibia University of Science and Technology (NUST)
-            students — offline-first course materials, AI-generated summaries/quizzes/ flashcards,
+            students: offline-first course materials, AI-generated summaries/quizzes/ flashcards,
             and (for students who connect their real NUST credentials) a live sync of your actual
             enrolled courses, materials, and grades from NUST eLearning (Moodle).
           </p>
@@ -56,13 +56,13 @@ function LegalPage() {
           <p>
             You can sign in with an email and password, a Google account, or your NUST student
             number and password. Signing in with your NUST student number links your account to a
-            system-generated address ending in "@nust-student.invalid" — this is never a real,
+            system-generated address ending in "@nust-student.invalid". This is never a real,
             reachable email address, only an internal identifier; it's never shown to other
             students.
           </p>
           <p>
-            Your profile stores your name, program, university, and faculty — shown to you and, for
-            a module you're enrolled in, to the lecturer(s) administering it.
+            Your profile stores your name, program, university, and faculty, shown to you and, for a
+            module you're enrolled in, to the lecturer(s) administering it.
           </p>
         </Section>
 
@@ -70,8 +70,8 @@ function LegalPage() {
           <p>
             Downloaded course materials, generated summaries, quizzes, and flashcards, and your
             uploaded personal documents are kept on your own device (in your browser's local
-            storage) so the app works offline. Some of this — your uploaded documents' extracted
-            text and summaries, your reading progress, and your activity history — also syncs to our
+            storage) so the app works offline. Some of this (your uploaded documents' extracted text
+            and summaries, your reading progress, and your activity history) also syncs to our
             servers (hosted on Supabase) so it follows you across your own devices. Nothing you
             store is visible to other students; a lecturer administering a module you're enrolled in
             can see your enrollment, any grades they've recorded for you, your materials-read
@@ -85,7 +85,7 @@ function LegalPage() {
             device (a small AI model downloaded once, never sent anywhere) or, if you connect your
             own free Google AI (Gemini) key in Settings, through Google's cloud AI service using
             your key. We never see or store your cloud AI key in a readable form, and we never use a
-            shared key on your behalf — every cloud request uses your own connected key, and content
+            shared key on your behalf. Every cloud request uses your own connected key, and content
             sent to it is subject to Google's own terms for that service.
           </p>
         </Section>
@@ -107,7 +107,7 @@ function LegalPage() {
           </p>
           <p>
             Separately, this app is also part of a NUST-approved research study on eLearning
-            usability — participation is entirely optional, and any data collected for that study (a
+            usability. Participation is entirely optional, and any data collected for that study (a
             one-time consent response, an optional usability survey) is anonymous: it is never
             linked to your name, student number, or account, only to a random identifier generated
             on your device. See the consent screen shown on your first visit for the full details of

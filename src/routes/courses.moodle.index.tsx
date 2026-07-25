@@ -7,7 +7,7 @@ import { useMoodleConnection } from "@/hooks/use-moodle";
 export const Route = createFileRoute("/courses/moodle/")({
   head: () => ({
     meta: [
-      { title: "My NUST courses — eLearn" },
+      { title: "My NUST courses - eLearn" },
       {
         name: "description",
         content: "Your real enrolled courses, materials, and grades from NUST eLearning.",
@@ -60,7 +60,7 @@ function MoodleCourses() {
             <p className="mt-2 max-w-[38ch] mx-auto text-sm text-muted-foreground">
               {moodle.lastSyncAt
                 ? "Your NUST eLearning account is connected, but no enrolled courses came back from the last sync."
-                : "Your courses will appear here after the first automatic sync — this can take a little while."}
+                : "Your courses will appear here after the first automatic sync. This can take a little while."}
             </p>
           </div>
         ) : (

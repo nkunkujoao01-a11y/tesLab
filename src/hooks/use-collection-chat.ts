@@ -183,7 +183,7 @@ export function useSendCollectionMessage(collectionId: string, documents: Retrie
           const docTitles = documents.map((d) => `"${d.title}"`).join(", ");
           response =
             documents.length > 0
-              ? `I couldn't find anything in this collection specifically about that. This collection has: ${docTitles}. Try asking something more specific — for example, "What does ${documents[0].title} say about..."`
+              ? `I couldn't find anything in this collection specifically about that. This collection has: ${docTitles}. Try asking something more specific, for example, "What does ${documents[0].title} say about..."`
               : "This collection doesn't have any documents yet, so there's nothing for me to look through.";
         } else {
           // A single document is grounded on its own full text (capped),

@@ -43,7 +43,7 @@ import {
 export const Route = createFileRoute("/documents/collections/$collectionId/chat")({
   head: () => ({
     meta: [
-      { title: "Ask this collection — eLearn" },
+      { title: "Ask this collection - eLearn" },
       {
         name: "description",
         content: "Ask questions grounded in every document in this collection.",
@@ -145,7 +145,7 @@ function CollectionChat() {
             <FileText className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No documents yet</p>
             <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-              Add at least one document to this collection before asking it questions — there's
+              Add at least one document to this collection before asking it questions. There's
               nothing to ground answers in yet.
             </p>
             <Link
@@ -167,7 +167,7 @@ function CollectionChat() {
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 <p>
                   The AI didn't finish {staleAiOperation.op === "load" ? "loading" : "generating"}{" "}
-                  {staleAiOperation.modelLabel} last time — this can happen if the app closed or
+                  {staleAiOperation.modelLabel} last time. This can happen if the app closed or
                   crashed. If that keeps happening, try a smaller model in Profile &gt; AI Settings,
                   or connect a free cloud AI key so answers don't rely on this device at all.
                 </p>
@@ -180,7 +180,7 @@ function CollectionChat() {
                   strokeWidth={1.75}
                 />
                 <p>
-                  Answering with your connected cloud AI — going offline will need the on-device
+                  Answering with your connected cloud AI. Going offline will need the on-device
                   model instead.
                 </p>
               </div>
@@ -189,7 +189,7 @@ function CollectionChat() {
               <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
                 <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about {members.length === 1 ? "this document" : "these documents"} — answers
+                  Ask about {members.length === 1 ? "this document" : "these documents"}. Answers
                   are grounded in {members.length === 1 ? "its" : "their"} actual text.
                 </p>
               </div>

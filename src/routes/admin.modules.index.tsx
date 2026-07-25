@@ -95,7 +95,7 @@ function AdminModulesPage() {
                 {modules?.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-xs text-muted-foreground">
-                      No modules yet — create one to get started.
+                      No modules yet. Create one to get started.
                     </td>
                   </tr>
                 )}

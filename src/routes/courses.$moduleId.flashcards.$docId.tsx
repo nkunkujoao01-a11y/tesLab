@@ -100,7 +100,7 @@ function MaterialFlashcardsPage() {
             <Layers className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No flashcards yet</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Go back to the reader and tap "Cards" — they'll show up here.
+              Go back to the reader and tap "Cards". They'll show up here.
             </p>
             <Link
               to="/courses/$moduleId/read/$docId"

@@ -165,7 +165,7 @@ export function MobileShell({ children }: { children: ReactNode }) {
         {!isOnline && (
           <div className="flex items-center justify-center gap-2 bg-prestige-deep px-4 py-2 text-[11px] font-medium uppercase tracking-widest text-prestige-cream">
             <WifiOff className="h-3.5 w-3.5 text-prestige-gold" strokeWidth={1.75} />
-            Offline mode — showing downloaded content
+            Offline mode, showing downloaded content
           </div>
         )}
         {storageLow && (
@@ -174,7 +174,7 @@ export function MobileShell({ children }: { children: ReactNode }) {
             className="flex items-center justify-center gap-2 bg-destructive px-4 py-2 text-[11px] font-medium uppercase tracking-widest text-destructive-foreground"
           >
             <TriangleAlert className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Low on device storage — {formatMb(storageQuota.availableMb)} left. Tap to review
+            Low on device storage: {formatMb(storageQuota.availableMb)} left. Tap to review
             downloads.
           </Link>
         )}

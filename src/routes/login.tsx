@@ -10,7 +10,7 @@ import { loginWithNust } from "@/lib/moodle-cloud";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — eLearn" },
+      { title: "Sign in - eLearn" },
       { name: "description", content: "Sign in to your eLearn account." },
     ],
   }),
@@ -64,7 +64,7 @@ function Login() {
         result.reason === "invalid_credentials"
           ? "Those NUST eLearning credentials weren't accepted. Check your student number and password."
           : result.reason === "rate_limited"
-            ? "Too many attempts — wait a few minutes before trying again."
+            ? "Too many attempts. Wait a few minutes before trying again."
             : "Couldn't sign in right now. Try again in a moment.",
       );
       return;

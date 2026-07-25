@@ -4,7 +4,7 @@ import { AdminShell } from "@/components/AdminShell";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
-    meta: [{ title: "Admin console — eLearn" }],
+    meta: [{ title: "Admin console - eLearn" }],
   }),
   component: AdminLayout,
 });

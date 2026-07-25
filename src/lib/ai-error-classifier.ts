@@ -66,10 +66,10 @@ export function isFatalCategory(category: ModelErrorCategory): boolean {
  * naturally in each caller's context. */
 export function fatalErrorUserMessage(category: ModelErrorCategory, featureLabel: string): string {
   if (category === "fatal-unsupported") {
-    return `This device can't run the current AI model for ${featureLabel} — try a different model in Profile > AI Settings.`;
+    return `This device can't run the current AI model for ${featureLabel}. Try a different model in Profile > AI Settings.`;
   }
   if (category === "fatal-oom") {
-    return `The AI ran low on memory generating ${featureLabel} — try closing other tabs/apps, or a smaller model in Profile > AI Settings.`;
+    return `The AI ran low on memory generating ${featureLabel}. Try closing other tabs/apps, or a smaller model in Profile > AI Settings.`;
   }
   return `Couldn't generate ${featureLabel}. Try again.`;
 }

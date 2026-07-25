@@ -197,7 +197,7 @@ export function useSubmitResearchSurvey() {
       try {
         await submitResearchSurvey(answers);
         await getUserDb(user.id).syncMeta.put({ key: SURVEY_COMPLETED_KEY, value: "true" });
-        toast.success("Thanks for completing the survey — it genuinely helps.");
+        toast.success("Thanks for completing the survey, it genuinely helps.");
         return true;
       } catch (err) {
         console.error("Failed to submit research survey", err);
@@ -248,7 +248,7 @@ export function useSubmitAnonymousSuggestion() {
       setSubmitting(true);
       try {
         await submitAnonymousSuggestion(message);
-        toast.success("Thanks — sent anonymously.");
+        toast.success("Thanks, sent anonymously.");
         return true;
       } catch (err) {
         console.error("Failed to submit anonymous suggestion", err);

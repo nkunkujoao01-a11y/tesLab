@@ -65,7 +65,7 @@ export function useCloudAiKey(): CloudAiKeyState {
       const message = err instanceof Error ? err.message : "";
       toast.error(
         message.includes("encryption secret is not configured")
-          ? "Cloud AI isn't set up on this deployment yet — an admin needs to configure the key encryption secret (see supabase/migrations/0014_ai_provider_keys.sql)."
+          ? "Cloud AI isn't set up on this deployment yet. An admin needs to configure the key encryption secret (see supabase/migrations/0014_ai_provider_keys.sql)."
           : "Couldn't save that key. Try again.",
       );
       return false;

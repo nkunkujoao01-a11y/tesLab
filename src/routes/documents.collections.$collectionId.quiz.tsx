@@ -20,7 +20,7 @@ import { QuizPanel } from "@/components/QuizFlashcards";
 export const Route = createFileRoute("/documents/collections/$collectionId/quiz")({
   head: () => ({
     meta: [
-      { title: "Quiz — eLearn" },
+      { title: "Quiz - eLearn" },
       { name: "description", content: "An AI-generated quiz for this collection." },
     ],
   }),
@@ -97,7 +97,7 @@ function CollectionQuizPage() {
             <ListChecks className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No quiz yet</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Go back to the collection and tap "Quiz for this collection" — it'll show up here.
+              Go back to the collection and tap "Quiz for this collection". It'll show up here.
             </p>
             <Link
               to="/documents/collections/$collectionId"

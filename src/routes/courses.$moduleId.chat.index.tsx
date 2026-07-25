@@ -174,7 +174,7 @@ function ModuleChat() {
             <CloudDownload className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No downloaded materials</p>
             <p className="mt-2 max-w-[36ch] mx-auto text-sm text-muted-foreground">
-              Download at least one material in this module first — asking AI about it needs the
+              Download at least one material in this module first. Asking AI about it needs the
               actual text on this device.
             </p>
             <Link
@@ -196,7 +196,7 @@ function ModuleChat() {
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 <p>
                   The AI didn't finish {staleAiOperation.op === "load" ? "loading" : "generating"}{" "}
-                  {staleAiOperation.modelLabel} last time — this can happen if the app closed or
+                  {staleAiOperation.modelLabel} last time. This can happen if the app closed or
                   crashed. If that keeps happening, try a smaller model in Profile &gt; AI Settings,
                   or connect a free cloud AI key so answers don't rely on this device at all.
                 </p>
@@ -209,7 +209,7 @@ function ModuleChat() {
                   strokeWidth={1.75}
                 />
                 <p>
-                  Answering with your connected cloud AI — going offline will need the on-device
+                  Answering with your connected cloud AI. Going offline will need the on-device
                   model instead.
                 </p>
               </div>
@@ -218,7 +218,7 @@ function ModuleChat() {
               <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
                 <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about anything in this module — answers are grounded across {documents.length}{" "}
+                  Ask about anything in this module. Answers are grounded across {documents.length}{" "}
                   downloaded {documents.length === 1 ? "material" : "materials"}, not just one.
                 </p>
                 <div className="mx-auto mt-4 flex max-w-[36ch] flex-wrap justify-center gap-1.5">

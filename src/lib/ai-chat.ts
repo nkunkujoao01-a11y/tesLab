@@ -87,7 +87,7 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
     dtype: "fp32",
     label: "SmolLM2 (360M)",
     description:
-      "The default — chosen for reliability, not speed. Runs at full precision, which two different quantized exports failed on for this model — a real, if large and slow, tradeoff. If it's freezing or crashing, connect a free cloud AI key in Settings instead of relying on this device.",
+      "The default, chosen for reliability, not speed. Runs at full precision, which two different quantized exports failed on for this model (a real, if large and slow, tradeoff). If it's freezing or crashing, connect a free cloud AI key in Settings instead of relying on this device.",
     approxSizeMb: 1450,
   },
   // Real-device testing also reported the device crashing during this
@@ -109,7 +109,7 @@ export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
     // *smaller* download of the two again, despite Gemma having nearly 3x
     // the parameters — corrected rather than left saying the opposite.
     description:
-      "More capable (nearly 3x the parameters), and actually a smaller download than the default thanks to quantization. Some devices have crashed during this download — if that happens, switch back to SmolLM2 and reload.",
+      "More capable (nearly 3x the parameters), and actually a smaller download than the default thanks to quantization. Some devices have crashed during this download. If that happens, switch back to SmolLM2 and reload.",
     approxSizeMb: 859,
   },
 };

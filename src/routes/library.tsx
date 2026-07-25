@@ -7,7 +7,7 @@ import { useAllFlashcardSets, useAllQuizzes } from "@/hooks/use-quiz";
 export const Route = createFileRoute("/library")({
   head: () => ({
     meta: [
-      { title: "Quiz & flashcard library — eLearn" },
+      { title: "Quiz & flashcard library - eLearn" },
       {
         name: "description",
         content: "Every quiz and flashcard set you've generated, in one place.",
@@ -97,7 +97,7 @@ function QuizLibrary() {
             <FileQuestion className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">Nothing generated yet</p>
             <p className="mt-2 max-w-[40ch] mx-auto text-sm text-muted-foreground">
-              Open a document and generate flashcards or a quiz — they'll show up here afterward,
+              Open a document and generate flashcards or a quiz. They'll show up here afterward,
               grouped by collection.
             </p>
           </div>

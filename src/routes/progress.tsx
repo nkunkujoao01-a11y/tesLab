@@ -29,11 +29,11 @@ export const Route = createFileRoute("/progress")({
   loader: () => fetchModules(),
   head: () => ({
     meta: [
-      { title: "Progress — eLearn" },
+      { title: "Progress - eLearn" },
       {
         name: "description",
         content:
-          "A quiet record of the reading you actually did — modules, chapters, streaks, and rank.",
+          "A quiet record of the reading you actually did: modules, chapters, streaks, and rank.",
       },
     ],
   }),
@@ -78,7 +78,7 @@ function WeeklyGoalCard() {
       ) : (
         <>
           <p className="mt-2 text-sm text-muted-foreground">
-            Set a personal goal for how many days you want to study this week — just for you, nobody
+            Set a personal goal for how many days you want to study this week, just for you, nobody
             else sees this.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -288,7 +288,7 @@ function ProgressPage() {
                   <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                   <p>
                     Lowest quiz average: <strong>{quizInsights.weakestModule.title}</strong> at{" "}
-                    {Math.round(quizInsights.weakestModule.avgPct * 100)}% — worth another pass.
+                    {Math.round(quizInsights.weakestModule.avgPct * 100)}%, worth another pass.
                   </p>
                 </div>
               )}

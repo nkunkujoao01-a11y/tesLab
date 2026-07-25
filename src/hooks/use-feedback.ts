@@ -58,7 +58,7 @@ export function useSubmitFeedback() {
           const { error } = await withTimeout(
             supabase.storage.from("feedback-images").upload(path, image.file),
             IMAGE_UPLOAD_TIMEOUT_MS,
-            "Uploading an image is taking too long — check your connection and try again.",
+            "Uploading an image is taking too long. Check your connection and try again.",
           );
           if (error) throw error;
           imagePaths.push(path);
@@ -77,7 +77,7 @@ export function useSubmitFeedback() {
         });
         if (error) throw error;
 
-        toast.success("Thanks — your feedback has been sent.");
+        toast.success("Thanks, your feedback has been sent.");
         return true;
       } catch (err) {
         console.error("Failed to submit feedback", err);

@@ -110,7 +110,7 @@ function armTimeout(requestId: string, entry: PendingRequest, timeoutMs: number)
     void cancelRequest(requestId);
     entry.reject(
       new Error(
-        "The AI model is taking too long to respond — this device may be too slow for on-device generation right now.",
+        "The AI model is taking too long to respond. This device may be too slow for on-device generation right now.",
       ),
     );
   }, timeoutMs);

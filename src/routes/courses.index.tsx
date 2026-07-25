@@ -19,7 +19,7 @@ export const Route = createFileRoute("/courses/")({
   loader: () => fetchModules(),
   head: () => ({
     meta: [
-      { title: "Library — eLearn" },
+      { title: "Library - eLearn" },
       {
         name: "description",
         content:
@@ -75,7 +75,7 @@ function Courses() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-prestige-deep">My documents</p>
               <p className="text-[11px] text-muted-foreground">
-                Upload your own PDFs — extracted and summarised on this device
+                Upload your own PDFs, extracted and summarised on this device
               </p>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={2} />

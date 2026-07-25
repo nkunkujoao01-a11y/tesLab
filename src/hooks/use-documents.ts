@@ -132,7 +132,7 @@ export function useUploadDocument() {
       const sizeMb = file.size / (1024 * 1024);
       if (sizeMb > MAX_UPLOAD_MB) {
         toast.error(
-          `That PDF is too large (${sizeMb.toFixed(1)} MB) — the limit is ${MAX_UPLOAD_MB} MB.`,
+          `That PDF is too large (${sizeMb.toFixed(1)} MB). The limit is ${MAX_UPLOAD_MB} MB.`,
         );
         return;
       }
@@ -254,7 +254,7 @@ export function useDeletePersonalDocument() {
       if (error) {
         console.error("Failed to remove document from other devices", error);
         toast.error(
-          "Removed here — will finish removing it from your other devices once back online.",
+          "Removed here. Will finish removing it from your other devices once back online.",
         );
       } else {
         await db.pendingDeletions.delete(`personal_document::${id}`);
@@ -500,7 +500,7 @@ export function useDeleteCollection() {
       if (error) {
         console.error("Failed to remove collection from other devices", error);
         toast.error(
-          "Removed here — will finish removing it from your other devices once back online.",
+          "Removed here. Will finish removing it from your other devices once back online.",
         );
       } else {
         await db.pendingDeletions.delete(`document_collection::${id}`);

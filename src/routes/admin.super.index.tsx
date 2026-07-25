@@ -161,7 +161,7 @@ function SuperAdminOverviewPage() {
             <div className="border-b border-border/60 px-4 py-3.5">
               <p className="text-sm font-medium text-prestige-deep">Device & sessions</p>
               <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                Avg {data?.avgSessionMinutes ?? "—"} min/session
+                Avg {data?.avgSessionMinutes ?? "N/A"} min/session
               </p>
             </div>
             <div>

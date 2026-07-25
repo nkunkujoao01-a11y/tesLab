@@ -251,7 +251,7 @@ function DocumentDetail() {
               {pullQuote}
             </p>
             <figcaption className="mt-3 text-[11px] uppercase tracking-widest text-prestige-mid">
-              — From this document
+              From this document
             </figcaption>
           </figure>
         )}
@@ -328,7 +328,7 @@ function DocumentDetail() {
 
         {isGeneratingQuiz && (
           <p className="mt-6 text-center text-[11px] text-muted-foreground">
-            Writing a quiz question by question can take a few minutes on this device — this is
+            Writing a quiz question by question can take a few minutes on this device. This is
             genuinely working, not stuck.
           </p>
         )}
@@ -339,7 +339,7 @@ function DocumentDetail() {
             <Link to="/settings" className="gold-underline font-medium text-prestige-deep">
               free cloud AI key
             </Link>{" "}
-            (while online) or the on-device assistant — download it from the{" "}
+            (while online) or the on-device assistant. Download it from the{" "}
             <Link to="/assistant" className="gold-underline font-medium text-prestige-deep">
               Ask AI
             </Link>{" "}

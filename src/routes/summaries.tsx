@@ -11,7 +11,7 @@ export const Route = createFileRoute("/summaries")({
   loader: () => fetchModules(),
   head: () => ({
     meta: [
-      { title: "Summaries — eLearn" },
+      { title: "Summaries - eLearn" },
       {
         name: "description",
         content: "Every AI summary you have generated, kept alongside its source module.",
@@ -67,7 +67,7 @@ function Summaries() {
             <Sparkles className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No summaries yet</p>
             <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-              Open a downloaded material and tap "Summarise this page" — it'll show up here.
+              Open a downloaded material and tap "Summarise this page" and it'll show up here.
             </p>
             <Link
               to="/courses"

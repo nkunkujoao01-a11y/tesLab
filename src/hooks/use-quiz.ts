@@ -481,7 +481,7 @@ export function useGenerateQuiz() {
         // never partially under-delivers this way.
         if (!usedCloud && questions.length < questionCount) {
           toast.warning(
-            `Generated ${questions.length} of ${questionCount} questions — the rest timed out on this device. Connecting a free cloud AI key (Settings) avoids this.`,
+            `Generated ${questions.length} of ${questionCount} questions. The rest timed out on this device. Connecting a free cloud AI key (Settings) avoids this.`,
           );
         }
         await getUserDb(user.id).generatedQuizzes.put({

@@ -94,15 +94,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "eLearn — Study anywhere, even offline" },
+      { title: "eLearn - Study anywhere, even offline" },
       {
         name: "description",
         content:
-          "A mobile-first learning platform for university students. Download modules, generate AI summaries, and track progress — online or off.",
+          "A mobile-first learning platform for university students. Download modules, generate AI summaries, and track progress, online or off.",
       },
       { name: "author", content: "eLearn" },
       { name: "theme-color", content: "#064e3b" },
-      { property: "og:title", content: "eLearn — Study anywhere, even offline" },
+      { property: "og:title", content: "eLearn - Study anywhere, even offline" },
       {
         property: "og:description",
         content:

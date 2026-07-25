@@ -49,7 +49,7 @@ import { useClearCache } from "@/hooks/use-clear-cache";
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "AI settings — eLearn" },
+      { title: "AI settings - eLearn" },
       { name: "description", content: "Manage on-device AI models and your free cloud AI key." },
     ],
   }),
@@ -118,8 +118,8 @@ function Settings() {
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
             <p>
               The AI didn't finish {staleAiOperation.op === "load" ? "loading" : "generating"}{" "}
-              {staleAiOperation.modelLabel} last time — this can happen if the app closed or
-              crashed. If that keeps happening, try a smaller model below.
+              {staleAiOperation.modelLabel} last time. This can happen if the app closed or crashed.
+              If that keeps happening, try a smaller model below.
             </p>
           </div>
         )}
@@ -133,7 +133,7 @@ function Settings() {
             <div className="min-w-0">
               <p className="text-sm font-medium text-prestige-deep">Free cloud AI</p>
               <p className="text-[11px] text-muted-foreground">
-                Better quizzes, flashcards, notes, and summaries when you're online — uses your own
+                Better quizzes, flashcards, notes, and summaries when you're online. Uses your own
                 free Google AI key, never a shared one, so it stays free no matter how many students
                 use it.
               </p>
@@ -209,7 +209,7 @@ function Settings() {
                         <span className="font-semibold text-prestige-deep">
                           "Welcome to AI Studio"
                         </span>{" "}
-                        — tick the agreement checkbox (you're a developer using the free API — this
+                        : tick the agreement checkbox (you're a developer using the free API, this
                         is normal, not a paid signup) and click{" "}
                         <span className="font-semibold text-prestige-deep">Continue</span>. The
                         email updates checkbox is optional, skip it if you want.
@@ -229,7 +229,7 @@ function Settings() {
                         3
                       </span>
                       <p className="text-[12px] leading-relaxed text-foreground/85">
-                        A "Create a new key" popup appears — type any name (e.g.{" "}
+                        A "Create a new key" popup appears: type any name (e.g.{" "}
                         <span className="font-semibold text-prestige-deep">Gemini API Key</span>),
                         leave the project as{" "}
                         <span className="font-semibold text-prestige-deep">
@@ -247,7 +247,7 @@ function Settings() {
                         A second popup shows your new key. Click the small copy icon next to it (or
                         select and copy the text starting with{" "}
                         <span className="font-semibold text-prestige-deep">AQ.</span> or{" "}
-                        <span className="font-semibold text-prestige-deep">AIza</span>) — then come
+                        <span className="font-semibold text-prestige-deep">AIza</span>), then come
                         back to this page and paste it below.
                       </p>
                     </li>
@@ -271,7 +271,7 @@ function Settings() {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {!isOnline
-                    ? "You're offline — reconnect to save your key."
+                    ? "You're offline, reconnect to save your key."
                     : "Free, no credit card. Your key is encrypted and only ever usable by your own account."}
                 </p>
               </form>
@@ -288,7 +288,7 @@ function Settings() {
             <div className="min-w-0">
               <p className="text-sm font-medium text-prestige-deep">NUST eLearning</p>
               <p className="text-[11px] text-muted-foreground">
-                Pull in your real courses, materials, and grades from elearning.nust.na — your
+                Pull in your real courses, materials, and grades from elearning.nust.na. Your
                 password is sent once to connect and never stored, only a revocable access token is.
               </p>
             </div>
@@ -316,7 +316,7 @@ function Settings() {
                   <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
                     <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                     <p>
-                      Your NUST eLearning connection needs to be reconnected — your access token was
+                      Your NUST eLearning connection needs to be reconnected. Your access token was
                       revoked or expired. Disconnect, then connect again below.
                     </p>
                   </div>
@@ -325,7 +325,7 @@ function Settings() {
                 <p className="text-[11px] text-muted-foreground">
                   {moodle.lastSyncAt
                     ? `Last synced ${new Date(moodle.lastSyncAt).toLocaleString()}`
-                    : "Not synced yet — your courses will appear after the first sync."}
+                    : "Not synced yet. Your courses will appear after the first sync."}
                 </p>
               </div>
             ) : (
@@ -376,7 +376,7 @@ function Settings() {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {!isOnline
-                    ? "You're offline — reconnect to connect your account."
+                    ? "You're offline, reconnect to connect your account."
                     : "Same login you use at elearning.nust.na. Sent once to connect, never stored."}
                 </p>
               </form>
@@ -411,8 +411,8 @@ function Settings() {
                   <div className="animate-rise mt-3 flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
                     <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                     <p>
-                      This device couldn't save the model for offline reuse — it works right now,
-                      but may need to redownload after you leave while offline.
+                      This device couldn't save the model for offline reuse. It works right now, but
+                      may need to redownload after you leave while offline.
                     </p>
                   </div>
                 )}
@@ -429,10 +429,10 @@ function Settings() {
                   />
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  {finalizing ? "Finishing up — almost there…" : `Downloading… ${progress}%`}
+                  {finalizing ? "Finishing up, almost there…" : `Downloading… ${progress}%`}
                 </p>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Keep this tab open and in view — switching apps or letting the screen lock can
+                  Keep this tab open and in view. Switching apps or letting the screen lock can
                   interrupt the download and restart it from zero.
                 </p>
               </div>
@@ -456,8 +456,8 @@ function Settings() {
                 )}
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   {!isOnline
-                    ? "You're offline — reconnect to download the model."
-                    : "Until downloaded, summaries use a fast built-in fallback — no download required."}
+                    ? "You're offline, reconnect to download the model."
+                    : "Until downloaded, summaries use a fast built-in fallback, no download required."}
                 </p>
               </div>
             )}
@@ -528,8 +528,8 @@ function Settings() {
                   <div className="animate-rise mt-3 flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
                     <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                     <p>
-                      This device couldn't save the assistant for offline reuse — it works right
-                      now, but may need to redownload after you leave while offline.
+                      This device couldn't save the assistant for offline reuse. It works right now,
+                      but may need to redownload after you leave while offline.
                     </p>
                   </div>
                 )}
@@ -547,11 +547,11 @@ function Settings() {
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   {chatFinalizing
-                    ? "Finishing up — almost there…"
+                    ? "Finishing up, almost there…"
                     : `Downloading ${CHAT_MODELS[chatModelChoice].label}… ${chatProgress}%`}
                 </p>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Keep this tab open and in view — switching apps or letting the screen lock can
+                  Keep this tab open and in view. Switching apps or letting the screen lock can
                   interrupt the download and restart it from zero.
                 </p>
               </div>
@@ -585,9 +585,9 @@ function Settings() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Download Gemma 3 (1B)?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This model has caused some devices to crash during download — closing
-                          other tabs/apps first may help. If it happens to you, SmolLM2 is smaller
-                          and hasn't had this problem.
+                          This model has caused some devices to crash during download. Closing other
+                          tabs/apps first may help. If it happens to you, SmolLM2 is smaller and
+                          hasn't had this problem.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -622,7 +622,7 @@ function Settings() {
                 )}
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   {!isOnline
-                    ? "You're offline — reconnect to download the model."
+                    ? "You're offline, reconnect to download the model."
                     : "Until downloaded, Ask AI and on-device quiz generation aren't available."}
                 </p>
               </div>
@@ -639,7 +639,7 @@ function Settings() {
             <div className="min-w-0">
               <p className="text-sm font-medium text-prestige-deep">Clear cache &amp; reload</p>
               <p className="text-[11px] text-muted-foreground">
-                Fixes a broken/unstyled page after an update — re-downloads everything fresh. Your
+                Fixes a broken/unstyled page after an update. Re-downloads everything fresh. Your
                 downloads, progress, and account aren't affected.
               </p>
             </div>

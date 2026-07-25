@@ -28,7 +28,7 @@ export const Route = createFileRoute("/dashboard")({
   loader: () => fetchModules(),
   head: () => ({
     meta: [
-      { title: "Dashboard — eLearn" },
+      { title: "Dashboard - eLearn" },
       {
         name: "description",
         content:

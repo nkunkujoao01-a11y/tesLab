@@ -7,7 +7,7 @@ import { groupIntoParagraphs } from "@/lib/summarize";
 export const Route = createFileRoute("/documents/$docId/summary")({
   head: () => ({
     meta: [
-      { title: "Summary — eLearn" },
+      { title: "Summary - eLearn" },
       { name: "description", content: "A structured, section-by-section AI summary." },
     ],
   }),
@@ -68,7 +68,7 @@ function DocumentSummaryPage() {
             <Sparkles className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No summary yet</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Go back to the document and tap "Summarise" — it'll show up here.
+              Go back to the document and tap "Summarise". It'll show up here.
             </p>
             <Link
               to="/documents/$docId"

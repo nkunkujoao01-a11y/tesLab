@@ -23,7 +23,7 @@ import { FlashcardDeck } from "@/components/QuizFlashcards";
 export const Route = createFileRoute("/documents/collections/$collectionId/flashcards")({
   head: () => ({
     meta: [
-      { title: "Flashcards — eLearn" },
+      { title: "Flashcards - eLearn" },
       { name: "description", content: "AI-generated flashcards for this collection." },
     ],
   }),
@@ -97,7 +97,7 @@ function CollectionFlashcardsPage() {
             <Layers className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No flashcards yet</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Go back to the collection and tap "Flashcards for this collection" — they'll show up
+              Go back to the collection and tap "Flashcards for this collection". They'll show up
               here.
             </p>
             <Link

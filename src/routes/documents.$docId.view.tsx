@@ -6,7 +6,7 @@ import { usePersonalDocument, usePersonalDocumentFile } from "@/hooks/use-docume
 export const Route = createFileRoute("/documents/$docId/view")({
   head: () => ({
     meta: [
-      { title: "View PDF — eLearn" },
+      { title: "View PDF - eLearn" },
       { name: "description", content: "View the original PDF exactly as uploaded." },
     ],
   }),
@@ -73,8 +73,8 @@ function DocumentViewPage() {
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <CloudDownload className="h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="text-sm text-muted-foreground">
-              The original file isn't available on this device — it may not have been saved when
-              this document was uploaded (usually due to low device storage at the time).
+              The original file isn't available on this device. It may not have been saved when this
+              document was uploaded (usually due to low device storage at the time).
             </p>
           </div>
         ) : (

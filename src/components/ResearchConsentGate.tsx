@@ -99,8 +99,8 @@ export function ResearchConsentGate() {
               Any data collected (questionnaire answers and system logs) will be kept confidential.
             </p>
             <p>
-              No personal information that can identify you — like your name or student number —
-              will be collected.
+              No personal information that can identify you, like your name or student number, will
+              be collected.
             </p>
             <p>
               All data will be stored on a password-protected computer accessible only to the
@@ -155,7 +155,7 @@ export function ResearchConsentGate() {
           </button>
         </div>
         <p className="mt-4 text-center text-[11px] text-prestige-cream/40 sm:text-right">
-          You can use eLearn either way — this only affects the research study itself.
+          You can use eLearn either way. This only affects the research study itself.
         </p>
       </div>
     </div>

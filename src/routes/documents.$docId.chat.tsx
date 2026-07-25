@@ -33,7 +33,7 @@ import {
 export const Route = createFileRoute("/documents/$docId/chat")({
   head: () => ({
     meta: [
-      { title: "Ask AI about this document — eLearn" },
+      { title: "Ask AI about this document - eLearn" },
       { name: "description", content: "Ask questions grounded in this document's actual text." },
     ],
   }),
@@ -141,7 +141,7 @@ function DocumentChat() {
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 <p>
                   The AI didn't finish {staleAiOperation.op === "load" ? "loading" : "generating"}{" "}
-                  {staleAiOperation.modelLabel} last time — this can happen if the app closed or
+                  {staleAiOperation.modelLabel} last time. This can happen if the app closed or
                   crashed. If that keeps happening, try a smaller model in Profile &gt; AI Settings,
                   or connect a free cloud AI key so answers don't rely on this device at all.
                 </p>
@@ -154,7 +154,7 @@ function DocumentChat() {
                   strokeWidth={1.75}
                 />
                 <p>
-                  Answering with your connected cloud AI — going offline will need the on-device
+                  Answering with your connected cloud AI. Going offline will need the on-device
                   model instead.
                 </p>
               </div>
@@ -163,7 +163,7 @@ function DocumentChat() {
               <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
                 <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about this document — answers are grounded in its actual text.
+                  Ask about this document. Answers are grounded in its actual text.
                 </p>
               </div>
             )}

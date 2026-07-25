@@ -19,7 +19,7 @@ export function ChatModelDownloadPrompt() {
         </div>
         <p className="mt-4 font-display text-lg text-prestige-deep">On-device study assistant</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          A small AI model that downloads once and then answers questions entirely on this device —
+          A small AI model that downloads once and then answers questions entirely on this device,
           no internet needed afterward. It's genuinely more limited than commercial AI like ChatGPT,
           in exchange for being free, private, and fully offline.
         </p>
@@ -33,10 +33,10 @@ export function ChatModelDownloadPrompt() {
               />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              {finalizing ? "Finishing up — almost there…" : `Downloading… ${progress}%`}
+              {finalizing ? "Finishing up, almost there…" : `Downloading… ${progress}%`}
             </p>
             <p className="mt-3 text-[11px] text-muted-foreground">
-              Keep this tab open and in view — switching apps or letting the screen lock can
+              Keep this tab open and in view. Switching apps or letting the screen lock can
               interrupt the download and restart it from zero.
             </p>
           </div>
@@ -59,7 +59,7 @@ export function ChatModelDownloadPrompt() {
             )}
             {!isOnline && (
               <p className="mt-3 text-[11px] text-muted-foreground">
-                You're offline — reconnect to download.
+                You're offline. Reconnect to download.
               </p>
             )}
           </>

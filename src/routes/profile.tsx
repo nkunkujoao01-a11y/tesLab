@@ -69,7 +69,7 @@ const KIND_LABELS: Record<string, string> = {
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "Profile — eLearn" },
+      { title: "Profile - eLearn" },
       {
         name: "description",
         content: "Manage downloads and your account.",
@@ -218,7 +218,7 @@ function Profile() {
                   <p className="text-sm font-medium text-prestige-deep">Progress sync</p>
                   <p className="text-[11px] text-muted-foreground">
                     {!isOnline
-                      ? "Offline — reconnect to sync"
+                      ? "Offline, reconnect to sync"
                       : syncing
                         ? "Syncing…"
                         : lastSyncedAt
@@ -240,7 +240,7 @@ function Profile() {
             </div>
             <p className="mt-3 text-[11px] text-muted-foreground">
               Reading history, activity, and AI summaries sync automatically when you sign in or
-              come back online — downloaded content itself stays on this device.
+              come back online. Downloaded content itself stays on this device.
             </p>
           </section>
 
@@ -259,7 +259,7 @@ function Profile() {
                       {!persistentStorage.supported
                         ? "Not supported on this browser"
                         : persistentStorage.persisted
-                          ? "Granted — downloads won't be cleared under storage pressure"
+                          ? "Granted, downloads won't be cleared under storage pressure"
                           : "Keeps downloaded modules and AI models from being auto-cleared"}
                     </p>
                   </div>
@@ -289,9 +289,9 @@ function Profile() {
                       {notificationPermission.permission === "unsupported"
                         ? "Not supported on this browser"
                         : notificationPermission.permission === "denied"
-                          ? "Blocked — re-enable in your browser's site settings"
+                          ? "Blocked, re-enable in your browser's site settings"
                           : notificationPermission.permission === "granted"
-                            ? "Granted — you'll be told when a model finishes downloading"
+                            ? "Granted, you'll be told when a model finishes downloading"
                             : "Get notified when an AI model finishes downloading in the background"}
                     </p>
                   </div>
@@ -322,7 +322,7 @@ function Profile() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-prestige-deep">Install eLearn</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Add it to your home screen — faster to open, full offline support
+                  Add it to your home screen, faster to open, full offline support
                 </p>
               </div>
             </div>
@@ -360,7 +360,7 @@ function Profile() {
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Open this page in Chrome or Edge on a computer to install — look for an install
+                  Open this page in Chrome or Edge on a computer to install. Look for an install
                   icon at the right end of the address bar, or this button will appear here once the
                   browser offers it.
                 </p>
@@ -377,7 +377,7 @@ function Profile() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-prestige-deep">Usability study survey</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Optional, anonymous — about 5 minutes, helps the NUST research this app is part of
+                  Optional, anonymous, about 5 minutes, helps the NUST research this app is part of
                 </p>
               </div>
             </div>
@@ -385,7 +385,7 @@ function Profile() {
               {surveyCompleted ? (
                 <p className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
                   <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
-                  Survey completed — thank you
+                  Survey completed, thank you
                 </p>
               ) : (
                 <button
@@ -411,7 +411,7 @@ function Profile() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-prestige-deep">Anonymous suggestion</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Not tied to your account — send an idea or comment anonymously, any time
+                  Not tied to your account, send an idea or comment anonymously, any time
                 </p>
               </div>
             </div>
@@ -444,7 +444,7 @@ function Profile() {
               </div>
               {!isOnline && (
                 <p className="text-[11px] text-muted-foreground">
-                  You're offline — reconnect to send a suggestion.
+                  You're offline, reconnect to send a suggestion.
                 </p>
               )}
             </div>
@@ -459,7 +459,7 @@ function Profile() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-prestige-deep">Send feedback</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Report a problem or suggest an improvement — screenshots help
+                  Report a problem or suggest an improvement, screenshots help
                 </p>
               </div>
             </div>
@@ -561,7 +561,7 @@ function Profile() {
               </div>
               {!isOnline && (
                 <p className="text-[11px] text-muted-foreground">
-                  You're offline — reconnect to send feedback.
+                  You're offline, reconnect to send feedback.
                 </p>
               )}
             </div>

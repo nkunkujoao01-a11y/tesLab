@@ -909,8 +909,8 @@ async function extractPdfTextViaPdfJs(
   if (!text) {
     throw new PdfExtractionError(
       isFullyScanned
-        ? "No text could be read from this PDF, even with OCR — the scan may be too unclear, or these pages may genuinely be blank."
-        : "No text could be extracted — this PDF may be scanned images rather than real text.",
+        ? "No text could be read from this PDF, even with OCR. The scan may be too unclear, or these pages may genuinely be blank."
+        : "No text could be extracted. This PDF may be scanned images rather than real text.",
       "empty",
     );
   }
@@ -958,7 +958,7 @@ async function extractPdfTextViaPdfium(file: File): Promise<ExtractResult> {
     const pageCount = document.getPageCount();
     if (!text) {
       throw new PdfExtractionError(
-        "No text could be extracted, even with the fallback reader — this PDF may be scanned images rather than real text.",
+        "No text could be extracted, even with the fallback reader. This PDF may be scanned images rather than real text.",
         "empty",
       );
     }

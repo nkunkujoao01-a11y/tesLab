@@ -93,7 +93,7 @@ export function useMoodleConnection(): MoodleConnectionState {
             : result.reason === "not_signed_in"
               ? "Sign in to eLearn first, then connect your NUST account."
               : result.reason === "rate_limited"
-                ? "Too many attempts — wait a few minutes before trying again."
+                ? "Too many attempts. Wait a few minutes before trying again."
                 : "Couldn't connect right now. Try again in a moment.";
         toast.error(message);
         return false;

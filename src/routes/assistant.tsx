@@ -31,7 +31,7 @@ import {
 export const Route = createFileRoute("/assistant")({
   head: () => ({
     meta: [
-      { title: "Ask AI — eLearn" },
+      { title: "Ask AI - eLearn" },
       {
         name: "description",
         content:
@@ -122,7 +122,7 @@ function Assistant() {
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 <p>
                   The AI didn't finish {staleAiOperation.op === "load" ? "loading" : "generating"}{" "}
-                  {staleAiOperation.modelLabel} last time — this can happen if the app closed or
+                  {staleAiOperation.modelLabel} last time. This can happen if the app closed or
                   crashed. If that keeps happening, try a smaller model in Profile &gt; AI Settings,
                   or connect a free cloud AI key so answers don't rely on this device at all.
                 </p>
@@ -135,7 +135,7 @@ function Assistant() {
                   strokeWidth={1.75}
                 />
                 <p>
-                  Answering with your connected cloud AI — going offline will need the on-device
+                  Answering with your connected cloud AI. Going offline will need the on-device
                   model instead.
                 </p>
               </div>
@@ -144,8 +144,8 @@ function Assistant() {
               <div className="animate-rise flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 <p>
-                  This device couldn't save the assistant for offline reuse — it works right now,
-                  but may need to redownload after you leave this page while offline.
+                  This device couldn't save the assistant for offline reuse. It works right now, but
+                  may need to redownload after you leave this page while offline.
                 </p>
               </div>
             )}
@@ -153,7 +153,7 @@ function Assistant() {
               <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
                 <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about your coursework, or anything else — answered by your connected cloud AI
+                  Ask about your coursework, or anything else. Answered by your connected cloud AI
                   when you're online, or on-device when you're not.
                 </p>
               </div>

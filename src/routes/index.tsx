@@ -1,18 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import {
-  CloudDownload,
-  Sparkles,
-  Compass,
-  ChevronRight,
-  type LucideIcon,
-} from "lucide-react";
+import { CloudDownload, Sparkles, Compass, ChevronRight, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "eLearn — Learn anywhere, even offline" },
+      { title: "eLearn - Learn anywhere, even offline" },
       {
         name: "description",
         content:
@@ -35,7 +29,7 @@ const SLIDES: Slide[] = [
   {
     eyebrow: "Chapter one",
     title: "Study anywhere, even without internet.",
-    body: "Download your modules on campus Wi-Fi and open them later — on the taxi, at home, on the veld. The library travels with you.",
+    body: "Download your modules on campus Wi-Fi and open them later, on the taxi, at home, on the veld. The library travels with you.",
     icon: CloudDownload,
     motif: () => (
       <div className="relative h-full w-full">
@@ -50,12 +44,8 @@ const SLIDES: Slide[] = [
           <div className="mb-3 h-px w-full bg-prestige-cream/15" />
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-[9px] uppercase tracking-widest text-prestige-gold">
-                Offline
-              </p>
-              <p className="font-display text-lg text-prestige-cream">
-                Chapter 04
-              </p>
+              <p className="text-[9px] uppercase tracking-widest text-prestige-gold">Offline</p>
+              <p className="font-display text-lg text-prestige-cream">Chapter 04</p>
             </div>
             <div className="text-right">
               <p className="text-[9px] uppercase tracking-widest text-prestige-cream/50">
@@ -95,7 +85,7 @@ const SLIDES: Slide[] = [
   {
     eyebrow: "Chapter three",
     title: "Never lose track of a single week.",
-    body: "A quiet record of the reading you actually did — modules, chapters, streaks, and the rank of your effort.",
+    body: "A quiet record of the reading you actually did: modules, chapters, streaks, and the rank of your effort.",
     icon: Compass,
     motif: () => (
       <div className="relative h-full w-full">
@@ -113,12 +103,7 @@ const SLIDES: Slide[] = [
                     : intensity === 2
                       ? "bg-prestige-gold/55"
                       : "bg-prestige-gold";
-              return (
-                <div
-                  key={i}
-                  className={cn("aspect-square rounded-[3px]", shade)}
-                />
-              );
+              return <div key={i} className={cn("aspect-square rounded-[3px]", shade)} />;
             })}
           </div>
         </div>
@@ -184,9 +169,7 @@ function Onboarding() {
                 aria-label={`Go to slide ${i + 1}`}
                 className={cn(
                   "h-1 rounded-full transition-all",
-                  i === step
-                    ? "w-8 bg-prestige-deep"
-                    : "w-4 bg-prestige-deep/15",
+                  i === step ? "w-8 bg-prestige-deep" : "w-4 bg-prestige-deep/15",
                 )}
               />
             ))}

@@ -29,31 +29,31 @@ const STEPS: Step[] = [
     icon: CloudDownload,
     eyebrow: "Step 1",
     title: "Download on Wi-Fi, study anywhere",
-    body: "Open a module in your Library and tap Get. It's saved to this device — the reader works with no signal at all afterward.",
+    body: "Open a module in your Library and tap Get. It's saved to this device, and the reader works with no signal at all afterward.",
   },
   {
     icon: Sparkles,
     eyebrow: "Step 2",
     title: "Real AI summaries, generated on this device",
-    body: "Open any downloaded page and tap Summarise. A fast built-in model works instantly — download the fuller neural model from your Profile for better summaries, whenever you like.",
+    body: "Open any downloaded page and tap Summarise. A fast built-in model works instantly, or download the fuller neural model from your Profile for better summaries, whenever you like.",
   },
   {
     icon: FileText,
     eyebrow: "Step 3",
     title: "Upload your own PDFs",
-    body: "Got lecture notes or readings as PDFs already? Upload them under My documents in the Library — text is extracted right on your device and can be summarised the same way.",
+    body: "Got lecture notes or readings as PDFs already? Upload them under My documents in the Library. Text is extracted right on your device and can be summarised the same way.",
   },
   {
     icon: LineChart,
     eyebrow: "Step 4",
     title: "A real record of what you've studied",
-    body: "Progress and streaks track materials you've actually opened — no fake numbers. Check Progress anytime for the full picture.",
+    body: "Progress and streaks track materials you've actually opened, no fake numbers. Check Progress anytime for the full picture.",
   },
   {
     icon: RefreshCw,
     eyebrow: "Step 5",
     title: "Your progress follows you",
-    body: "Reading history, summaries, and documents sync automatically when you're online — sign in on another device and it's all there. Downloads themselves stay on each device, by design.",
+    body: "Reading history, summaries, and documents sync automatically when you're online. Sign in on another device and it's all there. Downloads themselves stay on each device, by design.",
   },
 ];
 

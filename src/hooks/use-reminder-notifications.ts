@@ -107,7 +107,7 @@ export function useStreakReminder(): void {
       if (already) return;
       notifyIfPermitted(
         "Keep your streak going",
-        `You're on a ${streakBeforeToday}-day streak — open a module today to keep it alive.`,
+        `You're on a ${streakBeforeToday}-day streak. Open a module today to keep it alive.`,
       );
       await db.syncMeta.put({ key, value: "1" });
     })();
@@ -136,7 +136,7 @@ export function useGoalReminder(): void {
       if (already) return;
       notifyIfPermitted(
         "Behind on this week's goal",
-        `You've studied ${progress} of ${target} times this week — still time to catch up.`,
+        `You've studied ${progress} of ${target} times this week. Still time to catch up.`,
       );
       await db.syncMeta.put({ key, value: "1" });
     })();

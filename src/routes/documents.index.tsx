@@ -43,10 +43,10 @@ import {
 export const Route = createFileRoute("/documents/")({
   head: () => ({
     meta: [
-      { title: "My documents — eLearn" },
+      { title: "My documents - eLearn" },
       {
         name: "description",
-        content: "Upload your own PDFs — extracted and summarised entirely on this device.",
+        content: "Upload your own PDFs, extracted and summarised entirely on this device.",
       },
     ],
   }),
@@ -82,7 +82,7 @@ function NewCollectionDialog() {
         <DialogHeader>
           <DialogTitle>New collection</DialogTitle>
           <DialogDescription>
-            Group related documents together — e.g. everything for one course.
+            Group related documents together, e.g. everything for one course.
           </DialogDescription>
         </DialogHeader>
         <input
@@ -189,16 +189,16 @@ function DocumentsIndex() {
           <div className="animate-rise mb-6 flex items-start gap-2.5 rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
             <p>
-              The upload of "{staleExtraction.fileName}" didn't finish last time — this can happen
-              if the app closed or crashed partway through. Try again, ideally with a smaller file;
-              if it keeps happening, testing with the device plugged into a computer (via Chrome's
+              The upload of "{staleExtraction.fileName}" didn't finish last time. This can happen if
+              the app closed or crashed partway through. Try again, ideally with a smaller file; if
+              it keeps happening, testing with the device plugged into a computer (via Chrome's
               remote inspector) will show the real error.
             </p>
           </div>
         )}
         <p className="mb-6 max-w-[52ch] text-sm text-muted-foreground">
           Upload lecture notes or readings you already have as PDFs. Text is extracted right on this
-          device — nothing is sent anywhere except your own account's storage, and it works offline
+          device, nothing is sent anywhere except your own account's storage, and it works offline
           once uploaded.
         </p>
 
@@ -246,7 +246,7 @@ function DocumentsIndex() {
             <FileText className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
             <p className="mt-4 font-display text-lg text-prestige-deep">No documents yet</p>
             <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-              Upload a PDF to get started — it'll show up here, fully readable and summarisable
+              Upload a PDF to get started. It'll show up here, fully readable and summarisable
               offline.
             </p>
           </div>
@@ -299,7 +299,7 @@ function DocumentsIndex() {
                             <AlertDialogTitle>Delete this document?</AlertDialogTitle>
                             <AlertDialogDescription>
                               {doc.title} and its extracted text will be permanently removed. This
-                              can't be undone — you'd need to upload the PDF again.
+                              can't be undone; you'd need to upload the PDF again.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

@@ -29,7 +29,7 @@ import type { MoodleCourseModule } from "@/lib/db";
 
 export const Route = createFileRoute("/courses/moodle/$courseId")({
   head: () => ({
-    meta: [{ title: "Course — eLearn" }],
+    meta: [{ title: "Course - eLearn" }],
   }),
   component: MoodleCourseDetail,
 });
@@ -144,7 +144,7 @@ function FileViewer({ open, onClose }: { open: OpenFile; onClose: () => void }) 
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
               <p className="text-sm text-muted-foreground">
-                This file type can't be previewed here — download it instead.
+                This file type can't be previewed here. Download it instead.
               </p>
               <a
                 href={state.objectUrl}
@@ -324,7 +324,7 @@ function MoodleCourseDetail() {
           <p className="mt-3 text-sm text-muted-foreground">{course.lecturerName}</p>
         )}
         <p className="mt-4 text-[11px] text-muted-foreground">
-          Synced from your connected NUST eLearning account — files open right here; anything else
+          Synced from your connected NUST eLearning account; files open right here, anything else
           (forums, quizzes) opens the real NUST page in a new tab.
         </p>
 
@@ -345,7 +345,7 @@ function MoodleCourseDetail() {
                   <span className="shrink-0 font-medium text-prestige-deep">
                     {grade.gradeFormatted && grade.gradeFormatted !== "-"
                       ? grade.gradeFormatted
-                      : "—"}
+                      : "N/A"}
                   </span>
                 </div>
               ))}

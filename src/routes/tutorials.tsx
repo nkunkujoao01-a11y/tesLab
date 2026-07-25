@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 export const Route = createFileRoute("/tutorials")({
   head: () => ({
     meta: [
-      { title: "Tutorials — eLearn" },
+      { title: "Tutorials - eLearn" },
       {
         name: "description",
         content: "How offline AI, downloads, NUST sync, and quizzes/flashcards work in eLearn.",
@@ -69,29 +69,29 @@ function TutorialsPage() {
         <Section title="How offline AI works">
           <p>
             Summaries, quizzes, flashcards, and the study assistant can run entirely on your own
-            device — a small AI model downloaded once, then used with no network calls afterward, so
-            it works even with no signal. If you connect your own free Google AI (Gemini) key in
-            Settings, the app can also use Google's cloud AI instead, which is usually faster and
-            better quality when you're online. eLearn automatically falls back to on-device AI
-            whenever you're offline or haven't connected a key.
+            device, using a small AI model downloaded once, then used with no network calls
+            afterward, so it works even with no signal. If you connect your own free Google AI
+            (Gemini) key in Settings, the app can also use Google's cloud AI instead, which is
+            usually faster and better quality when you're online. eLearn automatically falls back to
+            on-device AI whenever you're offline or haven't connected a key.
           </p>
           <p>
-            On-device generation is slower on older or lower-memory phones — that's the model
-            running locally on your hardware, not a network delay. Connecting a free Gemini key is
-            the fastest way to speed this up.
+            On-device generation is slower on older or lower-memory phones. That's the model running
+            locally on your hardware, not a network delay. Connecting a free Gemini key is the
+            fastest way to speed this up.
           </p>
         </Section>
 
         <Section title="Downloading modules for offline use">
           <p>
             Download a module's materials once on Wi-Fi, then read, summarize, and quiz yourself on
-            them anywhere — no data, no signal needed afterward.
+            them anywhere, no data or signal needed afterward.
           </p>
           <Steps
             items={[
               "Open a module from Library or Courses.",
               'Tap the download icon next to any material, or "Download all" for the whole module.',
-              "Once downloaded, it's available offline — check Profile > Downloads any time to see what's stored on this device and how much space it's using.",
+              "Once downloaded, it's available offline. Check Profile > Downloads any time to see what's stored on this device and how much space it's using.",
             ]}
           />
         </Section>
@@ -99,22 +99,22 @@ function TutorialsPage() {
         <Section title="Connecting your NUST account">
           <p>
             Connecting your real NUST student number and password pulls in your actual enrolled
-            courses, materials, and grades from NUST eLearning (Moodle) — kept in sync automatically
+            courses, materials, and grades from NUST eLearning (Moodle), kept in sync automatically
             after that.
           </p>
           <Steps
             items={[
               "Go to Settings > NUST eLearning.",
               "Enter the same student number and password you use at elearning.nust.na.",
-              "Your password is sent once to connect and never stored — only a revocable access token is kept, so you can disconnect at any time.",
+              "Your password is sent once to connect and never stored. Only a revocable access token is kept, so you can disconnect at any time.",
             ]}
           />
         </Section>
 
         <Section title="Quizzes & flashcards">
           <p>
-            Generated from a module's own materials or your personal documents — real questions
-            based on what you actually uploaded or downloaded, not generic ones. Quiz results and
+            Generated from a module's own materials or your personal documents: real questions based
+            on what you actually uploaded or downloaded, not generic ones. Quiz results and
             flashcard ratings ("I knew this" / "I didn't know this") feed directly into your
             Progress page, so your own record reflects real understanding, not just whether you
             opened something.

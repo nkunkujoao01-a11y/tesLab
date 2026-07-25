@@ -49,7 +49,7 @@ import {
 
 export const Route = createFileRoute("/documents/collections/$collectionId/")({
   head: () => ({
-    meta: [{ title: "Collection — eLearn" }],
+    meta: [{ title: "Collection - eLearn" }],
   }),
   component: CollectionDetail,
 });
@@ -261,7 +261,7 @@ function CollectionDetail() {
               <AlertDialogTitle>Delete "{collection.name}"?</AlertDialogTitle>
               <AlertDialogDescription>
                 The collection itself will be removed, but its {members.length} document
-                {members.length === 1 ? "" : "s"} will stay — just uncategorized, not deleted.
+                {members.length === 1 ? "" : "s"} will stay, just uncategorized, not deleted.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

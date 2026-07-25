@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/admin/super")({
   head: () => ({
-    meta: [{ title: "Super admin — eLearn" }],
+    meta: [{ title: "Super admin - eLearn" }],
   }),
   component: SuperAdminLayout,
 });

@@ -428,7 +428,7 @@ function AdminModuleDetailPage() {
           <div>
             <p className="text-sm font-medium text-prestige-deep">Quiz questions</p>
             <p className="text-[11px] text-muted-foreground">
-              {existingQuestions.length} live — shared across every student in this module
+              {existingQuestions.length} live, shared across every student in this module
             </p>
           </div>
         </div>
@@ -450,7 +450,7 @@ function AdminModuleDetailPage() {
             <p className="text-xs font-semibold text-prestige-deep">Generate a quiz with AI</p>
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Upload a PDF, Word document, image, or text file — AI drafts multiple-choice questions
+            Upload a PDF, Word document, image, or text file. AI drafts multiple-choice questions
             from it for you to review before publishing to every student.
           </p>
           <input
@@ -484,7 +484,7 @@ function AdminModuleDetailPage() {
           {quizDraft && quizDraft.length > 0 && (
             <div className="mt-4 space-y-4 border-t border-prestige-deep/10 pt-4">
               <p className="text-[11px] font-medium text-prestige-deep">
-                Review before publishing — {quizDraft.length} question
+                Review before publishing: {quizDraft.length} question
                 {quizDraft.length === 1 ? "" : "s"}
               </p>
               {quizDraft.map((q, qi) => (
@@ -663,7 +663,7 @@ function AdminModuleDetailPage() {
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
               Matched by course code or lecturer against{" "}
-              {[...new Set(courseMatches.map((s) => s.courseFullName))].join(", ")} — review before
+              {[...new Set(courseMatches.map((s) => s.courseFullName))].join(", ")}. Review before
               adding.
             </p>
             <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto">
@@ -787,7 +787,7 @@ function AdminModuleDetailPage() {
           <div>
             <p className="text-sm font-medium text-prestige-deep">Grades</p>
             <p className="text-[11px] text-muted-foreground">
-              {grades.length} recorded — visible only to the student they belong to
+              {grades.length} recorded, visible only to the student they belong to
             </p>
           </div>
         </div>
@@ -857,7 +857,7 @@ function AdminModuleDetailPage() {
                 <li key={g.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                   <span className="min-w-0">
                     <span className="block truncate text-foreground/90">
-                      {rosterNameById.get(g.userId) ?? "Former student"} — {g.label}
+                      {rosterNameById.get(g.userId) ?? "Former student"}: {g.label}
                     </span>
                     <span className="text-[10.5px] text-muted-foreground">
                       {g.score}/{g.maxScore} · {formatRelative(g.gradedAt)}
