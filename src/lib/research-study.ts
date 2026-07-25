@@ -50,13 +50,21 @@ export async function submitResearchSurvey(answers: ResearchSurveyAnswers): Prom
 /** A general, always-available anonymous suggestion — separate from the
  * one-time research study above and from the account-tied feedback
  * feature (use-feedback.ts). Reuses the same device anonymous id rather
- * than a second identity scheme — see 0039_anonymous_suggestions.sql. */
-export async function submitAnonymousSuggestion(message: string): Promise<void> {
+ * than a second identity scheme — see 0039_anonymous_suggestions.sql.
+ * `imagePaths` (already-uploaded — see use-research-study.ts, which
+ * uploads to the anonymous-suggestion-images bucket keyed by this
+ * submission's own id, never the student's) defaults to none; a plain
+ * text-only suggestion is still the common case. */
+export async function submitAnonymousSuggestion(
+  message: string,
+  imagePaths: string[] = [],
+): Promise<void> {
   const anonymousId = await getAnonymousId();
   const { error } = await supabase.from("anonymous_suggestions").insert({
     id: crypto.randomUUID(),
     anonymous_id: anonymousId,
     message: message.trim(),
+    image_paths: imagePaths,
     submitted_at: new Date().toISOString(),
   });
   if (error) throw error;

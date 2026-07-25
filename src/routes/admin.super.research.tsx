@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download } from "lucide-react";
+import { useState } from "react";
+import { Download, ImageOff } from "lucide-react";
 import { formatRelative } from "@/lib/mock-data";
 import {
   useResearchSubmissions,
@@ -12,6 +13,33 @@ import { downloadBlob } from "@/lib/structured-export";
 export const Route = createFileRoute("/admin/super/research")({
   component: SuperAdminResearchPage,
 });
+
+/** Same "the underlying storage object can go missing even though the
+ * row still references it" fallback as admin.feedback.tsx's own
+ * identical FeedbackImage component — a plain placeholder instead of a
+ * broken image icon. */
+function SuggestionImage({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg bg-secondary/60 ring-1 ring-border/60">
+        <ImageOff className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
+      </div>
+    );
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer">
+      <img
+        src={url}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-16 w-16 rounded-lg object-cover ring-1 ring-border/60"
+      />
+    </a>
+  );
+}
 
 function scaleAverage(answers: Record<number, number>): string {
   const values = Object.values(answers);
@@ -184,7 +212,16 @@ function SuperAdminResearchPage() {
               <p className="text-[10.5px] font-medium text-prestige-mid">{s.anonymousId}</p>
               <p className="text-[10.5px] text-muted-foreground">{formatRelative(s.submittedAt)}</p>
             </div>
-            <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">{s.message}</p>
+            {s.message && (
+              <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">{s.message}</p>
+            )}
+            {s.imageUrls.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {s.imageUrls.map((url, imgIdx) => (
+                  <SuggestionImage key={imgIdx} url={url} />
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

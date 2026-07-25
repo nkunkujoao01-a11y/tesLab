@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
+  Sparkles as SparklesIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
@@ -26,6 +27,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { APP_VERSION, CHANGELOG } from "@/lib/changelog";
+import { useChangelogSeen } from "@/hooks/use-changelog";
 import {
   useAIModelStatus,
   useDownloadAIModel,
@@ -73,6 +83,46 @@ function SettingsGroup({ label, children }: { label: string; children: React.Rea
   );
 }
 
+/** "What's new" — a short, plain-language changelog (see changelog.ts),
+ * opened from the version footer at the bottom of Settings. Marks the
+ * current version seen the moment it opens, not on close — a student who
+ * opens it and immediately navigates away has still seen it. */
+function WhatsNewDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>What's new</DialogTitle>
+          <DialogDescription>Recent changes to eLearn, newest first.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5">
+          {CHANGELOG.map((entry) => (
+            <div key={entry.version}>
+              <p className="text-xs font-semibold uppercase tracking-widest text-prestige-mid">
+                v{entry.version} &middot; {entry.date}
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {entry.items.map((item, i) => (
+                  <li key={i} className="flex gap-2 text-sm leading-relaxed text-foreground/85">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-prestige-gold" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Settings() {
   const staleAiOperation = useStaleAiOperationWarning();
   const modelStatus = useAIModelStatus();
@@ -103,6 +153,8 @@ function Settings() {
   const [moodlePassword, setMoodlePassword] = useState("");
   const [showMoodlePassword, setShowMoodlePassword] = useState(false);
   const { clearCacheAndReload, clearing } = useClearCache();
+  const { hasUnseen: hasUnseenChangelog, markSeen: markChangelogSeen } = useChangelogSeen();
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
 
   const handleConnect = async (e: FormEvent) => {
     e.preventDefault();
@@ -693,6 +745,32 @@ function Settings() {
             </button>
           </section>
         </SettingsGroup>
+
+        {/* About — version tracker + "what's new", deliberately last on
+            the page (the least frequently needed setting here). */}
+        <SettingsGroup label="About">
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-card p-4 ring-1 ring-border/60">
+            <p className="text-xs text-muted-foreground">eLearn v{APP_VERSION}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setWhatsNewOpen(true);
+                markChangelogSeen();
+              }}
+              className="relative inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95]"
+            >
+              <SparklesIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
+              What's new
+              {hasUnseenChangelog && (
+                <span
+                  aria-hidden
+                  className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-prestige-gold"
+                />
+              )}
+            </button>
+          </div>
+        </SettingsGroup>
+        <WhatsNewDialog open={whatsNewOpen} onOpenChange={setWhatsNewOpen} />
       </div>
     </MobileShell>
   );

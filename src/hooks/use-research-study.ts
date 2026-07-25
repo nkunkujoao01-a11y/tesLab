@@ -3,12 +3,32 @@ import { toast } from "sonner";
 import { getUserDb } from "@/lib/db";
 import { useAuth } from "@/hooks/use-auth";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { supabase } from "@/lib/supabase";
 import {
   submitResearchConsent,
   submitResearchSurvey,
   submitAnonymousSuggestion,
 } from "@/lib/research-study";
 import type { ResearchSurveyAnswers } from "@/lib/supabase";
+import type { FeedbackImage } from "@/hooks/use-feedback";
+
+// Same real gap use-feedback.ts's own identical constant/comment already
+// found and fixed: supabase-js's storage upload() has no built-in
+// timeout, so a real image upload over a weak connection can hang with
+// the button stuck in "Sending…" forever.
+const IMAGE_UPLOAD_TIMEOUT_MS = 45_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}
 
 // Bookkeeping only — whether *this signed-in account* has already been
 // asked, stored in its own local UserDB (see db.ts) so it's never shown
@@ -243,16 +263,37 @@ export function useSubmitAnonymousSuggestion() {
   const [submitting, setSubmitting] = useState(false);
 
   const submit = useCallback(
-    async (message: string) => {
-      if (!message.trim() || !isOnline) return false;
+    async (message: string, images: FeedbackImage[] = []) => {
+      if ((!message.trim() && images.length === 0) || !isOnline) return false;
       setSubmitting(true);
       try {
-        await submitAnonymousSuggestion(message);
+        // Keyed by a fresh random id generated here, never by anything
+        // that identifies the student (not their account, not their
+        // device's anonymous_id) — see 0041_anonymous_suggestion_images.sql's
+        // own reasoning for why this can't reuse feedback-images' own
+        // {user_id}/... path convention.
+        const suggestionId = crypto.randomUUID();
+        const imagePaths: string[] = [];
+        for (const [index, image] of images.entries()) {
+          const path = `${suggestionId}/${index}-${image.file.name}`;
+          const { error } = await withTimeout(
+            supabase.storage.from("anonymous-suggestion-images").upload(path, image.file),
+            IMAGE_UPLOAD_TIMEOUT_MS,
+            "Uploading an image is taking too long. Check your connection and try again.",
+          );
+          if (error) throw error;
+          imagePaths.push(path);
+        }
+        await submitAnonymousSuggestion(message, imagePaths);
         toast.success("Thanks, sent anonymously.");
         return true;
       } catch (err) {
         console.error("Failed to submit anonymous suggestion", err);
-        toast.error("Couldn't send that. Check your connection and try again.");
+        toast.error(
+          err instanceof Error && err.message.includes("taking too long")
+            ? err.message
+            : "Couldn't send that. Check your connection and try again.",
+        );
         return false;
       } finally {
         setSubmitting(false);

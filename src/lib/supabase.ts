@@ -192,6 +192,10 @@ export type AnonymousSuggestionRow = {
   id: string;
   anonymous_id: string;
   message: string;
+  // 0041_anonymous_suggestion_images.sql — paths into the private
+  // anonymous-suggestion-images bucket, keyed by this row's own id, never
+  // by who uploaded them (see that migration's own reasoning).
+  image_paths: string[];
   submitted_at: string;
 };
 

@@ -244,12 +244,18 @@ export type AnonymousSuggestion = {
   anonymousId: string;
   message: string;
   submittedAt: string;
+  imageUrls: string[];
 };
 
-/** The general anonymous suggestion box (0039_anonymous_suggestions.sql)
- * — separate from research_consent/research_survey_responses above, same
+/** The general anonymous suggestion box (0039_anonymous_suggestions.sql,
+ * images added in 0041_anonymous_suggestion_images.sql) — separate from
+ * research_consent/research_survey_responses above, same
  * is_super_admin()-gated read access. Real rows only for an actual super
- * admin, empty for anyone else, per that table's RLS. */
+ * admin, empty for anyone else, per that table's RLS. Signed URLs are
+ * resolved here (not stored) since the bucket is private — same
+ * "resolved to a viewable URL at review time" pattern
+ * fetchAdminFeedback (admin-console-api.ts) already established for the
+ * unrelated feedback-images bucket. */
 export function useAnonymousSuggestions(): {
   suggestions: AnonymousSuggestion[];
   loading: boolean;
@@ -264,18 +270,35 @@ export function useAnonymousSuggestions(): {
     setLoading(true);
     void supabase
       .from("anonymous_suggestions")
-      .select("anonymous_id, message, submitted_at")
+      .select("anonymous_id, message, image_paths, submitted_at")
       .order("submitted_at", { ascending: false })
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (cancelled) return;
-        if (error) console.error("Failed to load anonymous suggestions", error);
-        setSuggestions(
-          (data ?? []).map((row) => ({
-            anonymousId: row.anonymous_id,
-            message: row.message,
-            submittedAt: row.submitted_at,
-          })),
+        if (error) {
+          console.error("Failed to load anonymous suggestions", error);
+          setSuggestions([]);
+          setLoading(false);
+          return;
+        }
+        const withImages = await Promise.all(
+          (data ?? []).map(async (row) => {
+            const imageUrls: string[] = [];
+            for (const path of row.image_paths) {
+              const { data: signed } = await supabase.storage
+                .from("anonymous-suggestion-images")
+                .createSignedUrl(path, 3600);
+              if (signed?.signedUrl) imageUrls.push(signed.signedUrl);
+            }
+            return {
+              anonymousId: row.anonymous_id,
+              message: row.message,
+              submittedAt: row.submitted_at,
+              imageUrls,
+            };
+          }),
         );
+        if (cancelled) return;
+        setSuggestions(withImages);
         setLoading(false);
       });
     return () => {

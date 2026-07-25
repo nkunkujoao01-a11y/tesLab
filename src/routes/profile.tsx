@@ -122,6 +122,32 @@ function Profile() {
   const { submit: submitSuggestion, submitting: submittingSuggestion } =
     useSubmitAnonymousSuggestion();
   const [suggestionMessage, setSuggestionMessage] = useState("");
+  const [suggestionImages, setSuggestionImages] = useState<FeedbackImage[]>([]);
+  const suggestionImageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAddSuggestionImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    const room = MAX_FEEDBACK_IMAGES - suggestionImages.length;
+    if (room <= 0) {
+      toast.error(`You can attach up to ${MAX_FEEDBACK_IMAGES} images.`);
+      return;
+    }
+    const oversized = files.find((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+    if (oversized) {
+      toast.error(`${oversized.name} is too large. The limit is ${MAX_IMAGE_MB} MB per image.`);
+      return;
+    }
+    setSuggestionImages((prev) => [...prev, ...files.slice(0, room).map(makeFeedbackImage)]);
+  };
+
+  const removeSuggestionImage = (id: string) => {
+    setSuggestionImages((prev) => {
+      const target = prev.find((img) => img.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((img) => img.id !== id);
+    });
+  };
   const { submitFeedback, submitting: submittingFeedback } = useSubmitFeedback();
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackImages, setFeedbackImages] = useState<FeedbackImage[]>([]);
@@ -411,7 +437,8 @@ function Profile() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-prestige-deep">Anonymous suggestion</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Not tied to your account, send an idea or comment anonymously, any time
+                  Not tied to your account, send an idea, comment, or screenshot anonymously, any
+                  time
                 </p>
               </div>
             </div>
@@ -423,15 +450,65 @@ function Profile() {
                 rows={3}
                 className="w-full resize-none rounded-lg border border-border/70 bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
               />
-              <div className="flex justify-end">
+
+              {suggestionImages.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {suggestionImages.map((img) => (
+                    <div key={img.id} className="relative h-16 w-16 shrink-0">
+                      <img
+                        src={img.previewUrl}
+                        alt=""
+                        className="h-full w-full rounded-lg object-cover ring-1 ring-border/70"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSuggestionImage(img.id)}
+                        aria-label="Remove image"
+                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-prestige-deep text-prestige-cream shadow"
+                      >
+                        <X className="h-3 w-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <input
+                    ref={suggestionImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleAddSuggestionImages}
+                  />
+                  <button
+                    type="button"
+                    disabled={suggestionImages.length >= MAX_FEEDBACK_IMAGES}
+                    onClick={() => suggestionImageInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Add image
+                  </button>
+                </div>
                 <button
                   type="button"
-                  disabled={!isOnline || !suggestionMessage.trim() || submittingSuggestion}
+                  disabled={
+                    !isOnline ||
+                    (!suggestionMessage.trim() && suggestionImages.length === 0) ||
+                    submittingSuggestion
+                  }
                   aria-disabled={!isOnline}
                   title={!isOnline ? "Sending needs a network connection" : undefined}
                   onClick={() =>
-                    void submitSuggestion(suggestionMessage).then((ok) => {
-                      if (ok) setSuggestionMessage("");
+                    void submitSuggestion(suggestionMessage, suggestionImages).then((ok) => {
+                      if (ok) {
+                        suggestionImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+                        setSuggestionMessage("");
+                        setSuggestionImages([]);
+                      }
                     })
                   }
                   className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
