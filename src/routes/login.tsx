@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleGlyph } from "@/components/GoogleGlyph";
 import { supabase } from "@/lib/supabase";
 import { loginWithNust } from "@/lib/moodle-cloud";
@@ -126,9 +127,8 @@ function Login() {
             <label htmlFor="password" className="text-xs font-medium text-prestige-mid">
               Password
             </label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               required
               autoComplete="current-password"
               value={password}

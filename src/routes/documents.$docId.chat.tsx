@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Bot, Loader2, Send, Sparkles, Trash2, TriangleAlert, User } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
-import { StructuredText } from "@/components/StructuredText";
+import { AssistantMessageBubble } from "@/components/AssistantMessageBubble";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { usePersonalDocument } from "@/hooks/use-documents";
 import {
@@ -185,19 +185,13 @@ function DocumentChat() {
                     <Bot className="h-3.5 w-3.5" strokeWidth={1.75} />
                   )}
                 </div>
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-prestige-deep text-prestige-cream"
-                      : "bg-card text-foreground/90 ring-1 ring-border/60"
-                  }`}
-                >
-                  {msg.role === "assistant" ? (
-                    <StructuredText text={msg.content} className="space-y-2" />
-                  ) : (
-                    msg.content
-                  )}
-                </div>
+                {msg.role === "assistant" ? (
+                  <AssistantMessageBubble content={msg.content} />
+                ) : (
+                  <div className="max-w-[80%] rounded-2xl bg-prestige-deep px-4 py-2.5 text-sm leading-relaxed text-prestige-cream">
+                    {msg.content}
+                  </div>
+                )}
               </div>
             ))}
             {sending && (
@@ -205,16 +199,16 @@ function DocumentChat() {
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
                   <Bot className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </div>
-                <div className="max-w-[80%] rounded-2xl bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground/90 ring-1 ring-border/60">
-                  {streamingText ? (
-                    <StructuredText text={streamingText} className="space-y-2" />
-                  ) : (
+                {streamingText ? (
+                  <AssistantMessageBubble content={streamingText} showCopy={false} />
+                ) : (
+                  <div className="max-w-[80%] rounded-2xl bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground/90 ring-1 ring-border/60">
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
                       {thinkingLabel}
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
             <div ref={sentinelRef} />

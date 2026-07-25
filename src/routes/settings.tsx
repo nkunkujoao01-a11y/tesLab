@@ -10,6 +10,8 @@ import {
   ArrowUpRight,
   Unlink,
   RotateCcw,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
@@ -82,6 +84,7 @@ function Settings() {
   const moodle = useMoodleConnection();
   const [moodleStudentNumber, setMoodleStudentNumber] = useState("");
   const [moodlePassword, setMoodlePassword] = useState("");
+  const [showMoodlePassword, setShowMoodlePassword] = useState(false);
   const { clearCacheAndReload, clearing } = useClearCache();
 
   const handleConnect = async (e: FormEvent) => {
@@ -335,14 +338,29 @@ function Settings() {
                     autoComplete="username"
                     className="h-14 flex-1 rounded-lg border border-border/70 bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
                   />
-                  <input
-                    type="password"
-                    value={moodlePassword}
-                    onChange={(e) => setMoodlePassword(e.target.value)}
-                    placeholder="NUST eLearning password"
-                    autoComplete="current-password"
-                    className="h-14 flex-1 rounded-lg border border-border/70 bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showMoodlePassword ? "text" : "password"}
+                      value={moodlePassword}
+                      onChange={(e) => setMoodlePassword(e.target.value)}
+                      placeholder="NUST eLearning password"
+                      autoComplete="current-password"
+                      className="h-14 w-full rounded-lg border border-border/70 bg-background px-3 pr-10 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowMoodlePassword((v) => !v)}
+                      aria-label={showMoodlePassword ? "Hide password" : "Show password"}
+                      tabIndex={-1}
+                      className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {showMoodlePassword ? (
+                        <EyeOff className="h-4 w-4" strokeWidth={1.75} />
+                      ) : (
+                        <Eye className="h-4 w-4" strokeWidth={1.75} />
+                      )}
+                    </button>
+                  </div>
                   <button
                     type="submit"
                     disabled={

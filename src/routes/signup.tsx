@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { ChevronRight, MailCheck } from "lucide-react";
+import { ChevronRight, Loader2, MailCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleGlyph } from "@/components/GoogleGlyph";
 import { supabase } from "@/lib/supabase";
+import { isDisposableEmail } from "@/lib/disposable-email-domains";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -24,6 +26,10 @@ function Signup() {
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   // Same account creation as email/password, just via Google's OAuth
   // consent instead of a form — Supabase creates the `profiles` row (see
@@ -45,6 +51,12 @@ function Signup() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (isDisposableEmail(email)) {
+      setError(
+        "That looks like a temporary/disposable email address — please use a real one you can actually check.",
+      );
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -59,9 +71,37 @@ function Signup() {
     if (data.session) {
       void navigate({ to: "/dashboard" });
     } else {
-      // Email confirmation is required before a session is issued.
+      // Email confirmation is required before a session is issued — see
+      // the code-entry step below (requires the "Confirm signup" email
+      // template in the Supabase dashboard to include {{ .Token }}, not
+      // just the default confirmation link).
       setCheckEmail(true);
     }
+  };
+
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault();
+    setVerifyError(null);
+    setVerifying(true);
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: verificationCode.trim(),
+      type: "signup",
+    });
+    setVerifying(false);
+    if (error) {
+      setVerifyError(error.message);
+      return;
+    }
+    if (data.session) void navigate({ to: "/dashboard" });
+  };
+
+  const handleResend = async () => {
+    setVerifyError(null);
+    setResending(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    setResending(false);
+    if (error) setVerifyError(error.message);
   };
 
   if (checkEmail) {
@@ -74,8 +114,42 @@ function Signup() {
           Check your email
         </h1>
         <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-          We sent a confirmation link to {email}. Follow it to finish creating your account.
+          We sent a 6-digit code to {email}. Enter it below to finish creating your account.
         </p>
+
+        <form
+          onSubmit={(e) => void handleVerify(e)}
+          className="mt-6 w-full max-w-[280px] space-y-3"
+        >
+          <Input
+            value={verificationCode}
+            onChange={(e) => setVerificationCode(e.target.value)}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            maxLength={6}
+            className="h-14 rounded-lg text-center text-lg tracking-[0.3em]"
+          />
+          {verifyError && <p className="text-sm text-destructive">{verifyError}</p>}
+          <button
+            type="submit"
+            disabled={verifying || verificationCode.trim().length < 6}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-prestige-deep px-5 py-3 text-sm font-medium text-prestige-cream shadow-lg shadow-prestige-deep/20 transition-transform active:scale-[0.97] disabled:opacity-60"
+          >
+            {verifying && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />}
+            {verifying ? "Verifying…" : "Verify"}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          disabled={resending}
+          onClick={() => void handleResend()}
+          className="mt-4 text-xs font-medium text-prestige-mid hover:text-prestige-deep hover:underline disabled:opacity-60"
+        >
+          {resending ? "Resending…" : "Didn't get a code? Resend"}
+        </button>
+
         <Link
           to="/login"
           className="mt-6 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-prestige-mid hover:text-prestige-deep"
@@ -137,9 +211,8 @@ function Signup() {
             <label htmlFor="password" className="text-xs font-medium text-prestige-mid">
               Password
             </label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               required
               minLength={6}
               autoComplete="new-password"
