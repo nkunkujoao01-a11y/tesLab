@@ -80,6 +80,15 @@ function TutorialsPage() {
             locally on your hardware, not a network delay. Connecting a free Gemini key is the
             fastest way to speed this up.
           </p>
+          <p>
+            Worth knowing honestly: the on-device model is still small and early, and makes mistakes
+            noticeably more often than the cloud AI does, especially on longer or more technical
+            material. Think of it as a genuinely useful assistant that's still learning, not a
+            finished product. Connecting a free Gemini key gives meaningfully better results
+            whenever you have a connection, and is the recommended option if accuracy matters for
+            what you're studying. Improving the on-device model further is possible, but depends on
+            this project's own time and funding.
+          </p>
         </Section>
 
         <Section title="Downloading modules for offline use">

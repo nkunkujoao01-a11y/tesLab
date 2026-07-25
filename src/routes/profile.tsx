@@ -20,11 +20,22 @@ import {
   ScrollText,
   GraduationCap,
   Lightbulb,
+  Heart,
+  Mail,
+  CalendarDays,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
+import { SettingsGroup } from "@/components/SettingsGroup";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { formatMb, formatRelative } from "@/lib/mock-data";
 import {
   useStorageUsageMb,
@@ -110,6 +121,8 @@ function Profile() {
   // instead of a confusing raw email under the student's name.
   const program = profile?.program || "";
   const [signingOut, setSigningOut] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(false);
+  const realEmail = !isSyntheticNustEmail(user?.email) ? user?.email : undefined;
   const lastSyncedAt = useLastSyncedAt();
   const { sync, syncing } = useManualSync();
   const isOnline = useOnlineStatus();
@@ -216,545 +229,632 @@ function Profile() {
 
       <div className="grid gap-8 px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10 lg:px-10 lg:pb-16">
         <div className="space-y-8">
-          {/* Identity card */}
-          <section className="animate-rise flex items-center gap-4 rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+          {/* Identity card — tapping it opens more account info/features
+              that don't otherwise fit this compact header (real email,
+              member-since date). */}
+          <button
+            type="button"
+            onClick={() => setIdentityOpen(true)}
+            className="animate-rise flex w-full items-center gap-4 rounded-2xl bg-card p-6 text-left ring-1 ring-border/60 transition-all hover:ring-prestige-gold/40 lg:p-8"
+          >
             <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-prestige-deep font-display text-lg text-prestige-cream ring-2 ring-prestige-gold/30">
               {fullName.slice(0, 2).toUpperCase()}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="eyebrow">{university}</p>
               <p className="mt-1 truncate font-display text-xl font-medium text-prestige-deep">
                 {fullName}
               </p>
               {program && <p className="text-xs text-muted-foreground">{program}</p>}
             </div>
-          </section>
+            <ChevronRight className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={2} />
+          </button>
 
-          {/* Sync */}
-          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
-            <div className="flex items-center justify-between gap-4">
+          <Dialog open={identityOpen} onOpenChange={setIdentityOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{fullName}</DialogTitle>
+                <DialogDescription>{university}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                {program && (
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-prestige-deep">Program</p>
+                      <p className="text-[11px] text-muted-foreground">{program}</p>
+                    </div>
+                  </div>
+                )}
+                {realEmail && (
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <Mail className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-prestige-deep">Email</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{realEmail}</p>
+                    </div>
+                  </div>
+                )}
+                {user?.created_at && (
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <CalendarDays className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-prestige-deep">Member since</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(user.created_at).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <SettingsGroup label="Account">
+            {/* Sync */}
+            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                    <RefreshCw
+                      className={cn("h-4 w-4", syncing && "animate-spin")}
+                      strokeWidth={1.75}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-prestige-deep">Progress sync</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {!isOnline
+                        ? "Offline, reconnect to sync"
+                        : syncing
+                          ? "Syncing…"
+                          : lastSyncedAt
+                            ? `Last synced ${formatRelative(new Date(lastSyncedAt).toISOString())}`
+                            : "Not synced yet"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={syncing || !isOnline}
+                  aria-disabled={!isOnline}
+                  title={!isOnline ? "Sync needs a network connection" : undefined}
+                  onClick={() => void sync()}
+                  className="shrink-0 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40 disabled:active:scale-100"
+                >
+                  Sync now
+                </button>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Reading history, activity, and AI summaries sync automatically when you sign in or
+                come back online. Downloaded content itself stays on this device.
+              </p>
+            </section>
+          </SettingsGroup>
+
+          <SettingsGroup label="Device">
+            {/* Device permissions */}
+            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+              <p className="text-sm font-medium text-prestige-deep">Device permissions</p>
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <HardDrive className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-prestige-deep">Persistent storage</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {!persistentStorage.supported
+                          ? "Not supported on this browser"
+                          : persistentStorage.persisted
+                            ? "Granted, downloads won't be cleared under storage pressure"
+                            : "Keeps downloaded modules and AI models from being auto-cleared"}
+                      </p>
+                    </div>
+                  </div>
+                  {persistentStorage.supported && !persistentStorage.persisted && (
+                    <button
+                      type="button"
+                      disabled={persistentStorage.requesting}
+                      onClick={() => void persistentStorage.requestPersist()}
+                      className="shrink-0 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                    >
+                      {persistentStorage.requesting ? "Requesting…" : "Enable"}
+                    </button>
+                  )}
+                  {persistentStorage.persisted && (
+                    <CircleCheck
+                      className="h-4 w-4 shrink-0 text-prestige-gold"
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <Bell className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-prestige-deep">Notifications</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {notificationPermission.permission === "unsupported"
+                          ? "Not supported on this browser"
+                          : notificationPermission.permission === "denied"
+                            ? "Blocked, re-enable in your browser's site settings"
+                            : notificationPermission.permission === "granted"
+                              ? "Granted, you'll be told when a model finishes downloading"
+                              : "Get notified when an AI model finishes downloading in the background"}
+                      </p>
+                    </div>
+                  </div>
+                  {notificationPermission.permission === "default" && (
+                    <button
+                      type="button"
+                      disabled={notificationPermission.requesting}
+                      onClick={() => void notificationPermission.requestPermission()}
+                      className="shrink-0 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                    >
+                      {notificationPermission.requesting ? "Requesting…" : "Enable"}
+                    </button>
+                  )}
+                  {notificationPermission.permission === "granted" && (
+                    <CircleCheck
+                      className="h-4 w-4 shrink-0 text-prestige-gold"
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Install app */}
+            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
               <div className="flex items-center gap-3">
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                  <RefreshCw
-                    className={cn("h-4 w-4", syncing && "animate-spin")}
-                    strokeWidth={1.75}
-                  />
+                  <Smartphone className="h-4 w-4" strokeWidth={1.75} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-prestige-deep">Progress sync</p>
+                  <p className="text-sm font-medium text-prestige-deep">Install eLearn</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {!isOnline
-                      ? "Offline, reconnect to sync"
-                      : syncing
-                        ? "Syncing…"
-                        : lastSyncedAt
-                          ? `Last synced ${formatRelative(new Date(lastSyncedAt).toISOString())}`
-                          : "Not synced yet"}
+                    Add it to your home screen, faster to open, full offline support
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                disabled={syncing || !isOnline}
-                aria-disabled={!isOnline}
-                title={!isOnline ? "Sync needs a network connection" : undefined}
-                onClick={() => void sync()}
-                className="shrink-0 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40 disabled:active:scale-100"
-              >
-                Sync now
-              </button>
-            </div>
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Reading history, activity, and AI summaries sync automatically when you sign in or
-              come back online. Downloaded content itself stays on this device.
-            </p>
-          </section>
 
-          {/* Device permissions */}
-          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
-            <p className="text-sm font-medium text-prestige-deep">Device permissions</p>
-            <div className="mt-4 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                    <HardDrive className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-prestige-deep">Persistent storage</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {!persistentStorage.supported
-                        ? "Not supported on this browser"
-                        : persistentStorage.persisted
-                          ? "Granted, downloads won't be cleared under storage pressure"
-                          : "Keeps downloaded modules and AI models from being auto-cleared"}
-                    </p>
-                  </div>
-                </div>
-                {persistentStorage.supported && !persistentStorage.persisted && (
+              <div className="mt-4">
+                {installed ? (
+                  <p className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
+                    <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
+                    Already installed on this device
+                  </p>
+                ) : isIos ? (
+                  <p className="text-xs text-muted-foreground">
+                    On iPhone/iPad: tap the Share icon in Safari, then "Add to Home Screen."
+                  </p>
+                ) : canPromptInstall ? (
                   <button
                     type="button"
-                    disabled={persistentStorage.requesting}
-                    onClick={() => void persistentStorage.requestPersist()}
-                    className="shrink-0 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                    disabled={installing}
+                    onClick={() => void handleInstall()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
                   >
-                    {persistentStorage.requesting ? "Requesting…" : "Enable"}
+                    {installing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    )}
+                    Install on this device
                   </button>
-                )}
-                {persistentStorage.persisted && (
-                  <CircleCheck className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={1.75} />
+                ) : isAndroid ? (
+                  <p className="text-xs text-muted-foreground">
+                    Open this page in Chrome, tap the <span className="font-medium">⋮ menu</span> in
+                    the top right, then <span className="font-medium">"Install app"</span> (or "Add
+                    to Home screen"). The button above will also appear here on its own after you've
+                    used the app a little more.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Open this page in Chrome or Edge on a computer to install. Look for an install
+                    icon at the right end of the address bar, or this button will appear here once
+                    the browser offers it.
+                  </p>
                 )}
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                    <Bell className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-prestige-deep">Notifications</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {notificationPermission.permission === "unsupported"
-                        ? "Not supported on this browser"
-                        : notificationPermission.permission === "denied"
-                          ? "Blocked, re-enable in your browser's site settings"
-                          : notificationPermission.permission === "granted"
-                            ? "Granted, you'll be told when a model finishes downloading"
-                            : "Get notified when an AI model finishes downloading in the background"}
-                    </p>
-                  </div>
+            </section>
+          </SettingsGroup>
+
+          <SettingsGroup label="Community">
+            {/* Research study survey */}
+            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+              <div className="flex items-center gap-3">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                  <ClipboardList className="h-4 w-4" strokeWidth={1.75} />
                 </div>
-                {notificationPermission.permission === "default" && (
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-prestige-deep">Usability study survey</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Optional, anonymous, about 5 minutes, helps the NUST research this app is part
+                    of
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4">
+                {surveyCompleted ? (
+                  <p className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
+                    <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
+                    Survey completed, thank you
+                  </p>
+                ) : (
                   <button
                     type="button"
-                    disabled={notificationPermission.requesting}
-                    onClick={() => void notificationPermission.requestPermission()}
-                    className="shrink-0 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                    onClick={() => setSurveyOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97]"
                   >
-                    {notificationPermission.requesting ? "Requesting…" : "Enable"}
+                    <ClipboardList className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Take the survey
                   </button>
                 )}
-                {notificationPermission.permission === "granted" && (
-                  <CircleCheck className="h-4 w-4 shrink-0 text-prestige-gold" strokeWidth={1.75} />
-                )}
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* Install app */}
-          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                <Smartphone className="h-4 w-4" strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-prestige-deep">Install eLearn</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Add it to your home screen, faster to open, full offline support
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              {installed ? (
-                <p className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
-                  <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
-                  Already installed on this device
-                </p>
-              ) : isIos ? (
-                <p className="text-xs text-muted-foreground">
-                  On iPhone/iPad: tap the Share icon in Safari, then "Add to Home Screen."
-                </p>
-              ) : canPromptInstall ? (
-                <button
-                  type="button"
-                  disabled={installing}
-                  onClick={() => void handleInstall()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40"
-                >
-                  {installing ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
-                  ) : (
-                    <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  )}
-                  Install on this device
-                </button>
-              ) : isAndroid ? (
-                <p className="text-xs text-muted-foreground">
-                  Open this page in Chrome, tap the <span className="font-medium">⋮ menu</span> in
-                  the top right, then <span className="font-medium">"Install app"</span> (or "Add to
-                  Home screen"). The button above will also appear here on its own after you've used
-                  the app a little more.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Open this page in Chrome or Edge on a computer to install. Look for an install
-                  icon at the right end of the address bar, or this button will appear here once the
-                  browser offers it.
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Research study survey */}
-          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                <ClipboardList className="h-4 w-4" strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-prestige-deep">Usability study survey</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Optional, anonymous, about 5 minutes, helps the NUST research this app is part of
-                </p>
-              </div>
-            </div>
-            <div className="mt-4">
-              {surveyCompleted ? (
-                <p className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
-                  <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
-                  Survey completed, thank you
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setSurveyOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97]"
-                >
-                  <ClipboardList className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Take the survey
-                </button>
-              )}
-            </div>
-          </section>
-
-          {/* Anonymous suggestion — separate from both the survey above
+            {/* Anonymous suggestion — separate from both the survey above
               (one-time, structured questions) and Send feedback below
               (tied to your account). Not linked to who you are at all. */}
-          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                <Lightbulb className="h-4 w-4" strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-prestige-deep">Anonymous suggestion</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Not tied to your account, send an idea, comment, or screenshot anonymously, any
-                  time
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              <textarea
-                value={suggestionMessage}
-                onChange={(e) => setSuggestionMessage(e.target.value)}
-                placeholder="Anything you'd rather share anonymously?"
-                rows={3}
-                className="w-full resize-none rounded-lg border border-border/70 bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
-              />
-
-              {suggestionImages.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {suggestionImages.map((img) => (
-                    <div key={img.id} className="relative h-16 w-16 shrink-0">
-                      <img
-                        src={img.previewUrl}
-                        alt=""
-                        className="h-full w-full rounded-lg object-cover ring-1 ring-border/70"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeSuggestionImage(img.id)}
-                        aria-label="Remove image"
-                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-prestige-deep text-prestige-cream shadow"
-                      >
-                        <X className="h-3 w-3" strokeWidth={2} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <input
-                    ref={suggestionImageInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleAddSuggestionImages}
-                  />
-                  <button
-                    type="button"
-                    disabled={suggestionImages.length >= MAX_FEEDBACK_IMAGES}
-                    onClick={() => suggestionImageInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
-                  >
-                    <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    Add image
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  disabled={
-                    !isOnline ||
-                    (!suggestionMessage.trim() && suggestionImages.length === 0) ||
-                    submittingSuggestion
-                  }
-                  aria-disabled={!isOnline}
-                  title={!isOnline ? "Sending needs a network connection" : undefined}
-                  onClick={() =>
-                    void submitSuggestion(suggestionMessage, suggestionImages).then((ok) => {
-                      if (ok) {
-                        suggestionImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
-                        setSuggestionMessage("");
-                        setSuggestionImages([]);
-                      }
-                    })
-                  }
-                  className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
-                >
-                  {submittingSuggestion ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
-                  ) : null}
-                  {submittingSuggestion ? "Sending…" : "Send anonymously"}
-                </button>
-              </div>
-              {!isOnline && (
-                <p className="text-[11px] text-muted-foreground">
-                  You're offline, reconnect to send a suggestion.
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Send feedback */}
-          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                <MessageSquareText className="h-4 w-4" strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-prestige-deep">Send feedback</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Report a problem or suggest an improvement, screenshots help
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
+            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
               <div className="flex items-center gap-3">
-                <p className="text-xs font-medium text-prestige-mid">How's the app overall?</p>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-label={`Rate ${value} out of 5`}
-                      onClick={() =>
-                        setFeedbackRating(feedbackRating === value ? undefined : value)
-                      }
-                      className="p-0.5"
-                    >
-                      <Star
-                        className={cn(
-                          "h-5 w-5 transition-colors",
-                          feedbackRating !== undefined && value <= feedbackRating
-                            ? "fill-prestige-gold text-prestige-gold"
-                            : "text-border",
-                        )}
-                        strokeWidth={1.75}
-                      />
-                    </button>
-                  ))}
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                  <Lightbulb className="h-4 w-4" strokeWidth={1.75} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-prestige-deep">Anonymous suggestion</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Not tied to your account, send an idea, comment, or screenshot anonymously, any
+                    time
+                  </p>
                 </div>
               </div>
-              <textarea
-                value={feedbackMessage}
-                onChange={(e) => setFeedbackMessage(e.target.value)}
-                placeholder="What happened, or what would you like to see?"
-                rows={4}
-                className="w-full resize-none rounded-lg border border-border/70 bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
-              />
+              <div className="mt-4 space-y-3">
+                <textarea
+                  value={suggestionMessage}
+                  onChange={(e) => setSuggestionMessage(e.target.value)}
+                  placeholder="Anything you'd rather share anonymously?"
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-border/70 bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                />
 
-              {feedbackImages.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {feedbackImages.map((img) => (
-                    <div key={img.id} className="relative h-16 w-16 shrink-0">
-                      <img
-                        src={img.previewUrl}
-                        alt=""
-                        className="h-full w-full rounded-lg object-cover ring-1 ring-border/70"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeFeedbackImage(img.id)}
-                        aria-label="Remove image"
-                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-prestige-deep text-prestige-cream shadow"
-                      >
-                        <X className="h-3 w-3" strokeWidth={2} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                {suggestionImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {suggestionImages.map((img) => (
+                      <div key={img.id} className="relative h-16 w-16 shrink-0">
+                        <img
+                          src={img.previewUrl}
+                          alt=""
+                          className="h-full w-full rounded-lg object-cover ring-1 ring-border/70"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeSuggestionImage(img.id)}
+                          aria-label="Remove image"
+                          className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-prestige-deep text-prestige-cream shadow"
+                        >
+                          <X className="h-3 w-3" strokeWidth={2} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <input
-                    ref={feedbackImageInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleAddFeedbackImages}
-                  />
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <input
+                      ref={suggestionImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleAddSuggestionImages}
+                    />
+                    <button
+                      type="button"
+                      disabled={suggestionImages.length >= MAX_FEEDBACK_IMAGES}
+                      onClick={() => suggestionImageInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                    >
+                      <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      Add image
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    disabled={feedbackImages.length >= MAX_FEEDBACK_IMAGES}
-                    onClick={() => feedbackImageInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                    disabled={
+                      !isOnline ||
+                      (!suggestionMessage.trim() && suggestionImages.length === 0) ||
+                      submittingSuggestion
+                    }
+                    aria-disabled={!isOnline}
+                    title={!isOnline ? "Sending needs a network connection" : undefined}
+                    onClick={() =>
+                      void submitSuggestion(suggestionMessage, suggestionImages).then((ok) => {
+                        if (ok) {
+                          suggestionImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+                          setSuggestionMessage("");
+                          setSuggestionImages([]);
+                        }
+                      })
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
                   >
-                    <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    Add screenshot
+                    {submittingSuggestion ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                    ) : null}
+                    {submittingSuggestion ? "Sending…" : "Send anonymously"}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={
-                    !isOnline ||
-                    (!feedbackMessage.trim() && feedbackRating === undefined) ||
-                    submittingFeedback
-                  }
-                  aria-disabled={!isOnline}
-                  title={!isOnline ? "Sending feedback needs a network connection" : undefined}
-                  onClick={() => void handleSubmitFeedback()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
-                >
-                  {submittingFeedback ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
-                  ) : null}
-                  {submittingFeedback ? "Sending…" : "Send"}
-                </button>
+                {!isOnline && (
+                  <p className="text-[11px] text-muted-foreground">
+                    You're offline, reconnect to send a suggestion.
+                  </p>
+                )}
               </div>
-              {!isOnline && (
-                <p className="text-[11px] text-muted-foreground">
-                  You're offline, reconnect to send feedback.
-                </p>
-              )}
-            </div>
-          </section>
+            </section>
 
-          {/* Settings list */}
-          <section className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
-            <ul className="divide-y divide-border/60">
-              {profile?.is_lecturer && (
+            {/* Send feedback */}
+            <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+              <div className="flex items-center gap-3">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                  <MessageSquareText className="h-4 w-4" strokeWidth={1.75} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-prestige-deep">Send feedback</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Report a problem or suggest an improvement, screenshots help
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-medium text-prestige-mid">How's the app overall?</p>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-label={`Rate ${value} out of 5`}
+                        onClick={() =>
+                          setFeedbackRating(feedbackRating === value ? undefined : value)
+                        }
+                        className="p-0.5"
+                      >
+                        <Star
+                          className={cn(
+                            "h-5 w-5 transition-colors",
+                            feedbackRating !== undefined && value <= feedbackRating
+                              ? "fill-prestige-gold text-prestige-gold"
+                              : "text-border",
+                          )}
+                          strokeWidth={1.75}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <textarea
+                  value={feedbackMessage}
+                  onChange={(e) => setFeedbackMessage(e.target.value)}
+                  placeholder="What happened, or what would you like to see?"
+                  rows={4}
+                  className="w-full resize-none rounded-lg border border-border/70 bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
+                />
+
+                {feedbackImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {feedbackImages.map((img) => (
+                      <div key={img.id} className="relative h-16 w-16 shrink-0">
+                        <img
+                          src={img.previewUrl}
+                          alt=""
+                          className="h-full w-full rounded-lg object-cover ring-1 ring-border/70"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeFeedbackImage(img.id)}
+                          aria-label="Remove image"
+                          className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-prestige-deep text-prestige-cream shadow"
+                        >
+                          <X className="h-3 w-3" strokeWidth={2} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <input
+                      ref={feedbackImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleAddFeedbackImages}
+                    />
+                    <button
+                      type="button"
+                      disabled={feedbackImages.length >= MAX_FEEDBACK_IMAGES}
+                      onClick={() => feedbackImageInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-prestige-mid ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40"
+                    >
+                      <ImagePlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      Add screenshot
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={
+                      !isOnline ||
+                      (!feedbackMessage.trim() && feedbackRating === undefined) ||
+                      submittingFeedback
+                    }
+                    aria-disabled={!isOnline}
+                    title={!isOnline ? "Sending feedback needs a network connection" : undefined}
+                    onClick={() => void handleSubmitFeedback()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+                  >
+                    {submittingFeedback ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                    ) : null}
+                    {submittingFeedback ? "Sending…" : "Send"}
+                  </button>
+                </div>
+                {!isOnline && (
+                  <p className="text-[11px] text-muted-foreground">
+                    You're offline, reconnect to send feedback.
+                  </p>
+                )}
+              </div>
+            </section>
+          </SettingsGroup>
+
+          <SettingsGroup label="More">
+            {/* Settings list */}
+            <section className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
+              <ul className="divide-y divide-border/60">
+                {profile?.is_lecturer && (
+                  <li>
+                    <Link
+                      to="/admin"
+                      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                    >
+                      <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                        <BookPlus className="h-4 w-4" strokeWidth={1.75} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-prestige-deep">Admin console</p>
+                        <p className="text-[11px] text-muted-foreground">Lecturer tools</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <Link
-                    to="/admin"
+                    to="/settings"
                     className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
                   >
                     <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                      <BookPlus className="h-4 w-4" strokeWidth={1.75} />
+                      <SettingsIcon className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-prestige-deep">Admin console</p>
-                      <p className="text-[11px] text-muted-foreground">Lecturer tools</p>
+                      <p className="text-sm font-medium text-prestige-deep">AI settings</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        On-device models &amp; free cloud AI
+                      </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
                   </Link>
                 </li>
-              )}
-              <li>
-                <Link
-                  to="/settings"
-                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                    <SettingsIcon className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-prestige-deep">AI settings</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      On-device models &amp; free cloud AI
+                <li>
+                  <Link
+                    to="/tutorials"
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-prestige-deep">Tutorials</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        How offline AI, downloads, and NUST sync work
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/legal"
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <ScrollText className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-prestige-deep">Terms &amp; Privacy</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        What we store and how it's used
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/courses"
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <Download className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-prestige-deep">Downloads</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {downloadedMaterialCount} {downloadedMaterialCount === 1 ? "item" : "items"}{" "}
+                        &middot; {formatMb(usedMb)}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/about"
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <Heart className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-prestige-deep">About the creator</p>
+                      <p className="text-[11px] text-muted-foreground">Support the project</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    disabled={signingOut}
+                    onClick={() => void handleSignOut()}
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40 disabled:opacity-60"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      {signingOut ? (
+                        <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                      ) : (
+                        <LogOut className="h-4 w-4" strokeWidth={1.75} />
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-prestige-deep">
+                      {signingOut ? "Signing out…" : "Sign out"}
                     </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/tutorials"
-                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                    <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-prestige-deep">Tutorials</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      How offline AI, downloads, and NUST sync work
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/legal"
-                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                    <ScrollText className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-prestige-deep">Terms &amp; Privacy</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      What we store and how it's used
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/courses"
-                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                    <Download className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-prestige-deep">Downloads</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {downloadedMaterialCount} {downloadedMaterialCount === 1 ? "item" : "items"}{" "}
-                      &middot; {formatMb(usedMb)}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
-                </Link>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  disabled={signingOut}
-                  onClick={() => void handleSignOut()}
-                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40 disabled:opacity-60"
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
-                    {signingOut ? (
-                      <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-                    ) : (
-                      <LogOut className="h-4 w-4" strokeWidth={1.75} />
-                    )}
-                  </div>
-                  <p className="text-sm font-medium text-prestige-deep">
-                    {signingOut ? "Signing out…" : "Sign out"}
-                  </p>
-                  <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
-                </button>
-              </li>
-            </ul>
-          </section>
+                    <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                  </button>
+                </li>
+              </ul>
+            </section>
+          </SettingsGroup>
         </div>
 
         {/* Storage rail */}

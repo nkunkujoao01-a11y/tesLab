@@ -88,6 +88,16 @@ function LegalPage() {
             shared key on your behalf. Every cloud request uses your own connected key, and content
             sent to it is subject to Google's own terms for that service.
           </p>
+          <p>
+            The on-device model is genuinely early-stage: it is small enough to run on an ordinary
+            phone with no internet, and makes mistakes noticeably more often than the cloud AI does,
+            especially on longer or more technical material. Treat any AI-generated summary, quiz
+            question, flashcard, or answer, on-device or cloud, as a study aid to check against your
+            own material, not a guaranteed-correct source. Connecting a free cloud AI key in
+            Settings gives meaningfully better results when you have a connection; continued
+            investment in improving the on-device model depends on this project's own resources and
+            funding.
+          </p>
         </Section>
 
         <Section title="Your real NUST Moodle data">
@@ -120,6 +130,24 @@ function LegalPage() {
             You can disconnect your NUST Moodle account and clear your device's local storage at any
             time from Profile and Settings. To request deletion of your account and the data we hold
             on our servers, contact whoever administers this deployment for you.
+          </p>
+        </Section>
+
+        <Section title="Limitation of liability">
+          <p>
+            eLearn is provided "as is," without warranty of any kind, by a student-built project,
+            not a commercial or institutional service. AI-generated content (summaries, quizzes,
+            flashcards, chat answers) can be incomplete or wrong, on-device more often than cloud,
+            and is never a substitute for your own course materials, your lecturer, or your own
+            judgment. Synced grades and course data reflect what NUST eLearning (Moodle) reports at
+            sync time and may not always be current.
+          </p>
+          <p>
+            To the fullest extent permitted by law, the creator and any contributors to this app are
+            not liable for any decision you make, grade, academic outcome, data loss, or other harm
+            arising from your use of eLearn, including reliance on AI-generated content or synced
+            data. You use this app, and act on anything it shows you, at your own discretion and
+            risk.
           </p>
         </Section>
 
