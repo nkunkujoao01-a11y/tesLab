@@ -23,6 +23,11 @@ import {
 } from "@/lib/ai-crash-breadcrumb";
 import { callGeminiWithPrompt, CloudUnavailableError } from "@/lib/ai-cloud";
 import { stripEmDash } from "@/lib/text-clean";
+import {
+  isGeminiNanoSupported,
+  loadGeminiNanoSession,
+  type GeminiNanoAvailability,
+} from "@/lib/ai-nano";
 
 const SETTING_KEY = "ai_chat_model_downloaded";
 // Separate from SETTING_KEY: whether the download actually persisted for
@@ -195,6 +200,57 @@ export function useDownloadChatModel() {
   }, []);
 
   return { downloadModel, status, progress, finalizing };
+}
+
+/** Feature-detects Chrome's built-in Gemini Nano (the Prompt API) once on
+ * mount — `null` means "still checking," distinct from `"unavailable"`
+ * (checked and confirmed absent), so callers can tell "not yet resolved"
+ * from "genuinely not here" and avoid a flash of a card that then
+ * disappears. See ai-nano.ts for what each real value means. */
+export function useGeminiNanoAvailability(): GeminiNanoAvailability | null {
+  const [availability, setAvailability] = useState<GeminiNanoAvailability | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void isGeminiNanoSupported().then((a) => {
+      if (!cancelled) setAvailability(a);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return availability;
+}
+
+/** Same shape as useDownloadChatModel, but for Gemini Nano — there's no
+ * file this app downloads or a Cache Storage entry to check afterward:
+ * calling loadGeminiNanoSession is what triggers Chrome's own
+ * browser-managed download (if not already present) and resolves once
+ * that finishes, so "downloading" here really means "waiting on Chrome." */
+export function useDownloadGeminiNano() {
+  const [status, setStatus] = useState<"idle" | "downloading" | "error">("idle");
+  const [progress, setProgress] = useState(0);
+
+  const downloadModel = useCallback(async () => {
+    setStatus("downloading");
+    setProgress(0);
+    try {
+      await loadGeminiNanoSession((p) => {
+        if (typeof p.total === "number" && p.total > 0) {
+          setProgress(Math.min(100, Math.round(((p.loaded ?? 0) / p.total) * 100)));
+        }
+      });
+      setProgress(100);
+      setStatus("idle");
+      notifyIfPermitted("Gemini Nano ready", "You can start asking it questions now.");
+    } catch (err) {
+      console.error("Failed to prepare Gemini Nano", err);
+      setStatus("error");
+    }
+  }, []);
+
+  return { downloadModel, status, progress };
 }
 
 /** Every message in the signed-in user's assistant conversation, oldest

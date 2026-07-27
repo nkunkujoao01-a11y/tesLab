@@ -49,8 +49,11 @@ import {
   useChatModelCachedStatus,
   useChatModelOfflineCapable,
   useStaleAiOperationWarning,
+  useGeminiNanoAvailability,
+  useDownloadGeminiNano,
 } from "@/hooks/use-ai-chat";
-import { CHAT_MODELS, type ChatModelChoice } from "@/lib/ai-chat";
+import { CHAT_MODELS, type TransformersChatModelChoice } from "@/lib/ai-chat";
+import { DOWNLOAD_RESILIENCE_NOTE } from "@/lib/resumable-fetch";
 import { useCloudAiKey, useCloudAiEnabled, useCloudAiQuota } from "@/hooks/use-cloud-ai";
 import { useMoodleConnection } from "@/hooks/use-moodle";
 import { Switch } from "@/components/ui/switch";
@@ -123,10 +126,16 @@ function Settings() {
   } = useDownloadChatModel();
   const smollm2Cached = useChatModelCachedStatus("smollm2");
   const gemma3Cached = useChatModelCachedStatus("gemma3-1b");
-  const chatModelCachedByChoice: Record<ChatModelChoice, boolean | null> = {
+  const chatModelCachedByChoice: Record<TransformersChatModelChoice, boolean | null> = {
     smollm2: smollm2Cached,
     "gemma3-1b": gemma3Cached,
   };
+  const geminiNanoAvailability = useGeminiNanoAvailability();
+  const {
+    downloadModel: downloadGeminiNano,
+    status: geminiNanoDownloadStatus,
+    progress: geminiNanoProgress,
+  } = useDownloadGeminiNano();
   const isOnline = useOnlineStatus();
   const { connected, connecting, connect, disconnect } = useCloudAiKey();
   const [cloudEnabled, setCloudEnabled] = useCloudAiEnabled();
@@ -495,8 +504,7 @@ function Settings() {
                     {finalizing ? "Finishing up, almost there…" : `Downloading… ${progress}%`}
                   </p>
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    Keep this tab open and in view. Switching apps or letting the screen lock can
-                    interrupt the download and restart it from zero.
+                    {DOWNLOAD_RESILIENCE_NOTE}
                   </p>
                 </div>
               ) : (
@@ -550,7 +558,7 @@ function Settings() {
             </div>
 
             <div className="mt-4 space-y-2">
-              {(Object.keys(CHAT_MODELS) as ChatModelChoice[]).map((choice) => {
+              {(Object.keys(CHAT_MODELS) as TransformersChatModelChoice[]).map((choice) => {
                 const info = CHAT_MODELS[choice];
                 const selected = chatModelChoice === choice;
                 const cached = chatModelCachedByChoice[choice];
@@ -582,10 +590,123 @@ function Settings() {
                   </button>
                 );
               })}
+
+              {/* Gemini Nano (Feature 74) — Chrome's own built-in model, not
+                a transformers.js download this app runs itself. Silently
+                absent everywhere it isn't real (Firefox, Safari, Android
+                Chrome, older Chrome builds) rather than a dead option that
+                errors when tapped. */}
+              {(geminiNanoAvailability === "available" ||
+                geminiNanoAvailability === "downloadable") && (
+                <button
+                  type="button"
+                  onClick={() => setChatModelChoice("gemini-nano")}
+                  className={cn(
+                    "w-full rounded-lg p-3 text-left ring-1 transition-colors",
+                    chatModelChoice === "gemini-nano"
+                      ? "bg-prestige-deep/5 ring-prestige-deep/30"
+                      : "ring-border/70 hover:bg-secondary",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-prestige-deep">
+                      Gemini Nano (Chrome built-in)
+                    </p>
+                    <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Chrome-managed
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Google's on-device model built into Chrome itself. Chromium desktop only, no
+                    Android or iOS support.
+                  </p>
+                  {geminiNanoAvailability === "available" && (
+                    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-prestige-mid">
+                      <CircleCheck className="h-3 w-3 text-prestige-gold" strokeWidth={1.75} />
+                      Ready on this device
+                    </p>
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="mt-4">
-              {chatModelStatus === "ready" ? (
+              {chatModelChoice === "gemini-nano" ? (
+                <div>
+                  {geminiNanoAvailability === "available" ? (
+                    <div className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
+                      <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
+                      Gemini Nano ready &middot; used automatically
+                    </div>
+                  ) : geminiNanoDownloadStatus === "downloading" ? (
+                    <div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-prestige-deep/10">
+                        <div
+                          className="h-full bg-prestige-gold transition-all"
+                          style={{ width: `${geminiNanoProgress}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        Downloading via Chrome… {geminiNanoProgress}%
+                      </p>
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        {DOWNLOAD_RESILIENCE_NOTE}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            type="button"
+                            disabled={!isOnline}
+                            aria-disabled={!isOnline}
+                            title={
+                              !isOnline
+                                ? "Downloading the model needs a network connection"
+                                : undefined
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100"
+                          >
+                            <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                            Download Gemini Nano
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Download Gemini Nano?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Chrome manages this download itself, not this app &mdash; it can be
+                              several gigabytes and is shared across every site you visit, not just
+                              this one. Desktop Chromium browsers only; it won't work on Android or
+                              iOS. If that doesn't suit this device, SmolLM2 is smaller and works
+                              everywhere.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setChatModelChoice("smollm2")}>
+                              Use SmolLM2 instead
+                            </AlertDialogCancel>
+                            <AlertDialogAction onClick={() => void downloadGeminiNano()}>
+                              Continue anyway
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      {geminiNanoDownloadStatus === "error" && (
+                        <p className="mt-2 text-[11px] text-destructive">
+                          Download failed. Check your connection and try again.
+                        </p>
+                      )}
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        {!isOnline
+                          ? "You're offline, reconnect to download the model."
+                          : "Until downloaded, Ask AI and on-device quiz generation aren't available."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : chatModelStatus === "ready" ? (
                 <div>
                   <div className="flex items-center gap-2 text-xs font-medium text-prestige-mid">
                     <CircleCheck className="h-4 w-4 text-prestige-gold" strokeWidth={1.75} />
@@ -618,8 +739,7 @@ function Settings() {
                       : `Downloading ${CHAT_MODELS[chatModelChoice].label}… ${chatProgress}%`}
                   </p>
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    Keep this tab open and in view. Switching apps or letting the screen lock can
-                    interrupt the download and restart it from zero.
+                    {DOWNLOAD_RESILIENCE_NOTE}
                   </p>
                 </div>
               ) : (

@@ -129,6 +129,28 @@ export type AppSetting = {
   value: string;
 };
 
+// resumable-fetch.ts's own scratch space for an in-progress, interruptible
+// model download — see that file's top comment for the full reasoning.
+// Device-wide, not per-account, same as the model-cache-status flags
+// above: a partial download is a fact about the device's own IndexedDB,
+// not the signed-in account.
+export type PartialDownloadChunk = {
+  // `${url}::${chunkIndex}` — composite, same reasoning as materialKey
+  // above (a bare chunkIndex alone isn't unique across different URLs).
+  key: string;
+  url: string;
+  chunkIndex: number;
+  data: Blob;
+};
+
+export type PartialDownloadMeta = {
+  url: string;
+  totalBytes: number;
+  receivedBytes: number;
+  contentType: string | null;
+  updatedAt: number;
+};
+
 /** A student's own uploaded PDF, extracted client-side (see
  * src/lib/pdf-extract.ts) — distinct from the shared `materials` catalog,
  * which stays lecturer/seed content. See DEV_LOG.md, Feature 26.
@@ -448,6 +470,8 @@ export type CachedCatalogModule = {
 class DeviceDB extends Dexie {
   appSettings!: EntityTable<AppSetting, "key">;
   catalogModules!: EntityTable<CachedCatalogModule, "id">;
+  partialDownloadChunks!: EntityTable<PartialDownloadChunk, "key">;
+  partialDownloadMeta!: EntityTable<PartialDownloadMeta, "url">;
 
   constructor() {
     super("elearn_device");
@@ -456,6 +480,16 @@ class DeviceDB extends Dexie {
     });
     this.version(2).stores({
       catalogModules: "id",
+    });
+    // Purely additive — never redefines appSettings/catalogModules' own
+    // keyPaths in place (a genuine index-corruption risk this project has
+    // already been careful about elsewhere in this file's own version
+    // history). `url` as a secondary index on partialDownloadChunks is
+    // what lets resumable-fetch.ts delete every chunk for one URL in a
+    // single `.where("url").equals(url)` call once a download completes.
+    this.version(3).stores({
+      partialDownloadChunks: "key, url",
+      partialDownloadMeta: "url",
     });
   }
 }

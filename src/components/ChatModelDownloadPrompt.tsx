@@ -1,6 +1,7 @@
 import { Bot, Download } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useDownloadChatModel } from "@/hooks/use-ai-chat";
+import { DOWNLOAD_RESILIENCE_NOTE } from "@/lib/resumable-fetch";
 
 /** The on-device chat model download prompt — shared by the general "Ask
  * AI" assistant (Phase I1) and any collection-scoped chat (Phase I2),
@@ -35,10 +36,7 @@ export function ChatModelDownloadPrompt() {
             <p className="mt-2 text-[11px] text-muted-foreground">
               {finalizing ? "Finishing up, almost there…" : `Downloading… ${progress}%`}
             </p>
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Keep this tab open and in view. Switching apps or letting the screen lock can
-              interrupt the download and restart it from zero.
-            </p>
+            <p className="mt-3 text-[11px] text-muted-foreground">{DOWNLOAD_RESILIENCE_NOTE}</p>
           </div>
         ) : (
           <>

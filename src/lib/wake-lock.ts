@@ -1,20 +1,26 @@
 // Keeps the screen from dimming/locking during a long, in-progress model
-// download — found to matter from a real user report: a model download
-// (transformers.js's own main-thread fetch, see ai-model.ts/ai-chat.ts's
-// own comments on why downloads stay on the main thread) has no way to
-// resume a partial fetch, so the screen going to sleep mid-download
-// effectively restarts it from zero next time.
+// download — found to matter from a real user report, back when a model
+// download (transformers.js's own main-thread fetch, see ai-model.ts/
+// ai-chat.ts's own comments on why downloads stay on the main thread) had
+// no way to resume a partial fetch at all, so the screen sleeping mid-
+// download effectively restarted it from zero next time.
 //
-// This is a real but *partial* fix, not a full one: the Screen Wake Lock
-// API only ever prevents the screen from sleeping while the tab stays
-// visible and foregrounded — the spec has the browser auto-release the
-// lock the instant the document is hidden (switching apps, backgrounding
-// the PWA, locking the phone with the power button), which is exactly the
-// other half of what was reported ("when you switch panel or leave the
-// pwa"). Surviving *that* would need the download to happen as a real
-// Background Fetch (a Service Worker API, Chrome-only, with real platform-
-// support and integration uncertainty against transformers.js's own
-// Cache Storage lookups) — a materially bigger, riskier build than this.
+// That restart-from-zero problem is now actually fixed independently (see
+// resumable-fetch.ts, DEV_LOG.md Feature 74) — a download interrupted by
+// the screen locking, an app switch, or even the tab closing outright now
+// resumes from its last saved chunk instead of restarting. This wake lock
+// is kept anyway, downgraded from "the only thing standing between a
+// locked screen and starting over" to a smaller, still-real optimization:
+// some browsers/OSes throttle a backgrounded tab's network activity even
+// without fully suspending it, so keeping the screen (and tab) foregrounded
+// still finishes a download faster in real wall-clock time — a nice-to-
+// have now, not the thing correctness depends on. Still only a partial,
+// best-effort mechanism in its own right: the Screen Wake Lock API only
+// ever prevents the screen from sleeping while the tab stays visible and
+// foregrounded, auto-releasing the instant the document is hidden — this
+// was never going to cover "switch apps or leave the PWA" on its own,
+// which is exactly why resumability, not a longer-lived wake lock, was the
+// real fix needed.
 export async function acquireWakeLock(): Promise<WakeLockSentinel | null> {
   if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return null;
   try {

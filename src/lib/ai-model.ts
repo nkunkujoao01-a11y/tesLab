@@ -37,6 +37,7 @@
 import { summarizeViaWorker } from "@/lib/ai-worker-client";
 import { classifyModelError, isFatalCategory } from "@/lib/ai-error-classifier";
 import { markAiOperationStarted, markAiOperationFinished } from "@/lib/ai-crash-breadcrumb";
+import { installResumableDownloads } from "@/lib/resumable-fetch";
 
 const MODEL_ID = "onnx-community/text_summarization-ONNX";
 const MODEL_DTYPE = "fp32";
@@ -105,7 +106,8 @@ export function loadSummarizerModel(onProgress?: (p: ModelProgress) => void): Pr
     pipelinePromise = (async () => {
       await markAiOperationStarted("load", "the summarization model");
       try {
-        const { pipeline } = await import("@huggingface/transformers");
+        const { pipeline, env } = await import("@huggingface/transformers");
+        installResumableDownloads(env);
         for (let attempt = 0; ; attempt++) {
           try {
             const summarizer = await pipeline("summarization", MODEL_ID, {

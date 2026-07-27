@@ -24,8 +24,20 @@ import { deviceDb } from "@/lib/db";
 import { generateChatViaWorker } from "@/lib/ai-worker-client";
 import { classifyModelError, isFatalCategory } from "@/lib/ai-error-classifier";
 import { markAiOperationStarted, markAiOperationFinished } from "@/lib/ai-crash-breadcrumb";
+import { installResumableDownloads } from "@/lib/resumable-fetch";
 
-export type ChatModelChoice = "smollm2" | "gemma3-1b";
+// The two models transformers.js actually downloads/runs (CHAT_MODELS
+// below covers exactly these). ChatModelChoice — the type describing
+// "which model is currently selected," used far more broadly across this
+// app — is a separate, wider union: it also includes "gemini-nano" (Feature
+// 74), which has no CHAT_MODELS entry at all (no repo id, no dtype — see
+// ai-nano.ts's own comment on why forcing it into ChatModelInfo would be
+// wrong). Keeping these two types separate is what lets `CHAT_MODELS[choice]`
+// stay a safe, always-defined lookup everywhere it's already used, rather
+// than needing an extra "is this actually gemini-nano" guard at every call
+// site.
+export type TransformersChatModelChoice = "smollm2" | "gemma3-1b";
+export type ChatModelChoice = TransformersChatModelChoice | "gemini-nano";
 
 // Matches transformers.js's own PretrainedOptions["dtype"] union — spelled
 // out here rather than imported so this file doesn't need a static,
@@ -58,7 +70,7 @@ export type ChatModelInfo = {
   approxSizeMb: number;
 };
 
-export const CHAT_MODELS: Record<ChatModelChoice, ChatModelInfo> = {
+export const CHAT_MODELS: Record<TransformersChatModelChoice, ChatModelInfo> = {
   // dtype history, real and humbling: started "q4" (block-quantized),
   // which real-device testing found crashed every quiz question with
   // "Can't create a session ... Could not find an implementation for
@@ -118,7 +130,7 @@ export const DEFAULT_CHAT_MODEL: ChatModelChoice = "smollm2";
 const CHAT_MODEL_CHOICE_KEY = "chat_model_choice";
 
 function isChatModelChoice(value: string): value is ChatModelChoice {
-  return value === "smollm2" || value === "gemma3-1b";
+  return value === "smollm2" || value === "gemma3-1b" || value === "gemini-nano";
 }
 
 /** The model the user has selected in Profile > AI Settings (see Feature
@@ -202,7 +214,17 @@ export async function loadChatModel(
   onProgress?: (p: ModelProgress) => void,
   modelChoice?: ChatModelChoice,
 ): Promise<Generator> {
-  const choice = modelChoice ?? (await getSelectedChatModel());
+  const resolvedChoice = modelChoice ?? (await getSelectedChatModel());
+  if (resolvedChoice === "gemini-nano") {
+    // Never reached in practice — askChatModel branches to
+    // generateChatViaGeminiNano before any caller gets here. Kept as an
+    // explicit failure (and a type-narrowing point for CHAT_MODELS below)
+    // rather than a silent wrong-model load if that branch is ever bypassed.
+    throw new Error(
+      "loadChatModel doesn't support Gemini Nano — use loadGeminiNanoSession instead",
+    );
+  }
+  const choice = resolvedChoice;
   const fatalError = fatalModelErrors.get(choice);
   if (fatalError) return Promise.reject(fatalError);
 
@@ -223,7 +245,8 @@ export async function loadChatModel(
   const promise = (async () => {
     await markAiOperationStarted("load", CHAT_MODELS[choice].label);
     try {
-      const { pipeline } = await import("@huggingface/transformers");
+      const { pipeline, env } = await import("@huggingface/transformers");
+      installResumableDownloads(env);
 
       // One dtype's worth of load attempts (with the existing transient-
       // retry policy) — called twice below: once for the primary dtype,
@@ -320,6 +343,11 @@ export async function loadChatModel(
 export async function isModelCachedForOffline(modelChoice?: ChatModelChoice): Promise<boolean> {
   if (typeof caches === "undefined") return false;
   const choice = modelChoice ?? (await getSelectedChatModel());
+  // Gemini Nano is never in CHAT_MODELS (no repo id — Chrome, not this
+  // app, owns and stores its model) and never in Cache Storage either, so
+  // there's nothing here to check — always "not cached this way," not an
+  // error.
+  if (choice === "gemini-nano") return false;
   const modelId = CHAT_MODELS[choice].id;
   try {
     const cacheNames = await caches.keys();
@@ -410,5 +438,15 @@ export async function askChatModel(
   maxNewTokens: number = MAX_NEW_TOKENS,
   sample = false,
 ): Promise<string> {
+  // Gemini Nano is a thin call into a browser-managed model, not a
+  // blocking WASM computation this page has to run — generated directly
+  // on the main thread (ai-nano.ts), never routed through the existing
+  // transformers.js worker pipeline built around a genuinely different
+  // kind of model. `maxNewTokens`/`sample` don't apply to it (the Prompt
+  // API has no equivalent knobs in the shape this was written against).
+  if ((await getSelectedChatModel()) === "gemini-nano") {
+    const { generateChatViaGeminiNano } = await import("@/lib/ai-nano");
+    return generateChatViaGeminiNano(history, onToken);
+  }
   return generateChatViaWorker(history, onToken, maxNewTokens, sample);
 }
