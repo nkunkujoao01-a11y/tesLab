@@ -151,6 +151,19 @@ export type PartialDownloadMeta = {
   updatedAt: number;
 };
 
+// Written directly by public/sw.js (raw IndexedDB, not Dexie — a service
+// worker's backgroundfetchsuccess/backgroundfetchfail handlers run
+// independent of any open tab, so this is the one signal the page-side
+// resumable-fetch.ts can rely on regardless of whether a tab was open when
+// the browser-managed download actually finished). "failure" covers both a
+// real failure and a user/OS-initiated abort — either way, the page-side
+// wait loop needs to stop waiting and fall back to a manual fetch.
+export type BackgroundFetchStatus = {
+  url: string;
+  state: "success" | "failure";
+  updatedAt: number;
+};
+
 /** A student's own uploaded PDF, extracted client-side (see
  * src/lib/pdf-extract.ts) — distinct from the shared `materials` catalog,
  * which stays lecturer/seed content. See DEV_LOG.md, Feature 26.
@@ -472,6 +485,7 @@ class DeviceDB extends Dexie {
   catalogModules!: EntityTable<CachedCatalogModule, "id">;
   partialDownloadChunks!: EntityTable<PartialDownloadChunk, "key">;
   partialDownloadMeta!: EntityTable<PartialDownloadMeta, "url">;
+  backgroundFetchStatus!: EntityTable<BackgroundFetchStatus, "url">;
 
   constructor() {
     super("elearn_device");
@@ -490,6 +504,14 @@ class DeviceDB extends Dexie {
     this.version(3).stores({
       partialDownloadChunks: "key, url",
       partialDownloadMeta: "url",
+    });
+    // Also purely additive. `public/sw.js` opens this same database
+    // (`elearn_device`) directly via the raw IndexedDB API — not through
+    // Dexie, since a service worker's own bundle doesn't import it — so
+    // this store's name and keyPath ("url") must stay in exact sync with
+    // what that file's idbPut() calls assume.
+    this.version(4).stores({
+      backgroundFetchStatus: "url",
     });
   }
 }

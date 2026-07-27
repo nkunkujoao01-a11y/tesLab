@@ -37,7 +37,7 @@
 import { summarizeViaWorker } from "@/lib/ai-worker-client";
 import { classifyModelError, isFatalCategory } from "@/lib/ai-error-classifier";
 import { markAiOperationStarted, markAiOperationFinished } from "@/lib/ai-crash-breadcrumb";
-import { installResumableDownloads } from "@/lib/resumable-fetch";
+import { installResumableDownloads, subscribeDownloadProgress } from "@/lib/resumable-fetch";
 
 const MODEL_ID = "onnx-community/text_summarization-ONNX";
 const MODEL_DTYPE = "fp32";
@@ -108,27 +108,37 @@ export function loadSummarizerModel(onProgress?: (p: ModelProgress) => void): Pr
       try {
         const { pipeline, env } = await import("@huggingface/transformers");
         installResumableDownloads(env);
-        for (let attempt = 0; ; attempt++) {
-          try {
-            const summarizer = await pipeline("summarization", MODEL_ID, {
-              dtype: MODEL_DTYPE,
-              progress_callback: broadcastProgress,
-            });
-            return summarizer as unknown as Summarizer;
-          } catch (err) {
-            const category = classifyModelError(err);
-            if (isFatalCategory(category)) {
-              const fatal = err instanceof Error ? err : new Error(String(err));
-              summarizerFatalError = fatal;
-              throw fatal;
+        // See resumable-fetch.ts's own comment on why this is a separate
+        // channel from transformers.js's own progress_callback — real byte
+        // progress during the actual download, not just at the very end.
+        const unsubscribeDownloadProgress = subscribeDownloadProgress((p) =>
+          broadcastProgress({ status: "progress", ...p }),
+        );
+        try {
+          for (let attempt = 0; ; attempt++) {
+            try {
+              const summarizer = await pipeline("summarization", MODEL_ID, {
+                dtype: MODEL_DTYPE,
+                progress_callback: broadcastProgress,
+              });
+              return summarizer as unknown as Summarizer;
+            } catch (err) {
+              const category = classifyModelError(err);
+              if (isFatalCategory(category)) {
+                const fatal = err instanceof Error ? err : new Error(String(err));
+                summarizerFatalError = fatal;
+                throw fatal;
+              }
+              if (attempt >= TRANSIENT_RETRY_ATTEMPTS || category !== "transient") throw err;
+              console.error(
+                `Transient failure loading summarizer model (attempt ${attempt + 1}), retrying`,
+                err,
+              );
+              await delay(TRANSIENT_RETRY_DELAY_MS);
             }
-            if (attempt >= TRANSIENT_RETRY_ATTEMPTS || category !== "transient") throw err;
-            console.error(
-              `Transient failure loading summarizer model (attempt ${attempt + 1}), retrying`,
-              err,
-            );
-            await delay(TRANSIENT_RETRY_DELAY_MS);
           }
+        } finally {
+          unsubscribeDownloadProgress();
         }
       } finally {
         // Reached only if the process is still alive to run it — see

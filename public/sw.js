@@ -173,6 +173,105 @@ self.addEventListener("message", (event) => {
   }
 });
 
+// Background Fetch (Feature 75) — lets a large on-device AI model download
+// (see src/lib/resumable-fetch.ts) keep running via the browser itself even
+// after every tab of this app closes, on the browsers that support it
+// (Chromium desktop and Android Chrome; not Firefox/Safari). These handlers
+// persist the result directly into the same IndexedDB database the page's
+// own Dexie-based resumable-fetch.ts reads from — using the raw IndexedDB
+// API here, not Dexie, since a service worker's own bundle doesn't import
+// the app's JS. Store names/keyPaths must stay in exact sync with
+// src/lib/db.ts's DeviceDB schema.
+const DEVICE_DB_NAME = "elearn_device";
+
+function openDeviceDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DEVICE_DB_NAME);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function idbPut(storeName, value) {
+  const db = await openDeviceDb();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, "readwrite");
+      tx.objectStore(storeName).put(value);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+self.addEventListener("backgroundfetchsuccess", (event) => {
+  const registration = event.registration;
+  event.waitUntil(
+    (async () => {
+      try {
+        const records = await registration.matchAll();
+        for (const record of records) {
+          const response = await record.responseReady;
+          const blob = await response.blob();
+          const url = record.request.url;
+          // Persisted as a single whole-file chunk (chunkIndex 0) — see
+          // resumable-fetch.ts's streamStoredChunks, which reads back
+          // however many chunks actually exist for a URL rather than
+          // assuming fixed-size pieces, so this is a normal, valid
+          // "already complete" state for it to find.
+          await idbPut("partialDownloadChunks", {
+            key: `${url}::0`,
+            url,
+            chunkIndex: 0,
+            data: blob,
+          });
+          await idbPut("partialDownloadMeta", {
+            url,
+            totalBytes: blob.size,
+            receivedBytes: blob.size,
+            contentType: response.headers.get("content-type"),
+            updatedAt: Date.now(),
+          });
+          await idbPut("backgroundFetchStatus", { url, state: "success", updatedAt: Date.now() });
+        }
+        await registration.updateUI({ title: "On-device AI model download complete" });
+      } catch (err) {
+        console.error("Failed to persist a background-fetched model file", err);
+      }
+    })(),
+  );
+});
+
+async function recordBackgroundFetchFailure(registration) {
+  try {
+    const records = await registration.matchAll();
+    for (const record of records) {
+      await idbPut("backgroundFetchStatus", {
+        url: record.request.url,
+        state: "failure",
+        updatedAt: Date.now(),
+      });
+    }
+  } catch (err) {
+    console.error("Failed to record a background fetch failure", err);
+  }
+}
+
+self.addEventListener("backgroundfetchfail", (event) => {
+  event.waitUntil(recordBackgroundFetchFailure(event.registration));
+});
+
+// A user (or the OS) can cancel an in-progress background fetch directly —
+// handled the same as an outright failure: either way the download didn't
+// complete, and the page-side wait loop (resumable-fetch.ts's
+// waitForBackgroundFetchOutcome) needs a definitive signal to stop waiting
+// and fall back to a manual fetch instead of hanging forever.
+self.addEventListener("backgroundfetchabort", (event) => {
+  event.waitUntil(recordBackgroundFetchFailure(event.registration));
+});
+
 async function precacheRoutes() {
   const cache = await caches.open(CACHE_NAME);
   await Promise.all(

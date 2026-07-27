@@ -24,7 +24,7 @@ import { deviceDb } from "@/lib/db";
 import { generateChatViaWorker } from "@/lib/ai-worker-client";
 import { classifyModelError, isFatalCategory } from "@/lib/ai-error-classifier";
 import { markAiOperationStarted, markAiOperationFinished } from "@/lib/ai-crash-breadcrumb";
-import { installResumableDownloads } from "@/lib/resumable-fetch";
+import { installResumableDownloads, subscribeDownloadProgress } from "@/lib/resumable-fetch";
 
 // The two models transformers.js actually downloads/runs (CHAT_MODELS
 // below covers exactly these). ChatModelChoice — the type describing
@@ -242,11 +242,18 @@ export async function loadChatModel(
     for (const subscriber of subscribers) subscriber(p);
   };
 
+  let unsubscribeDownloadProgress = () => {};
   const promise = (async () => {
     await markAiOperationStarted("load", CHAT_MODELS[choice].label);
     try {
       const { pipeline, env } = await import("@huggingface/transformers");
       installResumableDownloads(env);
+      // See resumable-fetch.ts's own comment on why this is a separate
+      // channel from transformers.js's own progress_callback — real byte
+      // progress during the actual download, not just at the very end.
+      unsubscribeDownloadProgress = subscribeDownloadProgress((p) =>
+        broadcastProgress({ status: "progress", ...p }),
+      );
 
       // One dtype's worth of load attempts (with the existing transient-
       // retry policy) — called twice below: once for the primary dtype,
@@ -303,6 +310,7 @@ export async function loadChatModel(
         throw fatal;
       }
     } finally {
+      unsubscribeDownloadProgress();
       // Reached only if the process is still alive to run it — a real
       // crash mid-load never gets here, which is exactly the signal
       // checkAndConsumeStaleAiBreadcrumb looks for on a later load.
