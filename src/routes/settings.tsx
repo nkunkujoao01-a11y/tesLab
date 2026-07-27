@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   Download,
   Brain,
@@ -136,6 +136,17 @@ function Settings() {
     status: geminiNanoDownloadStatus,
     progress: geminiNanoProgress,
   } = useDownloadGeminiNano();
+  // Self-heals a choice persisted before ai-nano.ts's mobile override
+  // shipped (see that file's own real-device comment — a phone had
+  // "gemini-nano" stored as the selection with the card showing "ready,"
+  // but it doesn't actually work there). Only fires once geminiNanoAvailability
+  // has actually resolved to "unavailable" (not the initial `null`
+  // loading state), so this never flickers while the check is in flight.
+  useEffect(() => {
+    if (chatModelChoice === "gemini-nano" && geminiNanoAvailability === "unavailable") {
+      setChatModelChoice("smollm2");
+    }
+  }, [chatModelChoice, geminiNanoAvailability, setChatModelChoice]);
   const isOnline = useOnlineStatus();
   const { connected, connecting, connect, disconnect } = useCloudAiKey();
   const [cloudEnabled, setCloudEnabled] = useCloudAiEnabled();

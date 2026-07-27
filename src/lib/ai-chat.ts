@@ -453,8 +453,21 @@ export async function askChatModel(
   // kind of model. `maxNewTokens`/`sample` don't apply to it (the Prompt
   // API has no equivalent knobs in the shape this was written against).
   if ((await getSelectedChatModel()) === "gemini-nano") {
-    const { generateChatViaGeminiNano } = await import("@/lib/ai-nano");
-    return generateChatViaGeminiNano(history, onToken);
+    const { generateChatViaGeminiNano, isGeminiNanoSupported } = await import("@/lib/ai-nano");
+    // Re-checked live, not just trusted from whenever this was originally
+    // selected — a real Android phone was found with "gemini-nano"
+    // persisted as the choice and the settings card showing "ready," but
+    // it doesn't actually work there (see ai-nano.ts's own comment on why
+    // Chrome's own availability() answer can't be trusted on mobile).
+    // Falls back to the default on-device model and corrects the stored
+    // preference instead of failing the student's request.
+    if ((await isGeminiNanoSupported()) !== "unavailable") {
+      return generateChatViaGeminiNano(history, onToken);
+    }
+    console.error(
+      "Gemini Nano was selected but isn't supported on this device — falling back to the default on-device model",
+    );
+    await setSelectedChatModel(DEFAULT_CHAT_MODEL);
   }
   return generateChatViaWorker(history, onToken, maxNewTokens, sample);
 }

@@ -50,12 +50,38 @@ function getLanguageModel(): LanguageModelStatic | null {
   return globalWithLanguageModel.LanguageModel ?? null;
 }
 
+// Real-device finding, not a guess: a student's actual Android phone had
+// `LanguageModel` present with `.availability()` self-reporting "available"
+// — the settings card showed "Ready on this device" and the assistant
+// silently switched to using it — but it doesn't actually work offline
+// there (chat required a network connection, which SmolLM2/Gemma running
+// through this app's own Web Worker never do once downloaded). Chrome's own
+// API surface on Android apparently doesn't reliably reflect whether the
+// underlying model is a genuine, fully-offline on-device one — this app's
+// own pre-launch research already concluded Gemini Nano is desktop-only,
+// but that was never meant to rely on Chrome telling the truth about it, so
+// this checks the platform directly instead of trusting `availability()`
+// alone. `navigator.userAgentData.mobile` is preferred (a direct signal,
+// not a string guess) with a `userAgent` regex fallback for browsers that
+// don't expose it.
+function isMobilePlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
+  if (typeof uaData?.mobile === "boolean") return uaData.mobile;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 /** Feature-detects the Prompt API and asks Chrome whether Gemini Nano is
  * usable right now — `"unavailable"` covers everything from "wrong
  * browser" to "unsupported hardware" to "not yet enabled," all of which
  * this app treats identically: don't show the option at all. Never throws
- * — any real error here also just means "treat as unavailable." */
+ * — any real error here also just means "treat as unavailable." Refuses
+ * outright on any mobile platform without even asking the browser (see
+ * isMobilePlatform's own comment on why Chrome's own answer can't be
+ * trusted here) — this is a deliberate override of whatever `availability()`
+ * itself would report. */
 export async function isGeminiNanoSupported(): Promise<GeminiNanoAvailability> {
+  if (isMobilePlatform()) return "unavailable";
   const LanguageModel = getLanguageModel();
   if (!LanguageModel) return "unavailable";
   try {
@@ -89,6 +115,14 @@ export function loadGeminiNanoSession(
   onProgress?: (p: ModelProgress) => void,
 ): Promise<LanguageModelSession> {
   if (sessionPromise) return sessionPromise;
+
+  // Same override as isGeminiNanoSupported — checked again here, not just
+  // trusted from an earlier call, so a choice persisted before this fix
+  // shipped (see this file's own real-device comment above) can't reach a
+  // real attempt on a device where it's known not to work.
+  if (isMobilePlatform()) {
+    return Promise.reject(new Error("Gemini Nano isn't supported on mobile"));
+  }
 
   const LanguageModel = getLanguageModel();
   if (!LanguageModel) {
