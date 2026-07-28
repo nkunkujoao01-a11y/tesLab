@@ -216,15 +216,18 @@ self.addEventListener("backgroundfetchsuccess", (event) => {
           const response = await record.responseReady;
           const blob = await response.blob();
           const url = record.request.url;
-          // Persisted as a single whole-file chunk (chunkIndex 0) — see
-          // resumable-fetch.ts's streamStoredChunks, which reads back
-          // however many chunks actually exist for a URL rather than
-          // assuming fixed-size pieces, so this is a normal, valid
-          // "already complete" state for it to find.
+          // Persisted as a single whole-file chunk under chunkIndex -1, a
+          // sentinel manual chunking's own 0,1,2,... loop can never
+          // produce (see resumable-fetch.ts's WHOLE_FILE_CHUNK_INDEX for
+          // the full reasoning) — this used to be chunkIndex 0, which
+          // could collide with manual chunking's own first slice of the
+          // same URL if this write landed while a manual download was
+          // independently in flight, corrupting the reassembled file.
+          // Must stay in sync with that constant's literal value.
           await idbPut("partialDownloadChunks", {
-            key: `${url}::0`,
+            key: `${url}::-1`,
             url,
-            chunkIndex: 0,
+            chunkIndex: -1,
             data: blob,
           });
           await idbPut("partialDownloadMeta", {

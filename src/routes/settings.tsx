@@ -114,7 +114,13 @@ function Settings() {
   const staleAiOperation = useStaleAiOperationWarning();
   const modelStatus = useAIModelStatus();
   const modelOfflineCapable = useAIModelOfflineCapable();
-  const { downloadModel, status: downloadStatus, progress, finalizing } = useDownloadAIModel();
+  const {
+    downloadModel,
+    status: downloadStatus,
+    progress,
+    finalizing,
+    errorMessage: downloadErrorMessage,
+  } = useDownloadAIModel();
   const chatModelStatus = useChatModelStatus();
   const chatModelOfflineCapable = useChatModelOfflineCapable();
   const [chatModelChoice, setChatModelChoice] = useChatModelChoice();
@@ -123,6 +129,7 @@ function Settings() {
     status: chatDownloadStatus,
     progress: chatProgress,
     finalizing: chatFinalizing,
+    errorMessage: chatDownloadErrorMessage,
   } = useDownloadChatModel();
   const smollm2Cached = useChatModelCachedStatus("smollm2");
   const gemma3Cached = useChatModelCachedStatus("gemma3-1b");
@@ -512,7 +519,11 @@ function Settings() {
                     />
                   </div>
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    {finalizing ? "Finishing up, almost there…" : `Downloading… ${progress}%`}
+                    {finalizing
+                      ? progress === 0
+                        ? "Preparing your download… this initial step can take up to 20 seconds before progress shows."
+                        : "Finishing up, almost there…"
+                      : `Downloading… ${progress}%`}
                   </p>
                   <p className="mt-2 text-[11px] text-muted-foreground">
                     {DOWNLOAD_RESILIENCE_NOTE}
@@ -535,7 +546,8 @@ function Settings() {
                   </button>
                   {downloadStatus === "error" && (
                     <p className="mt-2 text-[11px] text-destructive">
-                      Download failed. Check your connection and try again.
+                      {downloadErrorMessage ??
+                        "Download failed. Check your connection and try again."}
                     </p>
                   )}
                   <p className="mt-2 text-[11px] text-muted-foreground">
@@ -746,7 +758,9 @@ function Settings() {
                   </div>
                   <p className="mt-2 text-[11px] text-muted-foreground">
                     {chatFinalizing
-                      ? "Finishing up, almost there…"
+                      ? chatProgress === 0
+                        ? "Preparing your download… this initial step can take up to 20 seconds before progress shows."
+                        : "Finishing up, almost there…"
                       : `Downloading ${CHAT_MODELS[chatModelChoice].label}… ${chatProgress}%`}
                   </p>
                   <p className="mt-2 text-[11px] text-muted-foreground">
@@ -817,7 +831,8 @@ function Settings() {
                   )}
                   {chatDownloadStatus === "error" && (
                     <p className="mt-2 text-[11px] text-destructive">
-                      Download failed. Check your connection and try again.
+                      {chatDownloadErrorMessage ??
+                        "Download failed. Check your connection and try again."}
                     </p>
                   )}
                   <p className="mt-2 text-[11px] text-muted-foreground">

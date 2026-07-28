@@ -10,7 +10,7 @@ import { DOWNLOAD_RESILIENCE_NOTE } from "@/lib/resumable-fetch";
  * than two copies that could drift out of sync. */
 export function ChatModelDownloadPrompt() {
   const isOnline = useOnlineStatus();
-  const { downloadModel, status, progress, finalizing } = useDownloadChatModel();
+  const { downloadModel, status, progress, finalizing, errorMessage } = useDownloadChatModel();
 
   return (
     <div className="flex flex-1 items-center justify-center px-6">
@@ -34,7 +34,11 @@ export function ChatModelDownloadPrompt() {
               />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              {finalizing ? "Finishing up, almost there…" : `Downloading… ${progress}%`}
+              {finalizing
+                ? progress === 0
+                  ? "Preparing your download… this initial step can take up to 20 seconds before progress shows."
+                  : "Finishing up, almost there…"
+                : `Downloading… ${progress}%`}
             </p>
             <p className="mt-3 text-[11px] text-muted-foreground">{DOWNLOAD_RESILIENCE_NOTE}</p>
           </div>
@@ -52,7 +56,7 @@ export function ChatModelDownloadPrompt() {
             </button>
             {status === "error" && (
               <p className="mt-3 text-[11px] text-destructive">
-                Download failed. Check your connection and try again.
+                {errorMessage ?? "Download failed. Check your connection and try again."}
               </p>
             )}
             {!isOnline && (

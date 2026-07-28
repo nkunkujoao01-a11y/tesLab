@@ -63,8 +63,11 @@ function getLanguageModel(): LanguageModelStatic | null {
 // this checks the platform directly instead of trusting `availability()`
 // alone. `navigator.userAgentData.mobile` is preferred (a direct signal,
 // not a string guess) with a `userAgent` regex fallback for browsers that
-// don't expose it.
-function isMobilePlatform(): boolean {
+// don't expose it. Exported: also the platform signal behind
+// `ai-chat.ts`'s `getDefaultChatModel()`, which needs a synchronous
+// mobile/desktop check to pick a sensible default chat model without
+// waiting on the async `isGeminiNanoSupported()` check below.
+export function isMobilePlatform(): boolean {
   if (typeof navigator === "undefined") return false;
   const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
   if (typeof uaData?.mobile === "boolean") return uaData.mobile;

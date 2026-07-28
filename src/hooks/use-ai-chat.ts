@@ -11,7 +11,7 @@ import {
   isModelCachedForOffline,
   getSelectedChatModel,
   setSelectedChatModel,
-  DEFAULT_CHAT_MODEL,
+  getDefaultChatModel,
   type ModelProgress,
   type ChatTurn,
   type ChatModelChoice,
@@ -59,7 +59,7 @@ async function syncModelStatusFlags(choice: ChatModelChoice): Promise<void> {
  * syncModelStatusFlags) so switching models never leaves a stale
  * "Downloaded" status pointing at the model that's no longer selected. */
 export function useChatModelChoice(): [ChatModelChoice, (choice: ChatModelChoice) => void] {
-  const [choice, setChoiceState] = useState<ChatModelChoice>(DEFAULT_CHAT_MODEL);
+  const [choice, setChoiceState] = useState<ChatModelChoice>(getDefaultChatModel());
 
   useEffect(() => {
     let cancelled = false;
@@ -151,17 +151,27 @@ export function useDownloadChatModel() {
   const [status, setStatus] = useState<"idle" | "downloading" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [finalizing, setFinalizing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const downloadModel = useCallback(async () => {
     setStatus("downloading");
     setProgress(0);
     setFinalizing(false);
+    setErrorMessage(null);
     let stallTimer: ReturnType<typeof setTimeout> | undefined;
     const armStallTimer = (currentProgress: number) => {
       clearTimeout(stallTimer);
-      if (currentProgress < FINALIZING_THRESHOLD) return;
+      // Also arms at exactly 0%, not just the ≥90% "final stretch" case —
+      // a Background Fetch attempt (resumable-fetch.ts) can go up to its
+      // own 20s stall-detection window with zero progress events at all,
+      // which previously meant *no* "still working" message for up to 20s
+      // on a real download, reading exactly like the app had frozen. The
+      // 1-89% "normal slow trickle" zone deliberately keeps its existing,
+      // non-alarmist silence — this only adds a third, symmetric case.
+      if (currentProgress > 0 && currentProgress < FINALIZING_THRESHOLD) return;
       stallTimer = setTimeout(() => setFinalizing(true), STALL_MS);
     };
+    armStallTimer(0);
     // Best-effort only — see wake-lock.ts for exactly what this does and
     // doesn't protect against (screen-off while foregrounded, not
     // backgrounding/app-switching).
@@ -192,6 +202,7 @@ export function useDownloadChatModel() {
       notifyIfPermitted("Study assistant ready", "You can start asking it questions now.");
     } catch (err) {
       console.error("Failed to download chat model", err);
+      setErrorMessage(err instanceof Error ? err.message : null);
       setStatus("error");
     } finally {
       clearTimeout(stallTimer);
@@ -199,7 +210,7 @@ export function useDownloadChatModel() {
     }
   }, []);
 
-  return { downloadModel, status, progress, finalizing };
+  return { downloadModel, status, progress, finalizing, errorMessage };
 }
 
 /** Feature-detects Chrome's built-in Gemini Nano (the Prompt API) once on

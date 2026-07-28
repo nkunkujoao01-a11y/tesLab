@@ -55,6 +55,55 @@ const BACKGROUND_FETCH_MIN_BYTES = 5 * 1024 * 1024;
 
 const BACKGROUND_FETCH_ID_PREFIX = "elearn-model-dl";
 
+// A whole-file chunk (written by public/sw.js's backgroundfetchsuccess
+// handler) is stored under this sentinel index instead of `0` — manual
+// chunking's own loop (downloadResumable, below) only ever produces
+// `0, 1, 2, ...`, so this can never collide with it. This matters: the
+// Background Fetch attempt isn't guaranteed to actually stop the moment
+// this app "gives up waiting" on it (see downloadViaBackgroundFetch's own
+// comment on why) — if it succeeds anyway while manual chunking is
+// independently fetching the same URL, both used to write to the exact
+// same key (`${url}::0`), corrupting the reassembled file (whole file +
+// manual chunking's own 8MB slices, concatenated). A disjoint index makes
+// that structurally impossible: the two writers can never overwrite each
+// other, and streamStoredChunks (below) knows to prefer the whole-file
+// chunk over any partial ones if both ever exist. Must stay in exact sync
+// with the literal `-1` public/sw.js writes directly (that file can't
+// import this constant — it's a separate service-worker bundle).
+const WHOLE_FILE_CHUNK_INDEX = -1;
+
+/** Thrown when an assembled download's byte length doesn't match what was
+ * expected — deliberately worded so it can never match any pattern in
+ * ai-error-classifier.ts's FATAL_UNSUPPORTED_PATTERNS/FATAL_OOM_PATTERNS
+ * (verified directly against that file's patterns when writing this
+ * message) or `isTransientFetchError`'s `TypeError` check, so it always
+ * classifies as "unknown" — never latched into fatalModelErrors/
+ * summarizerFatalError the way a corrupted buffer reaching transformers.js
+ * itself would be. Real device evidence: a race between this file's two
+ * download mechanisms (see WHOLE_FILE_CHUNK_INDEX's own comment) could
+ * previously corrupt a download's stored chunks, which manifested to a
+ * user as "Gemma 3 said failed, and Ask AI stayed broken afterward" — this
+ * class exists so a similar corruption is caught, cleaned up, and reported
+ * honestly instead of reaching the model runtime as a mysterious crash. */
+export class DownloadIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DownloadIntegrityError";
+  }
+}
+
+/** Deletes every trace of an in-progress or corrupted download for `url` —
+ * shared by streamStoredChunks' normal post-success cleanup and its
+ * integrity-failure path, so a device with stale/corrupted rows (from
+ * before this fix shipped, or from any future issue) always gets a genuine
+ * clean slate for its next attempt rather than repeating the same
+ * corruption. */
+async function clearStoredDownload(url: string): Promise<void> {
+  await deviceDb.partialDownloadChunks.where("url").equals(url).delete();
+  await deviceDb.partialDownloadMeta.delete(url);
+  await deviceDb.backgroundFetchStatus.delete(url).catch(() => {});
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -128,15 +177,25 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
   }
 }
 
-/** Builds a real Response by reading every stored chunk for `url` back in
+/** Builds a real Response by reading stored chunks for `url` back in
  * `chunkIndex` order, whatever their actual sizes — deliberately not
  * assuming uniform `CHUNK_SIZE` pieces, since a Background-Fetch-completed
- * download is persisted as a single whole-file chunk (chunkIndex 0), while a
- * manually-chunked download has many `CHUNK_SIZE`-sized pieces. Deletes the
- * chunk/meta/status scratch space once the stream is fully consumed — it's
- * only ever needed to survive an interruption *during* the download, not
- * afterward (the completed file goes on to transformers.js's own Cache
- * Storage write, unaffected by anything here). */
+ * download is persisted as a single whole-file chunk (WHOLE_FILE_CHUNK_INDEX),
+ * while a manually-chunked download has many `CHUNK_SIZE`-sized pieces. If a
+ * whole-file chunk exists, it's streamed *alone* — any other rows for the
+ * same URL are ignored rather than concatenated with it, since those can
+ * only be manual chunking's own partial slices of the very same file (see
+ * WHOLE_FILE_CHUNK_INDEX's own comment on why both can legitimately exist at
+ * once). Verifies the assembled byte length matches `totalBytes` exactly
+ * before closing — a mismatch means the two download mechanisms raced
+ * despite the disjoint-index defense (or a previous corrupted attempt left
+ * bad data behind), and is reported as a DownloadIntegrityError with the
+ * corrupted rows cleared, rather than silently handing transformers.js a
+ * broken buffer. Deletes the chunk/meta/status scratch space once the
+ * stream is fully and correctly consumed — it's only ever needed to survive
+ * an interruption *during* the download, not afterward (the completed file
+ * goes on to transformers.js's own Cache Storage write, unaffected by
+ * anything here). */
 async function streamStoredChunks(
   url: string,
   totalBytes: number,
@@ -144,30 +203,46 @@ async function streamStoredChunks(
 ): Promise<Response> {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let streamedBytes = 0;
       try {
-        const chunks = await deviceDb.partialDownloadChunks
+        const allChunks = await deviceDb.partialDownloadChunks
           .where("url")
           .equals(url)
           .sortBy("chunkIndex");
-        if (chunks.length === 0) {
+        if (allChunks.length === 0) {
           controller.error(new Error(`No stored chunks found for ${url}`));
           return;
         }
-        for (const chunk of chunks) {
-          controller.enqueue(new Uint8Array(await chunk.data.arrayBuffer()));
+        const wholeFileChunk = allChunks.find((c) => c.chunkIndex === WHOLE_FILE_CHUNK_INDEX);
+        const chunksToStream = wholeFileChunk ? [wholeFileChunk] : allChunks;
+        for (const chunk of chunksToStream) {
+          const buf = await chunk.data.arrayBuffer();
+          streamedBytes += buf.byteLength;
+          controller.enqueue(new Uint8Array(buf));
+        }
+        if (streamedBytes !== totalBytes) {
+          await clearStoredDownload(url);
+          controller.error(
+            new DownloadIntegrityError(
+              `The downloaded file for ${shortFileNameFromUrl(url)} doesn't match its expected size ` +
+                `(expected ${totalBytes} bytes, got ${streamedBytes}) — this can happen when a ` +
+                `background download and a manual download of the same file overlap. The saved ` +
+                `partial download has been cleared so the next attempt starts clean.`,
+            ),
+          );
+          return;
         }
         controller.close();
       } catch (err) {
         controller.error(err);
         return;
       }
-      // Reached only once every chunk was successfully enqueued — a
-      // failure here (e.g. the tab closing right as this runs) just leaves
-      // it for the *next* attempt to find already-complete and clean up
-      // itself — self-healing, not a correctness problem.
-      await deviceDb.partialDownloadChunks.where("url").equals(url).delete();
-      await deviceDb.partialDownloadMeta.delete(url);
-      await deviceDb.backgroundFetchStatus.delete(url).catch(() => {});
+      // Reached only once every chunk was successfully enqueued and the
+      // integrity check passed — a failure here (e.g. the tab closing
+      // right as this runs) just leaves it for the *next* attempt to find
+      // already-complete and clean up itself — self-healing, not a
+      // correctness problem.
+      await clearStoredDownload(url);
     },
   });
 
@@ -296,6 +371,14 @@ async function downloadViaBackgroundFetch(
 
   let sawProgress = false;
   let abandoned = false;
+  // Set as soon as the registration exists, so the stall timeout below can
+  // actually stop the real, browser-owned fetch instead of merely stopping
+  // *this code* from waiting on it — without this, an "abandoned" fetch
+  // used to keep running for real and could later succeed and race a
+  // concurrent manual-chunking attempt for the same URL (see
+  // WHOLE_FILE_CHUNK_INDEX's own comment for what that race corrupted).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let activeRegistration: any = null;
 
   const stallTimeout = new Promise<null>((resolve) => {
     setTimeout(() => {
@@ -304,6 +387,17 @@ async function downloadViaBackgroundFetch(
         console.error(
           `Background fetch for ${url} showed no progress within ${BACKGROUND_FETCH_STALL_TIMEOUT_MS}ms, falling back to direct chunking`,
         );
+        // Best-effort, not awaited — the caller shouldn't wait any longer
+        // than it already has. `.abort()` is a real, spec'd
+        // BackgroundFetchRegistration method (Promise<boolean>, resolves
+        // `false`/never throws if the fetch already finished), so this is
+        // always safe to call even if the registration settled moments
+        // ago. The disjoint chunk-index defense (WHOLE_FILE_CHUNK_INDEX)
+        // and streamStoredChunks' integrity check are the real backstop if
+        // this doesn't win the race in time.
+        activeRegistration?.abort?.().catch((err: unknown) => {
+          console.error(`Failed to abort abandoned background fetch for ${url}`, err);
+        });
         resolve(null);
       }
     }, BACKGROUND_FETCH_STALL_TIMEOUT_MS);
@@ -337,6 +431,7 @@ async function downloadViaBackgroundFetch(
           downloadTotal: totalBytes,
         });
       }
+      activeRegistration = bgFetch;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (bgFetch as any).addEventListener?.("progress", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

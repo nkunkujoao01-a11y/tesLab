@@ -25,6 +25,16 @@ import { generateChatViaWorker } from "@/lib/ai-worker-client";
 import { classifyModelError, isFatalCategory } from "@/lib/ai-error-classifier";
 import { markAiOperationStarted, markAiOperationFinished } from "@/lib/ai-crash-breadcrumb";
 import { installResumableDownloads, subscribeDownloadProgress } from "@/lib/resumable-fetch";
+// Static import, not the dynamic-import pattern the rest of ai-nano.ts's
+// surface uses elsewhere in this file (e.g. askChatModel below) — this one
+// specific function must be callable synchronously (see
+// getDefaultChatModel's own comment), which rules out a dynamic import.
+// Safe: ai-nano.ts's only reference back to this file is a type-only
+// `import type { ChatTurn }`, erased at compile time, so this isn't a real
+// circular runtime dependency, and ai-nano.ts has no eager browser-global
+// access at module scope (every navigator/self touch is inside a function
+// body with its own guard) — safe to import statically here too.
+import { isMobilePlatform } from "@/lib/ai-nano";
 
 // The two models transformers.js actually downloads/runs (CHAT_MODELS
 // below covers exactly these). ChatModelChoice — the type describing
@@ -126,6 +136,14 @@ export const CHAT_MODELS: Record<TransformersChatModelChoice, ChatModelInfo> = {
   },
 };
 
+// The universally-safe fallback — works on every platform, no download
+// requirement beyond this app's own control (unlike Gemini Nano, which
+// Chrome itself manages). No longer "the default for a fresh device" (see
+// getDefaultChatModel below for that) — kept specifically as the target
+// every self-heal path lands on when a *live* check has just confirmed
+// something else doesn't actually work, since that target must always be
+// something guaranteed to work everywhere, not "whatever the platform
+// would otherwise prefer."
 export const DEFAULT_CHAT_MODEL: ChatModelChoice = "smollm2";
 const CHAT_MODEL_CHOICE_KEY = "chat_model_choice";
 
@@ -133,13 +151,30 @@ function isChatModelChoice(value: string): value is ChatModelChoice {
   return value === "smollm2" || value === "gemma3-1b" || value === "gemini-nano";
 }
 
+/** The model a fresh device (no stored preference yet) should start on —
+ * Gemini Nano on desktop (a real, Chrome-managed, zero-app-download model
+ * once selected — see ai-nano.ts), SmolLM2 on mobile (Gemini Nano is
+ * mobile-unavailable, see isMobilePlatform's own comment). Deliberately
+ * synchronous — only checks the platform, not the async
+ * `isGeminiNanoSupported()`/`LanguageModel.availability()` — so it can be
+ * used directly in a synchronous `useState` initializer (see
+ * useChatModelChoice, use-ai-chat.ts). A desktop browser that doesn't
+ * actually have the Prompt API enabled will pick "gemini-nano" here and
+ * then self-correct via askChatModel's own live-recheck-and-fallback
+ * (below) the first time it's actually used — that's expected, not a bug;
+ * see this file's own DEFAULT_CHAT_MODEL comment for why the self-heal
+ * target is deliberately not this function. */
+export function getDefaultChatModel(): ChatModelChoice {
+  return isMobilePlatform() ? "smollm2" : "gemini-nano";
+}
+
 /** The model the user has selected in Profile > AI Settings (see Feature
  * 47) — same `appSettings` key/value pattern as every other on-device-AI
- * preference in this app. Defaults to the small model so a fresh install
- * never silently prefers the larger download. */
+ * preference in this app. Falls back to getDefaultChatModel() for a fresh
+ * device with nothing stored yet. */
 export async function getSelectedChatModel(): Promise<ChatModelChoice> {
   const row = await deviceDb.appSettings.get(CHAT_MODEL_CHOICE_KEY);
-  return row && isChatModelChoice(row.value) ? row.value : DEFAULT_CHAT_MODEL;
+  return row && isChatModelChoice(row.value) ? row.value : getDefaultChatModel();
 }
 
 export async function setSelectedChatModel(choice: ChatModelChoice): Promise<void> {
