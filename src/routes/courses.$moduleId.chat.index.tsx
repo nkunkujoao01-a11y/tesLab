@@ -18,12 +18,10 @@ import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { fetchModule } from "@/lib/modules-api";
 import { useDownloadedModuleMaterials } from "@/hooks/use-downloads";
 import {
-  useChatModelStatus,
+  useChatEngineReadiness,
   useThinkingLabel,
   useStaleAiOperationWarning,
 } from "@/hooks/use-ai-chat";
-import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   useCollectionMessages,
@@ -79,7 +77,6 @@ export const Route = createFileRoute("/courses/$moduleId/chat/")({
 function ModuleChat() {
   const { module } = Route.useLoaderData();
   const contentByMaterialId = useDownloadedModuleMaterials(module.id);
-  const modelStatus = useChatModelStatus();
   const messages = useCollectionMessages(module.id);
 
   const documents = useMemo<RetrievableDocument[]>(
@@ -104,11 +101,7 @@ function ModuleChat() {
   const [draft, setDraft] = useState("");
 
   // See assistant.tsx's identical comment.
-  const { connected: cloudConnected } = useCloudAiKey();
-  const [cloudEnabled] = useCloudAiEnabled();
-  const isOnline = useOnlineStatus();
-  const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
-  const chatReady = modelStatus === "ready" || cloudChatReady;
+  const { ready: chatReady, cloudChatReady, modelStatus } = useChatEngineReadiness();
 
   const { sentinelRef, jumpToBottom } = useStickToBottom([messages, streamingText]);
 

@@ -5,7 +5,7 @@ import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { AssistantMessageBubble } from "@/components/AssistantMessageBubble";
 import {
-  useChatModelStatus,
+  useChatEngineReadiness,
   useChatModelOfflineCapable,
   useAssistantMessages,
   useSendAssistantMessage,
@@ -13,8 +13,6 @@ import {
   useThinkingLabel,
   useStaleAiOperationWarning,
 } from "@/hooks/use-ai-chat";
-import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   AlertDialog,
@@ -43,7 +41,6 @@ export const Route = createFileRoute("/assistant")({
 });
 
 function Assistant() {
-  const modelStatus = useChatModelStatus();
   const offlineCapable = useChatModelOfflineCapable();
   const messages = useAssistantMessages();
   const { sendMessage, sending, streamingText } = useSendAssistantMessage();
@@ -57,12 +54,11 @@ function Assistant() {
   // courses.$moduleId.read.$docId.tsx's identical comment for why quiz
   // generation used to wrongly gate on chatModelReady alone; this page had
   // the same gap, but worse: it blocked the whole chat UI behind a forced
-  // download prompt instead of just one disabled button.
-  const { connected: cloudConnected } = useCloudAiKey();
-  const [cloudEnabled] = useCloudAiEnabled();
-  const isOnline = useOnlineStatus();
-  const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
-  const chatReady = modelStatus === "ready" || cloudChatReady;
+  // download prompt instead of just one disabled button. Also accounts for
+  // Gemini Nano (see useChatEngineReadiness's own comment) — this used to
+  // be a 5-line copy duplicated across every chat surface that never knew
+  // about Gemini Nano at all.
+  const { ready: chatReady, cloudChatReady, modelStatus } = useChatEngineReadiness();
 
   const { sentinelRef, jumpToBottom } = useStickToBottom([messages, streamingText]);
 

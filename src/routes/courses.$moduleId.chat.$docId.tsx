@@ -18,12 +18,10 @@ import { fetchModule } from "@/lib/modules-api";
 import { materialKey } from "@/lib/db";
 import { useDownloadedMaterialContent, useDownloadedMaterialIds } from "@/hooks/use-downloads";
 import {
-  useChatModelStatus,
+  useChatEngineReadiness,
   useThinkingLabel,
   useStaleAiOperationWarning,
 } from "@/hooks/use-ai-chat";
-import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   useCollectionMessages,
@@ -71,7 +69,6 @@ function MaterialChat() {
   const downloadedMaterialIds = useDownloadedMaterialIds();
   const isDownloaded = downloadedMaterialIds.has(key);
   const content = useDownloadedMaterialContent(module.id, doc.id);
-  const modelStatus = useChatModelStatus();
   const messages = useCollectionMessages(key);
   const documents = useMemo(
     () =>
@@ -93,11 +90,7 @@ function MaterialChat() {
   const [draft, setDraft] = useState("");
 
   // See assistant.tsx's identical comment.
-  const { connected: cloudConnected } = useCloudAiKey();
-  const [cloudEnabled] = useCloudAiEnabled();
-  const isOnline = useOnlineStatus();
-  const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
-  const chatReady = modelStatus === "ready" || cloudChatReady;
+  const { ready: chatReady, cloudChatReady, modelStatus } = useChatEngineReadiness();
 
   const { sentinelRef, jumpToBottom } = useStickToBottom([messages, streamingText]);
 

@@ -11,7 +11,7 @@ import {
   isModelCachedForOffline,
   getSelectedChatModel,
   setSelectedChatModel,
-  getDefaultChatModel,
+  DEFAULT_CHAT_MODEL,
   type ModelProgress,
   type ChatTurn,
   type ChatModelChoice,
@@ -28,6 +28,8 @@ import {
   loadGeminiNanoSession,
   type GeminiNanoAvailability,
 } from "@/lib/ai-nano";
+import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 
 const SETTING_KEY = "ai_chat_model_downloaded";
 // Separate from SETTING_KEY: whether the download actually persisted for
@@ -59,7 +61,19 @@ async function syncModelStatusFlags(choice: ChatModelChoice): Promise<void> {
  * syncModelStatusFlags) so switching models never leaves a stale
  * "Downloaded" status pointing at the model that's no longer selected. */
 export function useChatModelChoice(): [ChatModelChoice, (choice: ChatModelChoice) => void] {
-  const [choice, setChoiceState] = useState<ChatModelChoice>(getDefaultChatModel());
+  // Deliberately the static, platform-independent DEFAULT_CHAT_MODEL here,
+  // not getDefaultChatModel() — this initializer runs during SSR too,
+  // where `navigator` doesn't exist, so isMobilePlatform() always reads as
+  // "not mobile" server-side regardless of the real client's platform. A
+  // real mobile user's client-side hydration pass would then compute a
+  // *different* value ("smollm2") than the server-rendered HTML did
+  // ("gemini-nano"), a genuine SSR/hydration mismatch (confirmed via a
+  // real "Hydration failed" React error). The effect below immediately
+  // resolves the real choice (including the platform-aware default when
+  // nothing's stored yet, via getSelectedChatModel's own fallback to
+  // getDefaultChatModel) — client-only, after mount, no SSR involved — so
+  // this static value only ever shows for one tick before being corrected.
+  const [choice, setChoiceState] = useState<ChatModelChoice>(DEFAULT_CHAT_MODEL);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +151,49 @@ export function useChatModelOfflineCapable(): boolean {
   }, []);
 
   return cached;
+}
+
+export type ChatEngineReadiness = {
+  // Whether *some* chat-answering path is ready to use right now.
+  ready: boolean;
+  // Whether the connected cloud AI key specifically is the ready path —
+  // callers use this to show "answering via your connected cloud AI"-style
+  // banners distinct from the on-device model being ready.
+  cloudChatReady: boolean;
+  modelStatus: ChatModelStatus;
+};
+
+/** Whether *some* chat-answering path is ready right now — the on-device
+ * transformers.js model, a connected+enabled+online cloud AI key, or
+ * Gemini Nano already available on this device (Chrome-managed, no
+ * app-level download needed). Used identically across every chat surface
+ * (Ask AI, collection chat, per-document chat, quiz generation) so "is AI
+ * usable right now" is answered the same way everywhere, rather than five
+ * separate copies of the same 5-line computation that could drift apart —
+ * which is exactly what happened here: none of those five copies knew
+ * about Gemini Nano at all. Real bug this fixes: once Gemini Nano became
+ * the default chat model on desktop (see ai-chat.ts's getDefaultChatModel),
+ * a Gemini-Nano user with no cloud key saw the on-device-model download
+ * prompt forever (useChatModelStatus can never report "ready" for
+ * Gemini Nano — isModelCachedForOffline always returns false for it), and
+ * clicking its "Download assistant" button threw "loadChatModel doesn't
+ * support Gemini Nano" outright, since that prompt only ever knew how to
+ * download a transformers.js model. */
+export function useChatEngineReadiness(): ChatEngineReadiness {
+  const modelStatus = useChatModelStatus();
+  const [chatModelChoice] = useChatModelChoice();
+  const geminiNanoAvailability = useGeminiNanoAvailability();
+  const { connected: cloudConnected } = useCloudAiKey();
+  const [cloudEnabled] = useCloudAiEnabled();
+  const isOnline = useOnlineStatus();
+  const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
+  const geminiNanoReady =
+    chatModelChoice === "gemini-nano" && geminiNanoAvailability === "available";
+  return {
+    ready: modelStatus === "ready" || cloudChatReady || geminiNanoReady,
+    cloudChatReady,
+    modelStatus,
+  };
 }
 
 // Same "finishing up" stall-detection as useDownloadAIModel (use-ai-model.ts,

@@ -32,9 +32,8 @@ import {
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { useAuth } from "@/hooks/use-auth";
 import { useFlashcardSet, useGenerateFlashcards, useQuiz, useGenerateQuiz } from "@/hooks/use-quiz";
-import { useChatModelStatus } from "@/hooks/use-ai-chat";
-import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus, useCanShareFiles } from "@/hooks/use-online-status";
+import { useChatEngineReadiness } from "@/hooks/use-ai-chat";
+import { useCanShareFiles } from "@/hooks/use-online-status";
 import { ReadingWidthControl } from "@/components/ReadingWidthControl";
 import { ScrollJumpButtons } from "@/components/ScrollJumpButtons";
 import { useReadingWidth, READING_WIDTH_STYLE } from "@/hooks/use-reading-width";
@@ -125,19 +124,17 @@ function Reader() {
   } = useGenerateQuiz();
   const isGeneratingQuiz = quizPendingIds.has(key);
   const quizQuestionProgress = quizProgress[key];
-  const chatModelStatus = useChatModelStatus();
-  const chatModelReady = chatModelStatus === "ready";
-  const { connected: cloudConnected } = useCloudAiKey();
-  const [cloudEnabled] = useCloudAiEnabled();
-  const isOnline = useOnlineStatus();
-  // A quiz needs *some* AI path — either the downloaded on-device model, or
-  // the online AI (connected key, turned on in settings, actual internet).
-  // Previously this button only ever checked chatModelReady, so a student
-  // who'd connected a free cloud key but never downloaded the on-device
-  // model saw a permanently disabled Quiz button despite cloud generation
-  // already working end-to-end.
-  const cloudQuizReady = cloudConnected === true && cloudEnabled && isOnline;
-  const quizUnavailable = !chatModelReady && !cloudQuizReady;
+  // A quiz needs *some* AI path — either the downloaded on-device model, the
+  // online AI (connected key, turned on in settings, actual internet), or
+  // Gemini Nano already available (see useChatEngineReadiness's own
+  // comment) — previously this button only ever checked chatModelReady, so
+  // a student who'd connected a free cloud key but never downloaded the
+  // on-device model saw a permanently disabled Quiz button despite cloud
+  // generation already working end-to-end, and later, once Gemini Nano
+  // became the desktop default, the same permanently-disabled-button bug
+  // resurfaced for it too.
+  const { ready: chatEngineReady } = useChatEngineReadiness();
+  const quizUnavailable = !chatEngineReady;
   const canShare = useCanShareFiles();
 
   const navigate = useNavigate();

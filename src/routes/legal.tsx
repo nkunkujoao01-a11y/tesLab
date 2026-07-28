@@ -41,7 +41,7 @@ function LegalPage() {
         <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-prestige-deep">
           Terms & Privacy
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated 2026-07-24.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated 2026-07-28.</p>
 
         <Section title="What this app is">
           <p>
@@ -89,14 +89,25 @@ function LegalPage() {
             sent to it is subject to Google's own terms for that service.
           </p>
           <p>
-            The on-device model is genuinely early-stage: it is small enough to run on an ordinary
-            phone with no internet, and makes mistakes noticeably more often than the cloud AI does,
-            especially on longer or more technical material. Treat any AI-generated summary, quiz
-            question, flashcard, or answer, on-device or cloud, as a study aid to check against your
-            own material, not a guaranteed-correct source. Connecting a free cloud AI key in
-            Settings gives meaningfully better results when you have a connection; continued
-            investment in improving the on-device model depends on this project's own resources and
-            funding.
+            The on-device AI is best understood as a working proof of concept: it genuinely
+            demonstrates that a free, private, fully offline AI assistant is possible on ordinary
+            hardware, not a finished, polished product. It runs entirely inside your own browser
+            with no server involved, so how well it works depends heavily on your specific device —
+            it may run smoothly on a capable phone, laptop, or desktop, and may run slowly, take a
+            long time to download, or struggle to work at all on an older or more limited device.
+            Making this work reliably across the huge range of real student devices is an active,
+            ongoing investigation, not something we consider solved, and it needs real resources,
+            time, and effort to keep improving. We ask for your patience with it.
+          </p>
+          <p>
+            Treat any AI-generated summary, quiz question, flashcard, or chat answer, on-device or
+            cloud, as a study aid to check against your own material, not a guaranteed-correct
+            source — the on-device model in particular makes mistakes noticeably more often than the
+            cloud AI does, especially on longer or more technical material. For anything where you
+            genuinely need an accurate, dependable answer, connect a free cloud AI key instead:
+            Settings walks through exactly how to get one from Google AI Studio at no cost and
+            activate it, and cloud answers are meaningfully more capable and consistent than the
+            on-device model, especially on a weaker device.
           </p>
         </Section>
 

@@ -16,12 +16,10 @@ import { AssistantMessageBubble } from "@/components/AssistantMessageBubble";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
 import {
-  useChatModelStatus,
+  useChatEngineReadiness,
   useThinkingLabel,
   useStaleAiOperationWarning,
 } from "@/hooks/use-ai-chat";
-import { useCloudAiKey, useCloudAiEnabled } from "@/hooks/use-cloud-ai";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   useCollectionMessages,
@@ -58,7 +56,6 @@ function CollectionChat() {
   const collection = useDocumentCollection(collectionId);
   const allDocs = usePersonalDocuments();
   const members = allDocs.filter((doc) => doc.collectionId === collectionId);
-  const modelStatus = useChatModelStatus();
   const messages = useCollectionMessages(collectionId);
   const { sendMessage, sending, streamingText } = useSendCollectionMessage(collectionId, members);
   const thinkingLabel = useThinkingLabel(sending);
@@ -69,11 +66,7 @@ function CollectionChat() {
   // See assistant.tsx's identical comment — a connected, enabled cloud key
   // with real internet can serve this chat too, without the on-device
   // model ever being downloaded.
-  const { connected: cloudConnected } = useCloudAiKey();
-  const [cloudEnabled] = useCloudAiEnabled();
-  const isOnline = useOnlineStatus();
-  const cloudChatReady = cloudConnected === true && cloudEnabled && isOnline;
-  const chatReady = modelStatus === "ready" || cloudChatReady;
+  const { ready: chatReady, cloudChatReady, modelStatus } = useChatEngineReadiness();
 
   const { sentinelRef, jumpToBottom } = useStickToBottom([messages, streamingText]);
 
