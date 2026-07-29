@@ -2,6 +2,46 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { User } from "@supabase/supabase-js";
 import { supabase, type ProfileRow } from "@/lib/supabase";
 
+// Real bug found from a user report: "sometimes, since I was offline, I
+// have to sign in again." Root cause, confirmed by reading
+// @supabase/auth-js's own source (v2.110.7): its internal __loadSession()
+// (what supabase.auth.getSession() below calls) reactively tries to
+// refresh the access token once it's *actually* expired (not just inside
+// the 90s proactive-refresh margin) — and if that refresh attempt fails
+// for *any* reason, including a plain offline network error, it returns
+// `{ session: null }` to the caller. Critically, it does NOT clear the
+// persisted session in storage on that path (confirmed: only a
+// non-retryable/non-network auth error does that) — so a perfectly valid,
+// still-refreshable session sits untouched in localStorage while
+// getSession() insists there isn't one. This only bites a *fresh* mount
+// (a reopened tab/app, not one that's stayed open) where the real token
+// expiry (commonly ~1hr) has already passed during an offline stretch —
+// exactly the "sometimes" in the report, not "every time."
+// There's no supported supabase-js option to ask getSession() to skip the
+// refresh attempt, so this reads the same storage key supabase-js itself
+// writes to, directly, as a deliberately best-effort fallback used only
+// when offline and getSession() reported nothing — never trusted for
+// anything security-relevant (the server's own RLS/JWT validation is the
+// real authority regardless of what this client-side value shows), and
+// wrapped so any wrong assumption about the storage format just falls
+// through to the existing (safe) "show sign-in" behavior rather than
+// throwing.
+function readPersistedSupabaseUser(): User | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const projectRef = new URL(import.meta.env.VITE_SUPABASE_URL as string).hostname.split(".")[0];
+    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && "user" in parsed) {
+      return (parsed as { user: User }).user ?? null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 type AuthContextValue = {
   user: User | null;
   profile: ProfileRow | null;
@@ -24,10 +64,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) {
-        setUser(data.session?.user ?? null);
-        setSessionLoading(false);
+      if (cancelled) return;
+      if (!data.session && typeof navigator !== "undefined" && !navigator.onLine) {
+        // See readPersistedSupabaseUser's own comment — don't force a
+        // sign-in screen for what's very likely just a failed background
+        // token refresh while offline, not a real sign-out.
+        const persistedUser = readPersistedSupabaseUser();
+        if (persistedUser) {
+          setUser(persistedUser);
+          setSessionLoading(false);
+          return;
+        }
       }
+      setUser(data.session?.user ?? null);
+      setSessionLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {

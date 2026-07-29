@@ -275,12 +275,31 @@ self.addEventListener("backgroundfetchabort", (event) => {
   event.waitUntil(recordBackgroundFetchFailure(event.registration));
 });
 
+// Same reasoning as src/lib/modules-api.ts's own withTimeout (a hung
+// request — not a fast rejection — is the realistic offline/poor-network
+// failure mode, and this is a separate vanilla-JS file with no import
+// access to that helper) — without this, a slow/dead connection right
+// after sign-in could leave *this precaching mechanism itself* silently
+// incomplete, on the same request it's trying to protect other routes
+// from a bad connection with.
+const PRECACHE_FETCH_TIMEOUT_MS = 6000;
+
+async function fetchWithTimeout(url, init) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PRECACHE_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function precacheRoutes() {
   const cache = await caches.open(CACHE_NAME);
   await Promise.all(
     PRECACHE_ROUTES.map(async (route) => {
       try {
-        const response = await fetch(route, { credentials: "include" });
+        const response = await fetchWithTimeout(route, { credentials: "include" });
         if (!response.ok) return;
         const html = await response.clone().text();
         await cache.put(route, response);
@@ -293,7 +312,7 @@ async function precacheRoutes() {
           [...assetUrls].map(async (url) => {
             try {
               if (await cache.match(url)) return;
-              const assetResponse = await fetch(url);
+              const assetResponse = await fetchWithTimeout(url);
               if (assetResponse.ok) await cache.put(url, assetResponse);
             } catch {
               // One asset failing shouldn't stop the rest of this route's

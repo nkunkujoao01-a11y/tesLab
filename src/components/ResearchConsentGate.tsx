@@ -127,6 +127,30 @@ export function ResearchConsentGate() {
             </p>
           </ConsentSection>
 
+          <ConsentSection title="A note on the AI">
+            <p>
+              The on-device AI in this platform is a working proof of concept, not a finished
+              product — it genuinely demonstrates that free, offline AI is possible, but it's still
+              early, and how well it runs can vary a lot between devices: smoothly on some, slowly
+              or unreliably on others. The system may have bugs or rough edges you'll notice while
+              using it. That's expected, and it's exactly the kind of thing this study needs to know
+              about — with further research, time, and effort, it can keep improving, and your
+              honest experience of what worked and what didn't is genuinely useful data, not just a
+              complaint.
+            </p>
+            <p>
+              If something breaks, feels wrong, or the system stops working for you, please say so,
+              either in the survey or directly:{" "}
+              <a
+                href="mailto:nkunkujoao01@gmail.com?subject=eLearn%20research%20study%20-%20issue"
+                className="font-medium text-prestige-gold underline underline-offset-2"
+              >
+                nkunkujoao01@gmail.com
+              </a>
+              .
+            </p>
+          </ConsentSection>
+
           <ConsentSection title="Ethical clearance">
             <p>
               This study has been reviewed and approved by the NUST Faculty of Computing and

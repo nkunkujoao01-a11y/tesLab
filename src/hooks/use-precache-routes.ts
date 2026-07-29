@@ -26,6 +26,33 @@ const PRECACHE_PATHS = [
 // matches and trigger *that route's* lazy import — it doesn't render the
 // component or need the placeholder id to correspond to a real document —
 // so a dummy id is enough to warm the chunk cache for every real docId.
+//
+// Real bug found from a user report: switching into an "Ask AI" thread
+// scoped to a specific material/collection/module (as opposed to the
+// general /assistant tab, which IS in PRECACHE_PATHS above) while offline,
+// for a thread not yet opened this session, left the page stuck on
+// RoutePending forever — these four routes' own chunks were never fetched,
+// so the router had nothing to resolve to and never settled. Each needs
+// the same placeholder-param treatment as /documents/$docId.
+const DYNAMIC_PRECACHE_ROUTES: {
+  to: string;
+  params: Record<string, string>;
+}[] = [
+  { to: "/documents/$docId", params: { docId: "__precache__" } },
+  { to: "/documents/$docId/chat", params: { docId: "__precache__" } },
+  {
+    to: "/documents/collections/$collectionId/chat",
+    params: { collectionId: "__precache__" },
+  },
+  {
+    to: "/courses/$moduleId/chat/",
+    params: { moduleId: "__precache__" },
+  },
+  {
+    to: "/courses/$moduleId/chat/$docId",
+    params: { moduleId: "__precache__", docId: "__precache__" },
+  },
+];
 
 /** Proactively warms this session's offline caches for the main nav
  * routes once actually signed in (not at service-worker install time,
@@ -70,13 +97,15 @@ export function usePrecacheRoutes(): void {
           console.error(`Failed to preload route chunk for ${to}`, err);
         }
       }
-      try {
-        await router.preloadRoute({
-          to: "/documents/$docId",
-          params: { docId: "__precache__" },
-        } as unknown as Parameters<typeof router.preloadRoute>[0]);
-      } catch (err) {
-        console.error("Failed to preload route chunk for /documents/$docId", err);
+      for (const { to, params } of DYNAMIC_PRECACHE_ROUTES) {
+        try {
+          await router.preloadRoute({
+            to,
+            params,
+          } as unknown as Parameters<typeof router.preloadRoute>[0]);
+        } catch (err) {
+          console.error(`Failed to preload route chunk for ${to}`, err);
+        }
       }
     })();
 

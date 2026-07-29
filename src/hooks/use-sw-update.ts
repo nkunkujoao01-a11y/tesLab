@@ -14,6 +14,15 @@ import { toast } from "sonner";
 // from then). A manual reload button rather than an automatic reload:
 // forcing a reload mid-quiz-generation or mid-typing would be worse than
 // a stale bundle for a few more minutes.
+// Stable, not generated per-call — passing the same id to sonner's
+// toast.message() on every call makes a second firing *replace* the
+// existing toast in place, rather than stacking a second persistent
+// (duration: Infinity) one on top of it. Real report: a student testing
+// across several real deploys in a short window saw multiple "new version
+// available" banners piling up, since each real controllerchange (one per
+// actual sw.js content change) previously created its own untracked toast.
+const SW_UPDATE_TOAST_ID = "sw-update-available";
+
 export function useServiceWorkerUpdateNotice(): void {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -21,6 +30,7 @@ export function useServiceWorkerUpdateNotice(): void {
     const handleControllerChange = () => {
       if (reloaded) return;
       toast.message("A new version of eLearn is available", {
+        id: SW_UPDATE_TOAST_ID,
         duration: Infinity,
         action: {
           label: "Reload",
