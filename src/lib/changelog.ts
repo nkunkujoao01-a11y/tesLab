@@ -6,7 +6,7 @@
 // Bump APP_VERSION and add one new entry at the top of CHANGELOG whenever
 // a real, user-visible batch of changes ships.
 
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.2.0";
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,18 @@ export type ChangelogEntry = {
 };
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "1.2.0",
+    date: "2026-07-29",
+    items: [
+      "A splash screen so it's always clear which app you're in while it loads",
+      "Google's Gemini Nano added as an on-device AI option on desktop Chrome, and set as the default there",
+      "AI model downloads now resume instead of restarting from zero if interrupted, and on most Chrome-based browsers keep going in the background even if you close the tab",
+      "Fixed a real bug where an interrupted AI model download could get stuck failing forever until you fully reloaded the app",
+      "Research consent can now be given anonymously if you'd rather not have your name attached",
+      "Clearer, more honest guidance about the on-device AI's real limits, with a pointer to connecting a free cloud AI key for anything you need a dependable answer for",
+    ],
+  },
   {
     version: "1.1.0",
     date: "2026-07-25",
