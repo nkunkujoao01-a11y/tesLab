@@ -253,6 +253,10 @@ export type ResearchSubmission = {
   // anonymousId: this is the real identity, present only when a
   // respondent actually chose to be identified.
   fullName: string | null;
+  // Only ever present for the NUST-student-number sign-in method (see
+  // 0043_research_student_number.sql) — null for Google/email sign-ins,
+  // same as fullName whenever the student chose to stay anonymous.
+  studentNumber: string | null;
   consent: { agreed: boolean; respondedAt: string } | null;
   survey: ResearchSurveyAnswers | null;
   surveySubmittedAt: string | null;
@@ -279,11 +283,11 @@ export function useResearchSubmissions(): {
     void Promise.all([
       supabase
         .from("research_consent")
-        .select("anonymous_id, agreed, responded_at, full_name")
+        .select("anonymous_id, agreed, responded_at, full_name, student_number")
         .order("responded_at", { ascending: false }),
       supabase
         .from("research_survey_responses")
-        .select("anonymous_id, answers, submitted_at, full_name")
+        .select("anonymous_id, answers, submitted_at, full_name, student_number")
         .order("submitted_at", { ascending: false }),
     ]).then(([consentRes, surveyRes]) => {
       if (cancelled) return;
@@ -297,6 +301,7 @@ export function useResearchSubmissions(): {
         byId.set(row.anonymous_id, {
           anonymousId: row.anonymous_id,
           fullName: row.full_name,
+          studentNumber: row.student_number,
           consent: { agreed: row.agreed, respondedAt: row.responded_at },
           survey: null,
           surveySubmittedAt: null,
@@ -308,10 +313,12 @@ export function useResearchSubmissions(): {
           existing.survey = row.answers;
           existing.surveySubmittedAt = row.submitted_at;
           existing.fullName = existing.fullName ?? row.full_name;
+          existing.studentNumber = existing.studentNumber ?? row.student_number;
         } else {
           byId.set(row.anonymous_id, {
             anonymousId: row.anonymous_id,
             fullName: row.full_name,
+            studentNumber: row.student_number,
             consent: null,
             survey: row.answers,
             surveySubmittedAt: row.submitted_at,

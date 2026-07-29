@@ -63,6 +63,9 @@ function exportSubmissionsCsv(submissions: ResearchSubmission[]) {
     // ResearchSubmission's own comment. Real name only when they
     // genuinely opted to be identified.
     "full_name",
+    // Only ever populated for the NUST-student-number sign-in method —
+    // blank for Google/email sign-ins even when identified.
+    "student_number",
     "consent_agreed",
     "consent_responded_at",
     "survey_submitted_at",
@@ -75,6 +78,7 @@ function exportSubmissionsCsv(submissions: ResearchSubmission[]) {
   const rows = submissions.map((s) => [
     s.anonymousId,
     s.fullName ?? "",
+    s.studentNumber ?? "",
     s.consent ? (s.consent.agreed ? "yes" : "no") : "",
     s.consent?.respondedAt ?? "",
     s.surveySubmittedAt ?? "",
@@ -120,9 +124,12 @@ function SuperAdminResearchPage() {
       <p className="mt-1 text-sm text-muted-foreground">
         NUST ethics-approved usability study. Grouped below by a per-device random id ("User_XXXX")
         — two students sharing a device could coincidentally share one id, so this pairing is
-        best-effort, not a guaranteed one-to-one match. A respondent's real name shows here only
-        when they chose to be identified rather than stay anonymous; it's blank whenever they picked
-        "Keep my response anonymous" at consent time.
+        best-effort, not a guaranteed one-to-one match. A respondent's real name (and student
+        number, when they signed in with it) shows here only when they chose to be identified rather
+        than stay anonymous; both are blank, and only the random id shows, whenever they picked
+        "Keep my response anonymous" at consent time. Student number is only ever available for
+        someone who signed in with their NUST student number specifically — it's not collected at
+        all for a Google or email/password sign-in.
       </p>
 
       <div className="mb-6 mt-5 grid grid-cols-3 gap-3">
@@ -159,10 +166,16 @@ function SuperAdminResearchPage() {
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium text-prestige-deep">
+                {/* A respondent who chose to be identified is shown by
+                    name only — the anonymous_id/"User_XXXX" tag is
+                    exactly what they chose *not* to be identified by, so
+                    showing both would undercut the point of asking. It's
+                    shown on its own only for a genuinely anonymous
+                    respondent, where it's the sole identifier there is. */}
                 {s.fullName ?? s.anonymousId}
-                {s.fullName && (
+                {s.fullName && s.studentNumber && (
                   <span className="ml-1.5 font-normal text-muted-foreground">
-                    ({s.anonymousId})
+                    ({s.studentNumber})
                   </span>
                 )}
               </p>

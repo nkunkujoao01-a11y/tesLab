@@ -108,10 +108,11 @@ export function ResearchConsentGate() {
               Any data collected (questionnaire answers and system logs) will be kept confidential.
             </p>
             <p>
-              By default, your name is recorded alongside your responses, so the researcher can
+              By default, your name is recorded alongside your responses (and your student number
+              too, if you signed in with it rather than Google or email), so the researcher can
               follow up with you if needed. If you'd prefer not to be identified, check "Keep my
-              response anonymous" below — no name or other identifying information will be collected
-              for you in that case.
+              response anonymous" below — no name, student number, or other identifying information
+              will be collected for you in that case.
             </p>
             <p>
               All data will be stored on a password-protected computer accessible only to the

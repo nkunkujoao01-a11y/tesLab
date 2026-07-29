@@ -166,6 +166,11 @@ export type ResearchConsentRow = {
   responded_at: string;
   user_id: string | null;
   full_name: string | null;
+  // Extracted from the synthetic `<studentnumber>@nust-student.invalid`
+  // login email (see moodle-server.ts's studentNumberToEmail) — null for
+  // anyone who signed in with Google or a plain email/password instead, or
+  // who chose to stay anonymous. See 0043_research_student_number.sql.
+  student_number: string | null;
 };
 
 export type ResearchSurveyAnswers = {
@@ -189,6 +194,8 @@ export type ResearchSurveyResponseRow = {
   submitted_at: string;
   user_id: string | null;
   full_name: string | null;
+  // See ResearchConsentRow's own comment on this field.
+  student_number: string | null;
 };
 
 // 0039_anonymous_suggestions.sql — same anonymous-by-design shape as

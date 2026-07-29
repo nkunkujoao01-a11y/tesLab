@@ -128,11 +128,12 @@ function LegalPage() {
           </p>
           <p>
             Separately, this app is also part of a NUST-approved research study on eLearning
-            usability. Participation is entirely optional, and any data collected for that study (a
-            one-time consent response, an optional usability survey) is anonymous: it is never
-            linked to your name, student number, or account, only to a random identifier generated
-            on your device. See the consent screen shown on your first visit for the full details of
-            that study.
+            usability. Participation is entirely optional. By default, any data collected for that
+            study (a one-time consent response, an optional usability survey) is linked to your real
+            name and, if you signed in with it, your student number, so the researcher can follow up
+            if needed — you can choose to stay anonymous instead at consent time, in which case none
+            of that is collected and only a random identifier generated on your device is used. See
+            the consent screen shown on your first visit for the full details of that study.
           </p>
         </Section>
 

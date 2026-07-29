@@ -32,26 +32,44 @@ export async function getAnonymousId(): Promise<string> {
   return id;
 }
 
-/** Resolves the real identity to attach to a submission — `null`/`null`
- * whenever the student chose to stay anonymous, matching this study's
- * still-honored anonymous option. `full_name` is read from `profiles` at
- * submission time (a snapshot, not a live join) so a later profile-name
- * change never retroactively rewrites what a past research record says a
- * respondent's name was. */
-async function resolveIdentity(
-  stayAnonymous: boolean,
-): Promise<{ userId: string | null; fullName: string | null }> {
-  if (stayAnonymous) return { userId: null, fullName: null };
+// Matches moodle-server.ts's studentNumberToEmail exactly — the only place
+// a student number is ever recorded is baked into this synthetic login
+// email for the NUST-student-number sign-in method; there's no separate
+// profiles.student_number column to read instead. Not present at all for
+// a Google or plain email/password sign-in.
+const NUST_LOGIN_EMAIL_DOMAIN = "nust-student.invalid";
+
+function studentNumberFromEmail(email: string | undefined): string | null {
+  if (!email || !email.endsWith(`@${NUST_LOGIN_EMAIL_DOMAIN}`)) return null;
+  return email.slice(0, -(NUST_LOGIN_EMAIL_DOMAIN.length + 1));
+}
+
+/** Resolves the real identity to attach to a submission — all fields
+ * `null` whenever the student chose to stay anonymous, matching this
+ * study's still-honored anonymous option. `full_name`/`student_number`
+ * are both read/derived at submission time (a snapshot, not a live join)
+ * so a later profile-name change never retroactively rewrites what a past
+ * research record says a respondent's name was. */
+async function resolveIdentity(stayAnonymous: boolean): Promise<{
+  userId: string | null;
+  fullName: string | null;
+  studentNumber: string | null;
+}> {
+  if (stayAnonymous) return { userId: null, fullName: null, studentNumber: null };
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { userId: null, fullName: null };
+  if (!user) return { userId: null, fullName: null, studentNumber: null };
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("id", user.id)
     .maybeSingle();
-  return { userId: user.id, fullName: profile?.full_name ?? null };
+  return {
+    userId: user.id,
+    fullName: profile?.full_name ?? null,
+    studentNumber: studentNumberFromEmail(user.email),
+  };
 }
 
 export async function submitResearchConsent(
@@ -63,7 +81,7 @@ export async function submitResearchConsent(
     value: stayAnonymous ? "true" : "false",
   });
   const anonymousId = await getAnonymousId();
-  const { userId, fullName } = await resolveIdentity(stayAnonymous);
+  const { userId, fullName, studentNumber } = await resolveIdentity(stayAnonymous);
   const { error } = await supabase.from("research_consent").insert({
     id: crypto.randomUUID(),
     anonymous_id: anonymousId,
@@ -71,6 +89,7 @@ export async function submitResearchConsent(
     responded_at: new Date().toISOString(),
     user_id: userId,
     full_name: fullName,
+    student_number: studentNumber,
   });
   if (error) throw error;
 }
@@ -82,7 +101,7 @@ export async function submitResearchSurvey(answers: ResearchSurveyAnswers): Prom
   // decisions.
   const stored = await deviceDb.appSettings.get(STAY_ANONYMOUS_KEY);
   const stayAnonymous = stored?.value === "true";
-  const { userId, fullName } = await resolveIdentity(stayAnonymous);
+  const { userId, fullName, studentNumber } = await resolveIdentity(stayAnonymous);
   const { error } = await supabase.from("research_survey_responses").insert({
     id: crypto.randomUUID(),
     anonymous_id: anonymousId,
@@ -90,6 +109,7 @@ export async function submitResearchSurvey(answers: ResearchSurveyAnswers): Prom
     submitted_at: new Date().toISOString(),
     user_id: userId,
     full_name: fullName,
+    student_number: studentNumber,
   });
   if (error) throw error;
 }
