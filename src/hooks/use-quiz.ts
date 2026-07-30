@@ -19,9 +19,9 @@ import {
   pickFlashcardCount,
   type QuizQuestion,
 } from "@/lib/quiz-gen";
-import { askChatModel } from "@/lib/ai-chat";
+import { askChatModel, getSelectedChatModel } from "@/lib/ai-chat";
 import { WorkerBusyError, answerQuestionViaWorker } from "@/lib/ai-worker-client";
-import { generateViaCloud, CloudUnavailableError } from "@/lib/ai-cloud";
+import { generateViaCloud, buildPrompt, CloudUnavailableError } from "@/lib/ai-cloud";
 import {
   classifyModelError,
   isFatalCategory,
@@ -35,6 +35,15 @@ import { logActivity } from "@/hooks/use-activity";
 // bounded budget so a very large document doesn't balloon a single
 // request against the student's own free-tier token quota.
 const CLOUD_SOURCE_CHARS = 12_000;
+
+// Flashcards, unlike quiz (one question per call), ask for a whole batch
+// of cards in one JSON array — same reasoning as summarize-structured.ts's
+// GEMINI_NANO_SOURCE_CHARS for why this is smaller than the cloud budget
+// (Chrome manages Gemini Nano's own, more constrained context window) and
+// a generous-but-bounded output budget to fit up to pickFlashcardCount()'s
+// max (15) short front/back pairs in one response.
+const GEMINI_NANO_FLASHCARD_SOURCE_CHARS = 4_000;
+const FLASHCARD_MAX_NEW_TOKENS = 800;
 
 /** Every flashcard set the signed-in user has ever generated, across all
  * documents — used by the quiz/flashcard library view (src/routes/library.tsx)
@@ -116,7 +125,7 @@ export function useGenerateFlashcards() {
       setPendingIds((prev) => new Set(prev).add(docId));
       try {
         let cards = [] as ReturnType<typeof generateFlashcards>;
-        let method: "cloud" | "extractive" = "extractive";
+        let method: "cloud" | "on-device" | "extractive" = "extractive";
         try {
           const raw = await generateViaCloud(
             "flashcards",
@@ -134,8 +143,42 @@ export function useGenerateFlashcards() {
             console.error("Unexpected error calling cloud AI for flashcard generation", err);
           }
           // Any cloud failure (offline, no key, bad JSON, rate limit) falls
-          // straight through to the existing extractive path below — cloud
-          // is an optional enhancement, never a requirement.
+          // straight through to the on-device/extractive paths below —
+          // cloud is an optional enhancement, never a requirement.
+        }
+
+        // Only Gemini Nano, not the transformers.js worker path — unlike
+        // quiz's one-question-at-a-time loop (safe/fast even on a weak
+        // device), this asks for a whole batch of cards in one JSON
+        // response, which risks being genuinely slow/unreliable on the
+        // small on-device models (SmolLM2/Gemma) mobile defaults to.
+        // Gemini Nano is a real, more capable model Chrome itself manages,
+        // and only ever the active choice on desktop by default — no new
+        // risk introduced for the worker path other callers already rely
+        // on being fast.
+        if (cards.length === 0 && (await getSelectedChatModel()) === "gemini-nano") {
+          try {
+            const count = pickFlashcardCount();
+            const prompt = buildPrompt(
+              "flashcards",
+              sourceText.slice(0, GEMINI_NANO_FLASHCARD_SOURCE_CHARS),
+              count,
+            );
+            const raw = await askChatModel(
+              [{ role: "user", content: prompt }],
+              undefined,
+              FLASHCARD_MAX_NEW_TOKENS,
+            );
+            const onDeviceCards = parseCloudFlashcardsJson(raw);
+            if (onDeviceCards.length > 0) {
+              cards = onDeviceCards;
+              method = "on-device";
+            }
+          } catch (err) {
+            console.error("On-device flashcard generation failed, falling back", err);
+            // Same "never a requirement" reasoning as the cloud attempt
+            // above — falls through to the extractive path below.
+          }
         }
 
         if (cards.length === 0) {

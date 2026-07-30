@@ -2312,6 +2312,36 @@ Once visible, every respondent still showed as an anonymous "User_XXXX" tag, eve
 
 ---
 
+## Feature 81: Gemini Nano now drives summarization and flashcard generation on desktop, matching the quiz path it already powered
+
+User's request, following on from Feature 77's "Gemini Nano is the desktop default" change: make Gemini Nano actually the model used for summarize/Ask AI/quiz/flashcards on desktop whenever cloud AI isn't connected and the user hasn't explicitly picked a different on-device model — not just the *default selection*, but the thing that actually runs.
+
+Checked each of the four surfaces against that bar:
+
+- **Ask AI**: already correct — `askChatModel()` (`ai-chat.ts`) checks `getSelectedChatModel()` live on every call and branches to `generateChatViaGeminiNano`, so once Feature 77 made `"gemini-nano"` the resolved desktop default, Ask AI was already using it. No change needed.
+- **Quiz**: already correct too — `use-quiz.ts`'s quiz path already ran everything through the same `askChatModel()` entry point, one question at a time. No change needed.
+- **Summarization** (`summarize-structured.ts`) and **flashcards** (`use-quiz.ts`'s `useGenerateFlashcards`) were the two real gaps: summarization only had a cloud path and a T5-summarizer-model path (never Gemini Nano), and flashcards only had `"cloud" | "extractive"` — no on-device-AI option existed at all.
+
+### What changed
+
+- **`summarize-structured.ts`**: after the existing cloud attempt, added a new branch — if `getSelectedChatModel() === "gemini-nano"`, build the same structured-summary prompt (truncated to 6,000 source chars, a smaller budget than cloud's since Gemini Nano's context window is tighter), call it via `generateChatViaGeminiNano`, and parse the JSON reply with the existing `parseCloudStructuredSummary`. Reports `method: "neural"` (reusing the existing value rather than adding a `"gemini-nano"` method) to avoid a large ripple through the ~17 files that read `.method` for display — from the user's point of view "neural" already meant "a real model wrote this," which is still true.
+- **`ai-cloud.ts`**: exposed the previously-private `PROMPTS` builder map as `buildPrompt(kind, sourceText, count?)`, so the flashcards on-device path can reuse the exact same prompt text cloud generation uses instead of duplicating it.
+- **`use-quiz.ts`**: `useGenerateFlashcards`'s `method` widened to `"cloud" | "on-device" | "extractive"`. New branch between the cloud attempt and the final extractive fallback: if nothing was generated yet and the selected model is `"gemini-nano"`, build the flashcards prompt (4,000 source chars) via the new `buildPrompt()`, call it through `askChatModel` (800 max tokens), and parse with the existing `parseCloudFlashcardsJson`. Deliberately gated to `"gemini-nano"` specifically, not extended to the transformers.js worker path (SmolLM2/Gemma 3 on mobile) — flashcards ask for a whole batch of cards in one JSON reply, which risks being slow/unreliable on the small models mobile defaults to, unlike quiz's one-question-at-a-time loop. Gemini Nano is Chrome-managed and only ever the desktop default, so this stays a safe, targeted addition.
+- **`db.ts`**: `GeneratedFlashcardSet.method` type widened to match, with its comment updated to note "on-device" now means a real on-device chat model (e.g. Gemini Nano), not just extractive fallback.
+- Checked the three flashcard route files (`documents.$docId.flashcards.tsx`, `courses.$moduleId.flashcards.$docId.tsx`, `documents.collections.$collectionId.flashcards.tsx`) — their existing display ternary (`method === "cloud" ? "Cloud AI" : "On-device"`) already treats any non-cloud method as "On-device," so the new value needed no display changes.
+
+### How it was validated
+
+`npx tsc --noEmit`, prettier, eslint all clean. Real logic tested via a temporary preview route (deleted before committing) with `window.LanguageModel` mocked via Playwright's `page.addInitScript`, calling the real functions directly through `page.evaluate()` (button clicks proved unreliable in this harness for unclear reasons, so direct calls were used instead, same as the debugging approach used elsewhere in this project):
+
+- Confirmed `generateStructuredSummary()` correctly detects `gemini-nano` as selected, calls it, and returns the mocked overview/sections with `method: "neural"`.
+- Confirmed the flashcards path (`buildPrompt` → `askChatModel` → `parseCloudFlashcardsJson`) correctly parses a mocked 2-card Gemini Nano JSON reply.
+- Confirmed an explicit non-Nano choice isn't silently overridden: `setSelectedChatModel("smollm2")` round-trips through `getSelectedChatModel()` correctly.
+
+**Not independently tested**: the full gating path inside the React hooks themselves (`useGenerateFlashcards` requires a signed-in user via `useAuth`, not easily simulated outside the real app), and no test ran against a genuine Chrome build with the real Prompt API enabled — this project's standing caveat on Gemini Nano testing (this sandbox's Chromium build does ship the real API, but nothing here exercised an actual on-device model, only a mocked one).
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.

@@ -19,12 +19,26 @@ import { summarizeText } from "@/lib/summarize";
 import { summarizeWithModel } from "@/lib/ai-model";
 import { callGeminiWithPrompt, CloudUnavailableError, stripJsonFence } from "@/lib/ai-cloud";
 import { stripEmDash } from "@/lib/text-clean";
+import { getSelectedChatModel } from "@/lib/ai-chat";
+import { isGeminiNanoSupported, generateChatViaGeminiNano } from "@/lib/ai-nano";
 
 // Cloud models handle far more context per call than the small on-device
 // summarizer's MODEL_INPUT_BUDGET below — this is a generous but still
 // bounded budget so a very large document doesn't balloon a single request
 // against the student's own free-tier token quota (see ai-cloud.ts).
 const CLOUD_SOURCE_CHARS = 12_000;
+
+// Gemini Nano is a real, general-purpose model (unlike the tiny T5
+// summarizer below, whose 3000-char budget is a genuine architectural
+// limit, not a policy choice) — capable of a single whole-document
+// structured-summary call the same way cloud does, rather than needing
+// this file's own per-section/per-chunk pipeline built specifically
+// around the T5 model's constraints. Deliberately smaller than the cloud
+// budget: Chrome manages Nano's real context window, which is genuinely
+// more constrained than a full server-side model, and this hasn't been
+// measured against a real device — a conservative bound that degrades to
+// the existing chunked pipeline on any failure, never a hard requirement.
+const GEMINI_NANO_SOURCE_CHARS = 6_000;
 
 type CloudStructuredSummary = { overview: string; sections: SummarySection[] };
 
@@ -182,6 +196,32 @@ function chunkForModel(text: string, maxChars: number): string[] {
   return chunks.length > 0 ? chunks : [text.slice(0, maxChars)];
 }
 
+/** One-shot structured summary via Chrome's built-in Gemini Nano — same
+ * prompt/parse shape as the cloud path (buildCloudStructuredSummaryPrompt/
+ * parseCloudStructuredSummary are generic enough to reuse directly), so
+ * this is a genuinely separate rung from the T5 pipeline below, not a
+ * retrofit of its chunk-by-chunk design. Returns `null` (never throws) on
+ * any failure — unsupported browser, a bad/unparseable reply, anything —
+ * so the caller always falls straight through to the existing on-device/
+ * extractive pipeline, same as a cloud failure already does. */
+async function tryGeminiNanoStructuredSummary(
+  text: string,
+): Promise<CloudStructuredSummary | null> {
+  try {
+    if ((await isGeminiNanoSupported()) === "unavailable") return null;
+    const raw = await generateChatViaGeminiNano([
+      {
+        role: "user",
+        content: buildCloudStructuredSummaryPrompt(text.slice(0, GEMINI_NANO_SOURCE_CHARS)),
+      },
+    ]);
+    return parseCloudStructuredSummary(raw);
+  } catch (err) {
+    console.error("Gemini Nano structured summary failed, falling back", err);
+    return null;
+  }
+}
+
 export type StructuredSummaryResult = {
   overview: string;
   sections: SummarySection[];
@@ -234,6 +274,20 @@ export async function generateStructuredSummary(
     // Any cloud failure falls straight through to the existing on-device/
     // extractive pipeline below — cloud is an optional enhancement, never
     // a requirement.
+  }
+
+  // Gemini Nano only ever applies when it's genuinely the student's active
+  // choice — the default on desktop, but not if they've explicitly picked
+  // a different on-device model in Settings (see ai-chat.ts's
+  // getDefaultChatModel/askChatModel for the same live-recheck pattern).
+  // Reported as "neural" like the T5 pipeline below, not a separate
+  // method value — both are "an on-device model produced this" from a
+  // student's point of view.
+  if ((await getSelectedChatModel()) === "gemini-nano") {
+    const nanoResult = await tryGeminiNanoStructuredSummary(text);
+    if (nanoResult) {
+      return { ...nanoResult, method: "neural" };
+    }
   }
 
   const modelDownloaded = (await deviceDb.appSettings.get(MODEL_DOWNLOADED_KEY))?.value === "true";

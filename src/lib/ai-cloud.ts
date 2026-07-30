@@ -259,6 +259,15 @@ export function generateViaCloud(
   return callGeminiWithPrompt(PROMPTS[kind](sourceText, count), userId);
 }
 
+/** Builds one of this app's own standard prompts (see PROMPTS above)
+ * without actually sending it anywhere — for a caller that needs the same
+ * prompt text this file's own cloud path uses, but through a different
+ * model (e.g. use-quiz.ts's on-device Gemini Nano flashcard path), rather
+ * than duplicating the prompt string in a second place. */
+export function buildPrompt(kind: CloudGenerationKind, sourceText: string, count?: number): string {
+  return PROMPTS[kind](sourceText, count);
+}
+
 /** Strips a ```json fenced code block if Gemini wrapped its response in
  * one despite being asked for raw JSON — observed as a real, common
  * instruction-following gap for this class of model, not a hypothetical

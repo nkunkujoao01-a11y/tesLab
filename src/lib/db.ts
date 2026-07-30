@@ -291,11 +291,12 @@ export type GeneratedFlashcardSet = {
   cards: Flashcard[];
   generatedAt: number;
   // Which path actually produced these cards — "cloud" only when the
-  // student's own BYOK Gemini key (see ai-cloud.ts) was used; absent for
-  // every row written before this existed, which were always extractive.
-  // A plain optional property, not a new indexed field, so this needs no
+  // student's own BYOK Gemini key (see ai-cloud.ts) was used, "on-device"
+  // for a real on-device chat model (e.g. Gemini Nano); absent for every
+  // row written before "cloud" existed, which were always extractive. A
+  // plain optional property, not a new indexed field, so this needs no
   // Dexie schema version bump.
-  method?: "cloud" | "extractive";
+  method?: "cloud" | "on-device" | "extractive";
 };
 
 /** A generated multiple-choice quiz for one personal document (Phase J).
