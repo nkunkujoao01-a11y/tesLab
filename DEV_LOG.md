@@ -2342,6 +2342,32 @@ Checked each of the four surfaces against that bar:
 
 ---
 
+## Feature 82: root-caused a real Lighthouse mobile-performance collapse (25/100: 13.3s FCP, 24.6s LCP, 15,960ms TBT, 33s SI) to eager route-precaching competing with the initial page's own render
+
+User pasted a real Lighthouse run (Moto G Power emulation, Slow 4G, mobile) showing a catastrophic Performance score alongside a much healthier Accessibility (89) / Best Practices (77) / SEO (100). The dominant diagnostics — "Minimize main-thread work 42.9s," "Reduce JavaScript execution time 31.4s," "Reduce unused JavaScript Est savings of 4,010 KiB," "20 long tasks found" — all point the same direction: far more JS being fetched/parsed/executed than the current page needs.
+
+**Root cause**: `usePrecacheRoutes()` (`src/hooks/use-precache-routes.ts`), wired into `__root.tsx`, fires the instant `user` becomes truthy — which, for anyone with a persisted session, is essentially immediately on load. It sequentially calls `router.preloadRoute()` for 12 routes (7 static nav routes + 5 dynamic Ask-AI-thread routes), each one triggering a real `import()` of that route's JS chunk so it's available offline later. This is legitimate, working offline-support logic (added deliberately across Features 42/79) — but it was running with no regard for whether the current page had even finished rendering yet, on every connection speed alike. One of those chunks alone (`/progress`, via recharts) is ~360KB before gzip; fetching+parsing+executing a dozen unrelated chunks like this is real, measurable main-thread work, and under Slow 4G throttling it directly collided with the current page's own critical rendering path — exactly reproducing the reported FCP/LCP/TBT/SI numbers. Confirmed by reading the actual production chunk sizes off a real `npm run build` (`.output/public/assets/*.js`) rather than guessing.
+
+### What changed
+
+`use-precache-routes.ts`:
+- The whole warming pass is now deferred to `requestIdleCallback` (2s `setTimeout` fallback for browsers without it) instead of firing synchronously inside the `useEffect` — so it never competes with whatever the browser is doing to get the current page on screen.
+- Each individual route's `preloadRoute()` call is now its own idle-callback turn (chained via `await new Promise(...)` around `runWhenIdle`), rather than one tight `for`-loop — so even once warming starts, it yields the main thread between every route instead of running as one long uninterrupted stretch.
+- Skipped entirely when `navigator.connection` reports `saveData` or a `slow-2g`/`2g` `effectiveType`. This isn't just a perf mitigation — it's the app's own stated mission ("70%+ data savings" vs Moodle for Namibian students on constrained connections) applied to itself: those are exactly the users this background warming shouldn't spend data on for routes they may never open this session.
+
+### Other findings from the same report, deliberately not acted on this pass
+
+- **Accessibility** ("buttons lack an accessible name," positive `tabindex`, heading order): grepped every icon-only `<Button size="icon">` in the app for a missing `aria-label` — found exactly two, and both are in `calendar.tsx`/`sidebar.tsx`, shadcn scaffold components confirmed (via a repo-wide import search) to be **unused dead code**, unreachable on any real page. These findings almost certainly came from a Radix/browser-extension source, not this app's own DOM — worth another look with the exact audited URL and extensions disabled, but not chased blind.
+- **"Page prevented back/forward cache restoration"**: `use-session-tracking.ts` already deliberately uses `pagehide` (not `beforeunload`/`unload`, which are known bfcache blockers — this was already a considered choice, see its own comment). The more likely blocker is `use-module-messaging.ts`'s Supabase Realtime `.channel()` subscription (WebSockets are a standing Chrome bfcache blocker) — real, but scoped to the module-chat feature specifically and not touched this pass without knowing which page Lighthouse actually audited.
+- **"Reduce unused CSS ~102 KiB" / "Minify JavaScript ~15 KiB"**: minor relative to the ~4MB JS finding; not pursued this pass.
+- The report's own caveats (a Chrome extension — "Stylish" — visibly polluted the Best Practices audit; stored IndexedDB data warning; page too slow to finish within Lighthouse's time limit, "results may be incomplete") mean some numbers here may shift once re-run in incognito with no extensions — the underlying precache fix is real and independent of that noise regardless.
+
+### How it was validated
+
+`npx tsc --noEmit`, prettier, eslint clean. Verified against a real `npm run build`'s actual chunk sizes (confirming the `/progress` route's recharts chunk really is ~360KB and genuinely a separate, lazily-split chunk from the main entry — so this fix's premise is based on real numbers, not assumption). **Not re-run through Lighthouse** — no way to reproduce the user's exact mobile/Slow-4G/real-device conditions in this environment; the user should re-run Lighthouse (ideally incognito, no extensions) after this deploys to confirm the FCP/LCP/TBT numbers actually recover.
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.

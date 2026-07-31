@@ -54,6 +54,37 @@ const DYNAMIC_PRECACHE_ROUTES: {
   },
 ];
 
+// Real-world data showed this warming work competing directly with the
+// current page's own render: firing a dozen `preloadRoute()` calls (each
+// fetching + parsing + executing a route's JS chunk, including the ~360KB
+// recharts chunk for /progress) the instant `user` becomes truthy in
+// __root.tsx routinely landed inside the current page's own critical
+// rendering path — worst-case on exactly the slow/metered connections this
+// app is built for. Deferred to the browser's idle period (never sooner than
+// `window.load`, since `requestIdleCallback` can still fire mid-render on a
+// busy page) and skipped outright when the device says it's on a
+// constrained connection — this is background warming for *future*
+// navigations, not something the current page or its data budget should
+// ever pay for.
+function isConstrainedConnection(): boolean {
+  const connection = (
+    navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }
+  ).connection;
+  if (!connection) return false;
+  if (connection.saveData) return true;
+  return connection.effectiveType === "slow-2g" || connection.effectiveType === "2g";
+}
+
+function runWhenIdle(task: () => void): void {
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(task, { timeout: 5000 });
+  } else {
+    setTimeout(task, 2000);
+  }
+}
+
 /** Proactively warms this session's offline caches for the main nav
  * routes once actually signed in (not at service-worker install time,
  * when most routes would only render a login redirect). Two halves,
@@ -75,7 +106,10 @@ const DYNAMIC_PRECACHE_ROUTES: {
  * Without both halves, a route not yet visited this session fails to
  * navigate to at all while offline — the shell HTML alone isn't enough if
  * the route's own component chunk was never fetched. Fires once per
- * sign-in, not on every render or navigation. */
+ * sign-in, not on every render or navigation. Skipped entirely on a
+ * save-data/2G connection — those users are exactly who this app's own
+ * "70% data savings" goal is for; spending their data on routes they may
+ * never visit this session isn't a trade this app should make for them. */
 export function usePrecacheRoutes(): void {
   const { user } = useAuth();
   const router = useRouter();
@@ -85,36 +119,48 @@ export function usePrecacheRoutes(): void {
     if (!user || firedRef.current) return;
     firedRef.current = true;
 
-    // Sequential, not fired all at once: each preloadRoute call mutates
-    // shared router match-store state, and firing several concurrently
-    // against routes that were never actually rendered/matched this
-    // session hit real internal errors when raced together.
-    void (async () => {
-      for (const to of PRECACHE_PATHS) {
-        try {
-          await router.preloadRoute({ to } as Parameters<typeof router.preloadRoute>[0]);
-        } catch (err) {
-          console.error(`Failed to preload route chunk for ${to}`, err);
-        }
-      }
-      for (const { to, params } of DYNAMIC_PRECACHE_ROUTES) {
-        try {
-          await router.preloadRoute({
-            to,
-            params,
-          } as unknown as Parameters<typeof router.preloadRoute>[0]);
-        } catch (err) {
-          console.error(`Failed to preload route chunk for ${to}`, err);
-        }
-      }
-    })();
+    if (isConstrainedConnection()) return;
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.ready
-        .then((registration) => {
-          registration.active?.postMessage({ type: "PRECACHE_ROUTES" });
-        })
-        .catch((err) => console.error("Failed to trigger route HTML precache", err));
-    }
+    runWhenIdle(() => {
+      // Sequential, not fired all at once: each preloadRoute call mutates
+      // shared router match-store state, and firing several concurrently
+      // against routes that were never actually rendered/matched this
+      // session hit real internal errors when raced together. Each step
+      // is its own idle callback so this never monopolizes a single main
+      // -thread turn even once it starts.
+      void (async () => {
+        for (const to of PRECACHE_PATHS) {
+          await new Promise<void>((resolve) =>
+            runWhenIdle(() => {
+              router
+                .preloadRoute({ to } as Parameters<typeof router.preloadRoute>[0])
+                .catch((err) => console.error(`Failed to preload route chunk for ${to}`, err))
+                .finally(resolve);
+            }),
+          );
+        }
+        for (const { to, params } of DYNAMIC_PRECACHE_ROUTES) {
+          await new Promise<void>((resolve) =>
+            runWhenIdle(() => {
+              router
+                .preloadRoute({
+                  to,
+                  params,
+                } as unknown as Parameters<typeof router.preloadRoute>[0])
+                .catch((err) => console.error(`Failed to preload route chunk for ${to}`, err))
+                .finally(resolve);
+            }),
+          );
+        }
+      })();
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready
+          .then((registration) => {
+            registration.active?.postMessage({ type: "PRECACHE_ROUTES" });
+          })
+          .catch((err) => console.error("Failed to trigger route HTML precache", err));
+      }
+    });
   }, [user, router]);
 }
