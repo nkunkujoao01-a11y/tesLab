@@ -70,7 +70,11 @@ export type Material = {
   kind: string;
   pages: number;
   sizeMb: number;
-  content: MaterialContent;
+  // Absent only for the SSR-only, list-view fetch below (fetchModules()
+  // during the server-rendered initial load) — see its own comment for why.
+  // Always present from fetchModule() (singular) and from any client-side
+  // fetchModules() call, which is what every content reader actually uses.
+  content?: MaterialContent;
 };
 
 export type Module = {
@@ -90,7 +94,7 @@ export type Module = {
   quizQuestions: QuizQuestion[];
 };
 
-function mapMaterial(row: MaterialRow): Material {
+function mapMaterial(row: Omit<MaterialRow, "content"> & { content?: MaterialContent }): Material {
   return {
     id: row.id,
     title: row.title,
@@ -110,7 +114,10 @@ function mapModuleQuizQuestion(row: ModuleQuizQuestionRow): QuizQuestion {
 }
 
 function mapModule(
-  row: ModuleRow & { materials: MaterialRow[]; module_quizzes: ModuleQuizQuestionRow[] },
+  row: ModuleRow & {
+    materials: (Omit<MaterialRow, "content"> & { content?: MaterialContent })[];
+    module_quizzes: ModuleQuizQuestionRow[];
+  },
 ): Module {
   return {
     id: row.id,
@@ -136,12 +143,29 @@ function mapModule(
 // has seen this module's metadata at least once," independent of the
 // separate, explicit "download for offline reading" action.
 
+// The list views this feeds (dashboard, courses grid, progress, summaries —
+// every current caller) only ever read a material's id/title/kind/pages/
+// size, never its .content — that's real extracted document text, often the
+// single biggest field on the row. During SSR specifically, fetching it here
+// is pure waste: it can't even reach the offline cache (cacheModules() below
+// no-ops server-side, see isBrowser) since content only needs to be *stored*
+// for offline use, never *rendered*, on this page. Dropping it from the SSR
+// query shrinks the SSR response and the hydration payload directly — both
+// on this app's own Slow-4G/low-end-device critical path (confirmed via a
+// real Lighthouse run: dashboard's SSR response was the single largest
+// contributor to a 5s+ FCP). A client-side call (browser revisit, or
+// usePrecacheRoutes()'s idle-time warm-up) still fetches full content and
+// populates the real offline cache exactly as before — this only changes
+// what the *server-rendered, unused-by-this-page* copy carries.
 export async function fetchModules(): Promise<Module[]> {
   try {
+    const materialsSelect = isBrowser
+      ? "materials(*)"
+      : "materials(id, module_id, title, kind, pages, size_mb, created_at)";
     const { data, error } = await withTimeout(
       supabase
         .from("modules")
-        .select("*, materials(*), module_quizzes(*)")
+        .select(`*, ${materialsSelect}, module_quizzes(*)`)
         .order("code")
         .order("created_at", { foreignTable: "module_quizzes" }),
     );

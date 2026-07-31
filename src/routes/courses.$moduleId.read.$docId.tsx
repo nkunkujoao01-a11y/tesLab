@@ -203,6 +203,7 @@ function Reader() {
           type="button"
           disabled={isPending}
           onClick={() =>
+            doc.content &&
             void downloadMaterial(doc.id, module.id, doc.sizeMb, doc.content, doc.kind)
           }
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-5 py-2.5 text-sm font-medium text-prestige-cream transition-transform active:scale-[0.97] disabled:opacity-60"

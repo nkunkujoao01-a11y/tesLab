@@ -387,6 +387,7 @@ function ModuleDetail() {
                   isDownloaded={downloadedMaterialIds.has(materialKey(module.id, mat.id))}
                   isPending={pendingIds.has(materialKey(module.id, mat.id))}
                   onDownload={() =>
+                    mat.content &&
                     void downloadMaterial(mat.id, module.id, mat.sizeMb, mat.content, mat.kind)
                   }
                 />
