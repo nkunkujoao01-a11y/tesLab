@@ -1,0 +1,232 @@
+<mxfile host="65bd71144e">
+    <diagram name="System Architecture" id="arch-current-v2">
+        <mxGraphModel dx="1542" dy="866" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1650" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="learn-seamless-flow (eLearn) — Current System Architecture" style="text;html=1;align=left;verticalAlign=middle;fontSize=26;fontColor=#1F2A44;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="10" width="1200" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="Offline-first PWA · React + TanStack Start · Supabase · on-device AI · NUST Moodle integration" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#5B6472;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="48" width="1200" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="user" value="Student / Lecturer" style="shape=umlActor;whiteSpace=wrap;html=1;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#E9EAEE;strokeColor=#4A4F5C;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="90" width="50" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="layerClient" value="CLIENT DEVICE — Browser / Installed PWA" style="swimlane;whiteSpace=wrap;html=1;startSize=34;fillColor=#EAF2FB;strokeColor=#3E6FA8;fontSize=15;fontStyle=1;fontColor=#1F2A44;verticalAlign=top;align=left;spacingLeft=12;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="180" width="1560" height="360" as="geometry"/>
+                </mxCell>
+                <mxCell id="app" value="React 19 App TanStack Start/Router src/routes/* (~55 routes)" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="layerClient" vertex="1">
+                    <mxGeometry x="20" y="44" width="280" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="ui" value="shadcn/ui + Tailwind Component Library MobileShell / AdminShell" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="layerClient" vertex="1">
+                    <mxGeometry x="320" y="44" width="240" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="sw" value="Service Worker public/sw.js cache-first · precache · Background Fetch" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="layerClient" vertex="1">
+                    <mxGeometry x="580" y="34" width="240" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="aiworker" value="On-device AI Worker ai.worker.ts transformers.js (+Gemini Nano)" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="layerClient" vertex="1">
+                    <mxGeometry x="840" y="34" width="260" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="extract" value="PDF/DOCX Extraction pdf-extract.ts · pdf-ocr.ts docx-extract.ts" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="layerClient" vertex="1">
+                    <mxGeometry x="1120" y="44" width="260" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="devicedb" value="Dexie DeviceDB (device-wide) settings · catalog cache partial downloads" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="layerClient" vertex="1">
+                    <mxGeometry x="20" y="190" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="userdb" value="Dexie UserDB (per-account) downloads · progress · docs AI outputs · Moodle cache" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="layerClient" vertex="1">
+                    <mxGeometry x="320" y="190" width="280" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="layerVercel" value="VERCEL DEPLOYMENT — Nitro Serverless" style="swimlane;whiteSpace=wrap;html=1;startSize=34;fillColor=#E7F6EF;strokeColor=#2F8F5B;fontSize=15;fontStyle=1;fontColor=#1F2A44;verticalAlign=top;align=left;spacingLeft=12;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="580" width="1560" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="nitro" value="Nitro Serverless Function SSR + createServerFn handlers src/server.ts, src/start.ts" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#CDEEDC;strokeColor=#2F8F5B;fontSize=12;fontStyle=1;shadow=0;" parent="layerVercel" vertex="1">
+                    <mxGeometry x="290" y="44" width="320" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="static" value="Static Asset Bucket hashed JS / CSS / wasm + PWA manifest &amp; icons" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#CDEEDC;strokeColor=#2F8F5B;fontSize=12;fontStyle=1;shadow=0;" parent="layerVercel" vertex="1">
+                    <mxGeometry x="630" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="croninterceptbox" value="/api/moodle/cron-sync intercept moodle-cron-handler.ts" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#CDEEDC;strokeColor=#2F8F5B;fontSize=12;fontStyle=1;shadow=0;" parent="layerVercel" vertex="1">
+                    <mxGeometry x="970" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="layerSupabase" value="SUPABASE BACKEND" style="swimlane;whiteSpace=wrap;html=1;startSize=34;fillColor=#F1EAFB;strokeColor=#6E43A8;fontSize=15;fontStyle=1;fontColor=#1F2A44;verticalAlign=top;align=left;spacingLeft=12;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="810" width="1560" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="auth" value="Supabase Auth email/password · Google OAuth NUST student-number login" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E2D2F7;strokeColor=#6E43A8;fontSize=12;fontStyle=1;shadow=0;" parent="layerSupabase" vertex="1">
+                    <mxGeometry x="95" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="postgres" value="Postgres + RLS 43 migrations modules · materials · moodle_*" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#E2D2F7;strokeColor=#6E43A8;fontSize=12;fontStyle=1;shadow=0;" parent="layerSupabase" vertex="1">
+                    <mxGeometry x="445" y="34" width="300" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="vault" value="Vault BYOK Gemini key encryption" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E2D2F7;strokeColor=#6E43A8;fontSize=12;fontStyle=1;shadow=0;" parent="layerSupabase" vertex="1">
+                    <mxGeometry x="795" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="pgcron" value="pg_cron scheduled Moodle sync trigger" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#E2D2F7;strokeColor=#6E43A8;fontSize=12;fontStyle=1;shadow=0;" parent="layerSupabase" vertex="1">
+                    <mxGeometry x="1145" y="34" width="300" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="layerExternal" value="EXTERNAL SERVICES" style="swimlane;whiteSpace=wrap;html=1;startSize=34;fillColor=#FCF1E3;strokeColor=#B9791F;fontSize=15;fontStyle=1;fontColor=#1F2A44;verticalAlign=top;align=left;spacingLeft=12;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="1040" width="1560" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="moodle" value="NUST eLearning (Moodle) elearning.nust.na" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#F8E3C4;strokeColor=#B9791F;fontSize=12;fontStyle=1;shadow=0;" parent="layerExternal" vertex="1">
+                    <mxGeometry x="95" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="gemini" value="Google Gemini API (BYOK) student&#39;s own API key" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#F8E3C4;strokeColor=#B9791F;fontSize=12;fontStyle=1;shadow=0;" parent="layerExternal" vertex="1">
+                    <mxGeometry x="445" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="hf" value="Hugging Face on-device model weight hosting" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#F8E3C4;strokeColor=#B9791F;fontSize=12;fontStyle=1;shadow=0;" parent="layerExternal" vertex="1">
+                    <mxGeometry x="795" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="googleoauth" value="Google OAuth Provider" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#F8E3C4;strokeColor=#B9791F;fontSize=12;fontStyle=1;shadow=0;" parent="layerExternal" vertex="1">
+                    <mxGeometry x="1145" y="44" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_user_app" value="opens app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#8E44AD;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#8E44AD;labelBackgroundColor=#FFFFFF;" parent="1" source="user" target="app" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_auth" value="sign in (email / OAuth / NUST ID)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#8E44AD;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#8E44AD;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="auth" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_auth_google" value="OAuth handshake" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#8E44AD;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#8E44AD;labelBackgroundColor=#FFFFFF;" parent="1" source="auth" target="googleoauth" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_auth_moodle" value="NUST student-number login" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#8E44AD;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#8E44AD;labelBackgroundColor=#FFFFFF;" parent="1" source="auth" target="moodle" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_nitro" value="SSR page load" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E75B6;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E75B6;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="nitro" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_nitro_pg" value="SSR data fetch (materials.content trimmed)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E75B6;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E75B6;labelBackgroundColor=#FFFFFF;" parent="1" source="nitro" target="postgres" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_pg" value="client-side queries (supabase-js, RLS)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E75B6;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E75B6;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="postgres" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_devicedb" value="cache catalog for offline browse" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E75B6;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E75B6;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="devicedb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_userdb" value="downloads · progress AI outputs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E7D32;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E7D32;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="userdb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_extract_userdb" value="extracted text stored" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E7D32;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E7D32;labelBackgroundColor=#FFFFFF;" parent="1" source="extract" target="userdb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_sw" value="register + precache messages" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E7D32;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E7D32;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="sw" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_sw_devicedb" value="Background Fetch persists model downloads" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#2E7D32;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#2E7D32;labelBackgroundColor=#FFFFFF;" parent="1" source="sw" target="devicedb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_aiworker" value="summarize / chat / quiz requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#E07B00;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#E07B00;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="aiworker" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_aiworker_hf" value="fetch model weights (first use, then cached)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#E07B00;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#E07B00;labelBackgroundColor=#FFFFFF;" parent="1" source="aiworker" target="hf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_app_gemini" value="optional BYOK cloud call (fallback to on-device)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#E07B00;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#E07B00;labelBackgroundColor=#FFFFFF;" parent="1" source="app" target="gemini" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_userdb_pg" value="sync.ts — bidirectional, timestamp-wins" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#00838F;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#00838F;labelBackgroundColor=#FFFFFF;dashed=1;" parent="1" source="userdb" target="postgres" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_pgcron_cron" value="POST cron-sync (shared secret)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#00838F;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#00838F;labelBackgroundColor=#FFFFFF;dashed=1;" parent="1" source="pgcron" target="croninterceptbox" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_cron_moodle" value="fetch courses/grades/ assignments (service role)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#00838F;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#00838F;labelBackgroundColor=#FFFFFF;dashed=1;" parent="1" source="croninterceptbox" target="moodle" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_cron_pg" value="write moodle_* tables" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#00838F;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#00838F;labelBackgroundColor=#FFFFFF;dashed=1;" parent="1" source="croninterceptbox" target="postgres" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_pg_userdb" value="down-sync moodle_* mirror for offline" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;fontStyle=1;strokeColor=#00838F;strokeWidth=2;endArrow=block;endFill=1;jettySize=auto;orthogonalLoop=1;fontColor=#00838F;labelBackgroundColor=#FFFFFF;dashed=1;" parent="1" source="postgres" target="userdb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend" value="LEGEND" style="swimlane;whiteSpace=wrap;html=1;startSize=34;fillColor=#FFFFFF;strokeColor=#B0B7C3;fontSize=15;fontStyle=1;fontColor=#1F2A44;verticalAlign=top;align=left;spacingLeft=12;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="1270" width="1560" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="legShapeHeader" value="Shapes" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#1F2A44;fontStyle=1;" parent="legend" vertex="1">
+                    <mxGeometry x="20" y="44" width="300" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="legActor" value="" style="shape=umlActor;whiteSpace=wrap;html=1;fillColor=#E9EAEE;strokeColor=#4A4F5C;" parent="legend" vertex="1">
+                    <mxGeometry x="20" y="76" width="30" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="legActorTxt" value="End user — student or lecturer" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="70" y="84" width="420" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="legBox" value="" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="legend" vertex="1">
+                    <mxGeometry x="20" y="130" width="50" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="legBoxTxt" value="Application / service component" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="90" y="130" width="420" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="legHex" value="" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#D3E4F6;strokeColor=#3E6FA8;fontSize=12;fontStyle=1;shadow=0;" parent="legend" vertex="1">
+                    <mxGeometry x="20" y="174" width="50" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="legHexTxt" value="Background worker / scheduled process" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="90" y="174" width="420" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="legCyl" value="" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#E2D2F7;strokeColor=#6E43A8;fontSize=12;fontStyle=1;shadow=0;" parent="legend" vertex="1">
+                    <mxGeometry x="20" y="218" width="50" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="legCylTxt" value="Database / persistent storage" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="90" y="222" width="420" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="legCloud" value="" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#F8E3C4;strokeColor=#B9791F;fontSize=12;fontStyle=1;shadow=0;" parent="legend" vertex="1">
+                    <mxGeometry x="480" y="76" width="60" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="legCloudTxt" value="External third-party service" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="550" y="78" width="420" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="legFlowHeader" value="Data flow" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#1F2A44;fontStyle=1;" parent="legend" vertex="1">
+                    <mxGeometry x="900" y="44" width="300" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="legLine0" style="endArrow=block;html=1;strokeColor=#8E44AD;strokeWidth=3;rounded=0;" parent="legend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="900" y="80" as="sourcePoint"/>
+                        <mxPoint x="960" y="80" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legLineTxt0" value="Authentication flow" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="975" y="68" width="400" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="legLine1" style="endArrow=block;html=1;strokeColor=#2E75B6;strokeWidth=3;rounded=0;" parent="legend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="900" y="118" as="sourcePoint"/>
+                        <mxPoint x="960" y="118" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legLineTxt1" value="Content / browsing flow" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="975" y="106" width="400" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="legLine2" style="endArrow=block;html=1;strokeColor=#2E7D32;strokeWidth=3;rounded=0;" parent="legend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="900" y="156" as="sourcePoint"/>
+                        <mxPoint x="960" y="156" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legLineTxt2" value="Offline storage flow" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="975" y="144" width="400" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="legLine3" style="endArrow=block;html=1;strokeColor=#E07B00;strokeWidth=3;rounded=0;" parent="legend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="900" y="194" as="sourcePoint"/>
+                        <mxPoint x="960" y="194" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legLineTxt3" value="AI processing flow" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="975" y="182" width="400" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="legLine4" style="endArrow=block;html=1;strokeColor=#00838F;strokeWidth=3;rounded=0;dashed=1;" parent="legend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="900" y="232" as="sourcePoint"/>
+                        <mxPoint x="960" y="232" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legLineTxt4" value="Sync &amp; Moodle integration flow" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1F2A44;" parent="legend" vertex="1">
+                    <mxGeometry x="975" y="220" width="400" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="legNote" value="Layer color = where the component runs. Arrow color = what kind of data is moving, independent of layer." style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#5B6472;" parent="legend" vertex="1">
+                    <mxGeometry x="20" y="262" width="1500" height="26" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

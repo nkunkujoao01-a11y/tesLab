@@ -159,6 +159,7 @@ function Settings() {
   const [cloudEnabled, setCloudEnabled] = useCloudAiEnabled();
   const cloudQuota = useCloudAiQuota();
   const [keyInput, setKeyInput] = useState("");
+  const [enlargedStepImage, setEnlargedStepImage] = useState<string | null>(null);
   const moodle = useMoodleConnection();
   const [moodleStudentNumber, setMoodleStudentNumber] = useState("");
   const [moodlePassword, setMoodlePassword] = useState("");
@@ -408,42 +409,96 @@ function Settings() {
                           email updates checkbox is optional, skip it if you want.
                         </p>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
-                          2
-                        </span>
-                        <p className="text-[12px] leading-relaxed text-foreground/85">
-                          Top right of the page, click{" "}
-                          <span className="font-semibold text-prestige-deep">+ Create API key</span>
-                          .
-                        </p>
+                      <li className="flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
+                            2
+                          </span>
+                          <p className="text-[12px] leading-relaxed text-foreground/85">
+                            Top right of the page, click{" "}
+                            <span className="font-semibold text-prestige-deep">
+                              + Create API key
+                            </span>
+                            .
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEnlargedStepImage(
+                              "/settings-help/ai-studio-step-2-create-key-button.webp",
+                            )
+                          }
+                          className="ml-8 overflow-hidden rounded-lg border border-border/60"
+                        >
+                          <img
+                            src="/settings-help/ai-studio-step-2-create-key-button.webp"
+                            alt="Google AI Studio's API Keys page, with the + Create API key button highlighted in the top right"
+                            loading="lazy"
+                            className="w-full max-w-[220px]"
+                          />
+                        </button>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
-                          3
-                        </span>
-                        <p className="text-[12px] leading-relaxed text-foreground/85">
-                          A "Create a new key" popup appears: type any name (e.g.{" "}
-                          <span className="font-semibold text-prestige-deep">Gemini API Key</span>),
-                          leave the project as{" "}
-                          <span className="font-semibold text-prestige-deep">
-                            Default Gemini Project
-                          </span>{" "}
-                          unless you already have one, then click{" "}
-                          <span className="font-semibold text-prestige-deep">Create key</span>.
-                        </p>
+                      <li className="flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
+                            3
+                          </span>
+                          <p className="text-[12px] leading-relaxed text-foreground/85">
+                            A "Create a new key" popup appears: type any name (e.g.{" "}
+                            <span className="font-semibold text-prestige-deep">Gemini API Key</span>
+                            ), leave the project as{" "}
+                            <span className="font-semibold text-prestige-deep">
+                              Default Gemini Project
+                            </span>{" "}
+                            unless you already have one, then click{" "}
+                            <span className="font-semibold text-prestige-deep">Create key</span>.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEnlargedStepImage(
+                              "/settings-help/ai-studio-step-3-create-key-dialog.webp",
+                            )
+                          }
+                          className="ml-8 overflow-hidden rounded-lg border border-border/60"
+                        >
+                          <img
+                            src="/settings-help/ai-studio-step-3-create-key-dialog.webp"
+                            alt="The Create a new key popup, with a name field and a Create key button"
+                            loading="lazy"
+                            className="w-full max-w-[220px]"
+                          />
+                        </button>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
-                          4
-                        </span>
-                        <p className="text-[12px] leading-relaxed text-foreground/85">
-                          A second popup shows your new key. Click the small copy icon next to it
-                          (or select and copy the text starting with{" "}
-                          <span className="font-semibold text-prestige-deep">AQ.</span> or{" "}
-                          <span className="font-semibold text-prestige-deep">AIza</span>), then come
-                          back to this page and paste it below.
-                        </p>
+                      <li className="flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-prestige-gold text-[10px] font-bold text-prestige-deep">
+                            4
+                          </span>
+                          <p className="text-[12px] leading-relaxed text-foreground/85">
+                            A second popup shows your new key. Click the small copy icon next to it
+                            (or select and copy the text starting with{" "}
+                            <span className="font-semibold text-prestige-deep">AQ.</span> or{" "}
+                            <span className="font-semibold text-prestige-deep">AIza</span>), then
+                            come back to this page and paste it below.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEnlargedStepImage("/settings-help/ai-studio-step-4-copy-key.webp")
+                          }
+                          className="ml-8 overflow-hidden rounded-lg border border-border/60"
+                        >
+                          <img
+                            src="/settings-help/ai-studio-step-4-copy-key.webp"
+                            alt="The API key details popup, with the copy icon next to the new key"
+                            loading="lazy"
+                            className="w-full max-w-[220px]"
+                          />
+                        </button>
                       </li>
                     </ol>
                   </div>
@@ -471,6 +526,20 @@ function Settings() {
                 </form>
               )}
             </div>
+            <Dialog
+              open={enlargedStepImage !== null}
+              onOpenChange={(open) => !open && setEnlargedStepImage(null)}
+            >
+              <DialogContent className="max-w-md gap-0 p-0">
+                {enlargedStepImage && (
+                  <img
+                    src={enlargedStepImage}
+                    alt="Enlarged Google AI Studio step screenshot"
+                    className="w-full rounded-lg"
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </section>
 
           {/* AI summarization model */}
