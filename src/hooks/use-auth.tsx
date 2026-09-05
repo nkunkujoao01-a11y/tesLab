@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { User } from "@supabase/supabase-js";
+import type { Session, User } from "@supabase/supabase-js";
+import { toast } from "sonner";
 import { supabase, type ProfileRow } from "@/lib/supabase";
 import { getUserDb } from "@/lib/db";
 import { withTimeout } from "@/lib/with-timeout";
@@ -107,13 +108,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // reset to loading" apart from "this is a genuinely different user,
   // clear the stale one first".
   const loadedProfileForUserIdRef = useRef<string | null>(null);
+  // Whether this mount has ever shown a real signed-in user — combined
+  // with hadPersistedTokenAtMount (captured inside the effect below) to
+  // gate the "session timed out" message so it only fires for an actual
+  // loss of a real session, never for a plain "not signed in yet" page
+  // load with no token in storage at all.
+  const hadConfirmedUserRef = useRef(false);
+  // Set right before calling supabase.auth.signOut() below, so the
+  // resulting SIGNED_OUT event is recognized as user-initiated rather
+  // than a real timeout — see resolveSession's own comment.
+  const explicitSignOutRef = useRef(false);
 
+  // Security-audit follow-up bug (real, found by re-reading this file
+  // against @supabase/auth-js's actual source, not just its docs): the
+  // offline-persisted-user fallback above was only ever applied to the
+  // ONE-TIME getSession() check below — but supabase-js's own
+  // onAuthStateChange() subscription independently re-runs the exact same
+  // __loadSession() logic to emit its own "INITIAL_SESSION" event shortly
+  // after subscribing, AND fires again on every later background
+  // token-refresh attempt (see this file's very first comment — that's
+  // the visibilitychange-triggered refresh). Every one of those firings
+  // used to call setUser(session?.user ?? null) unconditionally, with no
+  // fallback — so a null session from EITHER of those (not just the
+  // initial getSession() call) could silently undo the fallback the
+  // moment it was applied (a race at mount), or sign someone out mid-tab
+  // for a background refresh that failed only because they were offline,
+  // with the token happening to expire while the tab stayed open. This is
+  // the actual mechanism behind "sometimes get logged out for no reason".
+  // Fixed by routing every place a session can resolve to `null` through
+  // the same resolveSession() logic below, so the offline-fallback and
+  // "explicit sign-out always wins" rules apply everywhere consistently,
+  // not just on the very first check.
   useEffect(() => {
     let cancelled = false;
+    // Captured once, synchronously, before any async resolution and
+    // before supabase-js has a chance to clear storage on a genuinely
+    // invalid/expired token (it only clears storage for that specific
+    // case, per readPersistedSupabaseUser's own comment) — this is what
+    // lets the "timed out" message correctly fire even on a brand-new
+    // page load/reload (not just mid-session), the single most common
+    // real version of this: closing the laptop for a while and reopening
+    // it later to a token that's now genuinely expired. Without this, a
+    // fresh mount's hadConfirmedUserRef always starts false, which would
+    // wrongly suppress the message for exactly that case.
+    const hadPersistedTokenAtMount = readPersistedSupabaseUser() !== null;
 
-    supabase.auth.getSession().then(({ data }) => {
+    function resolveSession(session: Session | null, isExplicitSignOut: boolean) {
       if (cancelled) return;
-      if (!data.session && typeof navigator !== "undefined" && !navigator.onLine) {
+
+      if (session) {
+        hadConfirmedUserRef.current = true;
+        setUser(session.user);
+        setSessionLoading(false);
+        return;
+      }
+
+      // A real "Sign out" button click (see signOut() below, which sets
+      // this flag right before calling supabase.auth.signOut()) always
+      // wins — never second-guessed with a stale offline fallback, and
+      // never shown as a "timed out" message (the user knows why).
+      if (isExplicitSignOut) {
+        explicitSignOutRef.current = false;
+        setUser(null);
+        setSessionLoading(false);
+        return;
+      }
+
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
         // See readPersistedSupabaseUser's own comment — don't force a
         // sign-in screen for what's very likely just a failed background
         // token refresh while offline, not a real sign-out.
@@ -124,13 +185,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
-      setUser(data.session?.user ?? null);
+
+      // A real, network-confirmed loss of session (online, or offline
+      // with nothing persisted to fall back to) — not an offline
+      // artifact. Only surface the "timed out" message if there was a
+      // real session to lose: either this mount already showed
+      // signed-in content, or storage held a token when this mount
+      // started (a fresh page load onto an already-expired token — the
+      // most common real version of this). A plain "never signed in at
+      // all" page load (no token ever existed) is not a timeout.
+      if (hadConfirmedUserRef.current || hadPersistedTokenAtMount) {
+        toast.error("Your session has timed out. Please log in again.");
+      }
+      setUser(null);
       setSessionLoading(false);
-    });
+    }
+
+    supabase.auth.getSession().then(({ data }) => resolveSession(data.session, false));
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      setSessionLoading(false);
+      resolveSession(session, event === "SIGNED_OUT" && explicitSignOutRef.current);
       // "SIGNED_IN" fires only for a genuine new sign-in action (password,
       // Google OAuth, or the NUST student-number flow — all end in
       // signInWithPassword under the hood) — never for the page-load
@@ -265,7 +339,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loading = sessionLoading || profileLoading;
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    explicitSignOutRef.current = true;
+    try {
+      // supabase-js's own signOut() notifies onAuthStateChange
+      // subscribers with the SIGNED_OUT event (and awaits that) before
+      // this resolves, so resolveSession's own reset of the flag above
+      // always runs first in the success path — this try/catch only
+      // exists as a safety net for the flag's lifetime if signOut()
+      // itself throws before ever reaching that point (e.g. some
+      // pre-flight error), so it can never get stuck true and wrongly
+      // suppress a real future "timed out" message.
+      await supabase.auth.signOut();
+    } catch (err) {
+      explicitSignOutRef.current = false;
+      throw err;
+    }
   };
 
   // Marks the welcome tour (see WelcomeTour.tsx) as seen, once, forever —
