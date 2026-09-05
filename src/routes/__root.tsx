@@ -60,9 +60,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="font-display text-2xl font-medium text-foreground">
           This page did not load
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Try again or head back to the dashboard.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Try again or head back to the start.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -77,12 +75,24 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a
-            href="/dashboard"
+          {/* Bug found from a user report: this used to be a raw
+              <a href="/dashboard">, which forces a full hard document
+              reload (not client-side routing) straight into /dashboard's
+              own loader — the same kind of live Supabase fetch that most
+              likely threw the error being shown here in the first place,
+              on a device with nothing cached yet. Offline, that reload
+              could land right back on this same error screen, trapping
+              the user with no working way out. Fixed to match
+              NotFoundComponent's already-correct pattern just above:
+              client-side navigation (works offline unconditionally) to
+              "/", a static route with no loader that can never itself
+              throw. */}
+          <Link
+            to="/"
             className="inline-flex items-center justify-center rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>

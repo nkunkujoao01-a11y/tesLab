@@ -8,6 +8,11 @@ import { useAuth } from "@/hooks/use-auth";
 // as something worth capping rather than trusting the browser alone.
 export const MAX_FEEDBACK_IMAGES = 4;
 export const MAX_IMAGE_MB = 8;
+// Minimal, future-proofing input validation — the `message` column has no
+// DB-side length constraint (plain `text`), so this is the only bound on
+// an absurdly large paste before it's stored and later rendered to an
+// admin. Generous enough for any real bug report.
+export const MAX_FEEDBACK_MESSAGE_LENGTH = 5000;
 
 export type FeedbackImage = { id: string; file: File; previewUrl: string };
 
@@ -49,6 +54,11 @@ export function useSubmitFeedback() {
   const submitFeedback = useCallback(
     async (message: string, images: FeedbackImage[], rating?: number) => {
       if (!user) return false;
+      const trimmedMessage = message.trim();
+      if (trimmedMessage.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
+        toast.error(`Feedback is limited to ${MAX_FEEDBACK_MESSAGE_LENGTH} characters.`);
+        return false;
+      }
       setSubmitting(true);
       const feedbackId = crypto.randomUUID();
       try {
@@ -67,7 +77,7 @@ export function useSubmitFeedback() {
         const { error } = await supabase.from("feedback").insert({
           id: feedbackId,
           user_id: user.id,
-          message: message.trim(),
+          message: trimmedMessage,
           image_paths: imagePaths,
           // 0024_feedback_rating.sql — undefined stays a real SQL null
           // (supabase-js omits an undefined key entirely), not a fake 0;

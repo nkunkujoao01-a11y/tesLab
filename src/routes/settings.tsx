@@ -508,6 +508,9 @@ function Settings() {
                       value={keyInput}
                       onChange={(e) => setKeyInput(e.target.value)}
                       placeholder="2. Paste your key here"
+                      maxLength={200}
+                      autoComplete="off"
+                      spellCheck={false}
                       className="h-14 flex-1 rounded-lg border border-border/70 bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-prestige-gold/50"
                     />
                     <button

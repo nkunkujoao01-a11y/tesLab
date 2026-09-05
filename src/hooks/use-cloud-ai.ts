@@ -49,6 +49,18 @@ export function useCloudAiKey(): CloudAiKeyState {
   const connect = useCallback(async (key: string) => {
     const trimmed = key.trim();
     if (!trimmed) return false;
+    // Minimal, future-proofing input validation: a real Gemini API key is
+    // a short single-line token (Google's own are ~39 chars) — reject an
+    // absurdly long paste or one containing whitespace/control characters
+    // before it ever reaches the network or the database, rather than
+    // trusting whatever was pasted. Not a security boundary by itself
+    // (saveCloudKey's own RPC + RLS is what actually protects the stored
+    // value — see ai-cloud.ts), just a sane bound on obviously-malformed
+    // input.
+    if (trimmed.length > 200 || /\s/.test(trimmed)) {
+      toast.error("That doesn't look like a valid API key.");
+      return false;
+    }
     setConnecting(true);
     try {
       await saveCloudKey(trimmed);
