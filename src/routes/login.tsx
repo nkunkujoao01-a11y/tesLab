@@ -116,6 +116,7 @@ function Login() {
               id="identifier"
               type="text"
               required
+              maxLength={254}
               autoComplete="username"
               placeholder="you@example.com or 12345678"
               value={identifier}
@@ -130,6 +131,7 @@ function Login() {
             <PasswordInput
               id="password"
               required
+              maxLength={128}
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

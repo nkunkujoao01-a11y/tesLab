@@ -86,6 +86,17 @@ type AuthContextValue = {
   user: User | null;
   profile: ProfileRow | null;
   loading: boolean;
+  // True only once `profile` has been confirmed by a live server fetch
+  // this mount — false while it's still the optimistic offline/cold-start
+  // cache read (see the profile effect below). A locally-cached profile
+  // lives in this device's own IndexedDB, editable via devtools like any
+  // client-side storage — never trust it for anything privilege-gating
+  // (e.g. is_lecturer/is_super_admin-based UI access); wait for this flag
+  // instead. The actual data/write access is always independently
+  // enforced server-side via RLS regardless of this flag, so this only
+  // protects against a *client UI* briefly showing admin-shaped screens
+  // to someone who tampered with their own cache — never real data.
+  profileVerified: boolean;
   signOut: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 };
@@ -95,6 +106,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [profileVerified, setProfileVerified] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(true);
   // Starts true (not false) because the very first render always has a
   // user to resolve or rule out — see the race this fixes, below.
@@ -232,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       loadedProfileForUserIdRef.current = null;
       setProfile(null);
+      setProfileVerified(false);
       setProfileLoading(false);
       return;
     }
@@ -243,6 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // A genuine account switch (sign out A, sign in as B) — never show
       // B even a flash of A's cached name/avatar/role.
       if (loadedProfileForUserIdRef.current !== null) setProfile(null);
+      setProfileVerified(false);
       setProfileLoading(true);
 
       // Cold-start-while-offline: this render has no in-memory profile
@@ -284,6 +298,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (data) {
           setProfile(data);
+          // Only a genuine live fetch flips this — never the optimistic
+          // cache read above, so a tampered local cache can never make
+          // profileVerified true.
+          setProfileVerified(true);
           loadedProfileForUserIdRef.current = userId;
           void getUserDb(userId)
             .syncMeta.put({ key: PROFILE_CACHE_KEY, value: JSON.stringify(data) })
@@ -373,7 +391,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, completeOnboarding }}>
+    <AuthContext.Provider
+      value={{ user, profile, profileVerified, loading, signOut, completeOnboarding }}
+    >
       {children}
     </AuthContext.Provider>
   );

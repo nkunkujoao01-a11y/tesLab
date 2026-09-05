@@ -187,6 +187,7 @@ function Signup() {
               id="fullName"
               type="text"
               required
+              maxLength={100}
               autoComplete="name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -201,6 +202,7 @@ function Signup() {
               id="email"
               type="email"
               required
+              maxLength={254}
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -215,6 +217,7 @@ function Signup() {
               id="password"
               required
               minLength={6}
+              maxLength={128}
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

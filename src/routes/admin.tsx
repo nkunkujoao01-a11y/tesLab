@@ -12,11 +12,24 @@ export const Route = createFileRoute("/admin")({
 /** Gate applied once at the layout level — every /admin/* page inherits
  * it, rather than each page re-checking `profile.is_lecturer` the way the
  * old single-page /admin/catalog route had to (see Feature 59). Same
- * access model as before: a manual DB flag, not self-service. */
+ * access model as before: a manual DB flag, not self-service.
+ *
+ * Security-audit hardening: waits for `profileVerified` (a genuine live
+ * server fetch, not the offline/cold-start cache read — see use-auth.tsx)
+ * before trusting `is_lecturer`/`is_super_admin` either way. A student
+ * could edit their own cached profile in devtools IndexedDB to say
+ * is_lecturer: true — that was already harmless (every real admin
+ * read/write is independently RLS-enforced server-side regardless of
+ * what this client thinks), but it could briefly flash the admin shell
+ * UI before the real fetch corrected it. Requiring a verified fetch
+ * first closes that off too, at the cost of admin access needing a live
+ * connection at least once per session — reasonable, since this console
+ * is inherently online-only anyway (managing shared catalog/student
+ * data). */
 function AdminLayout() {
-  const { profile, loading } = useAuth();
+  const { profile, profileVerified, loading } = useAuth();
 
-  if (loading) {
+  if (loading || !profileVerified) {
     return <div className="min-h-screen bg-background" />;
   }
 

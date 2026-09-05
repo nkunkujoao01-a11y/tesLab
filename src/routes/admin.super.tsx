@@ -15,11 +15,17 @@ export const Route = createFileRoute("/admin/super")({
  * is correctly excluded even though they now satisfy is_lecturer() the
  * same way a super admin does (see 0035_super_admin_role.sql). Renders
  * inline rather than a full-screen takeover — this is already inside
- * AdminShell from the parent layout. */
+ * AdminShell from the parent layout.
+ *
+ * Also requires `profileVerified`, same reasoning as admin.tsx's own
+ * gate — never trust a cached/tampered is_super_admin for even a UI
+ * decision, only a live-confirmed one. admin.tsx's own gate already
+ * waits for it too, but this route can theoretically be reached before
+ * that finishes re-rendering, so it's checked again here directly. */
 function SuperAdminLayout() {
-  const { profile, loading } = useAuth();
+  const { profile, profileVerified, loading } = useAuth();
 
-  if (loading) {
+  if (loading || !profileVerified) {
     return <div className="min-h-[40vh]" />;
   }
 
