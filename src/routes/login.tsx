@@ -6,6 +6,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleGlyph } from "@/components/GoogleGlyph";
 import { supabase } from "@/lib/supabase";
 import { loginWithNust } from "@/lib/moodle-cloud";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -29,6 +30,7 @@ function looksLikeEmail(identifier: string): boolean {
 
 function Login() {
   const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +78,25 @@ function Login() {
   // there's no "reset loading" step here; a stuck spinner on this specific
   // click would mean the redirect itself never fired, which the error
   // branch below already surfaces.
+  //
+  // Bug found from a real user report: "can't sign in with Google" — the
+  // actual cause was the device being offline at the time (confirmed by a
+  // failed manifest.webmanifest fetch in the same console log; a separate
+  // "message channel closed" error in the same log is a well-known
+  // browser-extension artifact, unrelated to this app). Google sign-in is
+  // a real redirect to accounts.google.com — it can never work without a
+  // live connection, same as NUST Moodle login elsewhere in this app —
+  // but this button previously attempted it anyway with no upfront check,
+  // so the failure showed up as a confusing browser-level network error
+  // instead of this app's own clear messaging. Checking isOnline first
+  // (same pattern already used for Moodle connect / cloud AI key save in
+  // settings.tsx) fixes that.
   const handleGoogleSignIn = async () => {
     setError(null);
+    if (!isOnline) {
+      setError("You're offline. Connect to the internet to sign in with Google.");
+      return;
+    }
     setGoogleLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -165,12 +184,17 @@ function Login() {
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          disabled={googleLoading}
+          disabled={googleLoading || !isOnline}
           className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-medium text-prestige-deep shadow-sm transition-transform active:scale-[0.97] disabled:opacity-60"
         >
           <GoogleGlyph className="h-4 w-4" />
           <span>{googleLoading ? "Redirecting…" : "Continue with Google"}</span>
         </button>
+        {!isOnline && (
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+            You're offline — Google sign-in needs a connection.
+          </p>
+        )}
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           New here?{" "}
