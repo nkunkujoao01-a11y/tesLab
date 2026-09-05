@@ -7,39 +7,11 @@ import type {
 } from "@/lib/supabase";
 import { deviceDb } from "@/lib/db";
 import type { QuizQuestion } from "@/lib/quiz-gen";
+// Shared with use-auth.tsx's profile fetch and dashboard.tsx's offline
+// cold-start empty state — see with-timeout.ts.
+import { withTimeout } from "@/lib/with-timeout";
 
 export type { MaterialContent };
-
-// FR: on a bad connection, a hung Supabase request previously blocked the
-// whole route for however long the browser's own TCP timeout takes (~8s,
-// measured in DEV_LOG.md Feature 29) before the loader could fail into any
-// fallback at all. 6s is short enough to fail fast into the IndexedDB
-// catalog cache below while still being generous on a genuinely slow (not
-// dead) connection — see Feature 30.
-const NETWORK_TIMEOUT_MS = 6000;
-
-class NetworkTimeoutError extends Error {
-  constructor() {
-    super("Network request timed out");
-    this.name = "NetworkTimeoutError";
-  }
-}
-
-function withTimeout<T>(promise: PromiseLike<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new NetworkTimeoutError()), NETWORK_TIMEOUT_MS);
-    Promise.resolve(promise).then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (err: unknown) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    );
-  });
-}
 
 // fetchModules()/fetchModule() run as TanStack Start route loaders, which
 // execute on the SERVER during SSR for the initial render, not just in the

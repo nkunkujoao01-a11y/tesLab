@@ -1,6 +1,45 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase, type ProfileRow } from "@/lib/supabase";
+import { getUserDb } from "@/lib/db";
+import { withTimeout } from "@/lib/with-timeout";
+
+// Bug found from a user report: switching tabs (or just backgrounding and
+// re-foregrounding the app) caused a full-screen skeleton flash every
+// time, online or offline — and offline, closing and reopening the app
+// left it stuck on that skeleton forever. Root cause: @supabase/auth-js
+// attaches its own internal `visibilitychange` listener (not app code)
+// that fires a token-refresh attempt on every tab-focus event. That
+// refresh re-invokes onAuthStateChange below with a freshly-deserialized
+// (but same-user) session object every time — a new `User` object
+// reference even though the actual signed-in user hasn't changed. The
+// profile-fetch effect further down used to depend on that whole `user`
+// object, so it re-ran on every one of those events, resetting
+// profileLoading to true with no timeout and no offline fallback —
+// MobileShell.tsx reads `loading` (sessionLoading || profileLoading) to
+// decide whether to blank the screen to <ShellSkeleton />, so this both
+// flashed the skeleton on every tab switch and, offline (where the fetch
+// never resolved), left it stuck forever. Fixed below by keying the
+// profile effect on the stable `userId` string instead of the `user`
+// object, adding a timeout, and treating a fetch failure as "keep
+// whatever we already have" instead of "hang".
+const PROFILE_CACHE_KEY = "cachedProfile";
+
+function readCachedProfile(raw: unknown, userId: string): ProfileRow | null {
+  try {
+    if (!raw || typeof raw !== "object" || !("value" in raw)) return null;
+    const value = (raw as { value: unknown }).value;
+    if (typeof value !== "string") return null;
+    const parsed = JSON.parse(value) as ProfileRow | null;
+    if (parsed && typeof parsed === "object" && parsed.id === userId) return parsed;
+    return null;
+  } catch {
+    // Same "never trust it, just fall through" defensiveness as
+    // readPersistedSupabaseUser below — a malformed cache entry should
+    // never be able to throw or misbehave, only be ignored.
+    return null;
+  }
+}
 
 // Real bug found from a user report: "sometimes, since I was offline, I
 // have to sign in again." Root cause, confirmed by reading
@@ -60,6 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // user to resolve or rule out — see the race this fixes, below.
   const [profileLoading, setProfileLoading] = useState(true);
 
+  // Stable primitive, not the `user` object — see the profile effect's
+  // dependency array below for why that distinction is the actual fix.
+  const userId = user?.id ?? null;
+  // Which user's profile is currently loaded (in `profile` state), so the
+  // effect can tell "we already have this exact user's profile, don't
+  // reset to loading" apart from "this is a genuinely different user,
+  // clear the stale one first".
+  const loadedProfileForUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -107,28 +155,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
+      loadedProfileForUserIdRef.current = null;
       setProfile(null);
       setProfileLoading(false);
       return;
     }
+
     let cancelled = false;
-    setProfileLoading(true);
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle()
+    const alreadyHaveThisUsersProfile = loadedProfileForUserIdRef.current === userId;
+
+    if (!alreadyHaveThisUsersProfile) {
+      // A genuine account switch (sign out A, sign in as B) — never show
+      // B even a flash of A's cached name/avatar/role.
+      if (loadedProfileForUserIdRef.current !== null) setProfile(null);
+      setProfileLoading(true);
+
+      // Cold-start-while-offline: this render has no in-memory profile
+      // for this user at all (e.g. the app was just reopened). Race an
+      // optimistic read of the last profile we successfully cached for
+      // this account against the live network fetch below — if the cache
+      // wins (network is slow/offline), use it immediately instead of
+      // leaving the skeleton up for the full timeout with nothing to show.
+      void getUserDb(userId)
+        .syncMeta.get(PROFILE_CACHE_KEY)
+        .then((raw) => {
+          if (cancelled) return;
+          // The network fetch already won — don't clobber fresher data
+          // with a possibly-stale cached copy.
+          if (loadedProfileForUserIdRef.current === userId) return;
+          const cached = readCachedProfile(raw, userId);
+          if (cached) {
+            setProfile(cached);
+            setProfileLoading(false);
+          }
+        })
+        .catch(() => {
+          // IndexedDB unavailable/blocked — just fall through to the
+          // network-only path below, same as a cache miss.
+        });
+    }
+    // else: we already have this exact user's profile loaded (e.g. a
+    // duplicate effect run from tab-switch-triggered session churn, now
+    // that `userId` — not `user` — is the dependency, this should only
+    // happen on a genuine remount). Keep showing it and refresh silently
+    // in the background instead of blanking the screen to a skeleton.
+
+    withTimeout(supabase.from("profiles").select("*").eq("id", userId).maybeSingle())
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) console.error("Failed to load profile", error);
-        setProfile(data ?? null);
+        if (error) {
+          console.error("Failed to load profile", error);
+          return;
+        }
+        if (data) {
+          setProfile(data);
+          loadedProfileForUserIdRef.current = userId;
+          void getUserDb(userId)
+            .syncMeta.put({ key: PROFILE_CACHE_KEY, value: JSON.stringify(data) })
+            .catch(() => {
+              // Best-effort cache write — a failure here just means the
+              // next cold offline start won't have it, not a live bug.
+            });
+        }
+      })
+      .catch((err: unknown) => {
+        // Offline, timed out, or a real network error. Deliberately does
+        // NOT clear `profile` (keep whatever we already had, stale is
+        // better than blank) and does not leave loading stuck — see the
+        // `finally` below.
+        console.error("Failed to load profile", err);
+      })
+      .finally(() => {
+        if (cancelled) return;
         setProfileLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userId]);
 
   // Supabase's session (and every downloaded model/document this app
   // caches offline) lives in localStorage/IndexedDB, which browsers are
@@ -142,18 +248,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // enough to earn it), so this is a mitigation, not a guarantee, and
   // never blocks anything if the Storage API isn't available at all.
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     if (typeof navigator === "undefined" || !navigator.storage?.persist) return;
     void navigator.storage.persist().catch(() => {
       // Silently ignored — a refusal here just means the existing eviction
       // risk is unchanged, not a new failure this app needs to surface.
     });
-  }, [user]);
+  }, [userId]);
 
   // `loading` must stay true until the profile fetch also resolves — a
   // consumer like the /admin gate reads `!profile?.is_lecturer` the
   // instant `loading` flips, and profile fetching is a separate, later
-  // effect keyed on `user`. Exposing only session-loading left a real
+  // effect keyed on `userId`. Exposing only session-loading left a real
   // window where loading===false and profile===null, misreading a real
   // lecturer as not one until the profile request landed.
   const loading = sessionLoading || profileLoading;

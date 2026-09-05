@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Play, Download, CheckCircle2, Loader2, CalendarClock } from "lucide-react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { Play, Download, CheckCircle2, Loader2, CalendarClock, WifiOff } from "lucide-react";
 import { MobileShell, PageHeader, SectionHeader } from "@/components/MobileShell";
 import { LibrarySearchButton } from "@/components/LibrarySearch";
 import { formatMb } from "@/lib/mock-data";
 import { fetchModules } from "@/lib/modules-api";
+import { NetworkTimeoutError } from "@/lib/with-timeout";
 import {
   useDownloadModule,
   useDownloadedModuleIds,
@@ -37,7 +38,75 @@ export const Route = createFileRoute("/dashboard")({
     ],
   }),
   component: Dashboard,
+  // Bug found from a user report: on a brand-new device/session that's
+  // offline before ever caching a module catalog, fetchModules() (see
+  // modules-api.ts) has nothing to fall back to and rethrows — which used
+  // to fall through to the generic root error boundary, a bad first
+  // impression for an app whose whole pitch is working offline. This
+  // route-level errorComponent intercepts that specific case (a
+  // NetworkTimeoutError, or any error while genuinely offline) and shows
+  // a friendly empty state instead. It's scoped to just this route rather
+  // than changing fetchModules()'s own contract, since courses.index.tsx,
+  // summaries.tsx, and progress.tsx all call the same function and handle
+  // its thrown errors via the shared root boundary today — broadening the
+  // fallback there is a separate decision, not bundled into this fix.
+  errorComponent: DashboardErrorComponent,
 });
+
+function DashboardErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  const isOfflineNoCache =
+    error instanceof NetworkTimeoutError || (typeof navigator !== "undefined" && !navigator.onLine);
+  const retry = () => {
+    void router.invalidate().finally(() => reset());
+  };
+
+  if (!isOfflineNoCache) {
+    // A genuinely unexpected error, not the offline/no-cache case this
+    // component exists for — don't paper over it with a friendly offline
+    // message; show the same "something went wrong" the root boundary
+    // uses everywhere else, so real bugs stay visible.
+    console.error(error);
+    return (
+      <MobileShell>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+          <p className="eyebrow mb-3">Something went wrong</p>
+          <h1 className="font-display text-xl font-medium text-foreground">
+            This page did not load
+          </h1>
+          <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">Try again in a moment.</p>
+          <button
+            onClick={retry}
+            className="mt-6 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Try again
+          </button>
+        </div>
+      </MobileShell>
+    );
+  }
+
+  return (
+    <MobileShell>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <div className="grid h-14 w-14 place-items-center rounded-full bg-prestige-deep/5 text-prestige-mid">
+          <WifiOff className="h-6 w-6" strokeWidth={1.75} />
+        </div>
+        <h1 className="mt-5 font-display text-xl font-medium text-prestige-deep">You're offline</h1>
+        <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
+          Nothing is downloaded to this device yet, so there's no offline content to show. Connect
+          once to load your modules — after that, this dashboard works offline too.
+        </p>
+        <button
+          onClick={retry}
+          className="mt-6 inline-flex items-center justify-center rounded-lg bg-prestige-deep px-5 py-2.5 text-sm font-medium text-prestige-cream transition-transform active:scale-[0.97]"
+        >
+          Try again
+        </button>
+      </div>
+    </MobileShell>
+  );
+}
 
 function Dashboard() {
   const modules = Route.useLoaderData();
