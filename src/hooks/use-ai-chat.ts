@@ -474,9 +474,9 @@ export function useStaleAiOperationWarning(): StaleAiBreadcrumb | null {
 }
 
 const STAGE_1_LABEL = "Thinking…";
-const STAGE_2_LABEL = "Still thinking, this can take a while on some phones…";
+const STAGE_2_LABEL = "Still thinking, this can take a while on some device…";
 const STAGE_3_LABEL =
-  "Still working. The on-device model is slow on older/budget phones. Almost there…";
+  "Still working. The on-device model is slow on older/budget device. Almost there…";
 
 // Used only until this device has completed at least one real generation
 // (see ai-perf.ts) — a reasonable guess, not a measurement, for how long a
