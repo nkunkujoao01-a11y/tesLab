@@ -99,7 +99,7 @@ function Profile() {
   const summariesMb = useSummariesStorageMb();
   const otherMb = byKind.other ?? 0;
   const downloadedMaterialCount = useDownloadedMaterialIds().size;
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, profileVerified, signOut } = useAuth();
   const navigate = useNavigate();
   // The synthetic email a NUST-number login creates (moodle-server.ts's
   // studentNumberToEmail) is an internal implementation detail — a real
@@ -731,7 +731,16 @@ function Profile() {
             {/* Settings list */}
             <section className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
               <ul className="divide-y divide-border/60">
-                {profile?.is_lecturer && (
+                {/* Security-audit follow-up (real bug): this used to gate on
+                    `profile?.is_lecturer` alone, unlike admin.tsx/admin.super.tsx
+                    which both wait for `profileVerified` (a genuine live server
+                    fetch) before trusting that flag — see use-auth.tsx. A
+                    tampered cached profile (edited is_lecturer: true in
+                    devtools IndexedDB) could show this link on a cold/offline
+                    load before the live fetch resolves, even though navigating
+                    into /admin would still correctly block them. Same
+                    cache-cannot-elevate-privileges rule applied here too. */}
+                {profileVerified && profile?.is_lecturer && (
                   <li>
                     <Link
                       to="/admin"

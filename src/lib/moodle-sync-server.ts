@@ -22,6 +22,18 @@ function isMoodleError(body: unknown): body is MoodleErrorBody {
   );
 }
 
+// Review follow-up: this call used to only ever be reached through an HTTP
+// self-call that carried its own fetch timeout (see moodle-server.ts's
+// runImmediateMoodleSync comment on why that self-call was removed) — once
+// syncOneConnection started being invoked in-process instead, nothing here
+// or in either caller bounded how long a single stalled elearning.nust.na
+// request could hang for. A cron run (many of these calls per student,
+// across every course) or an immediate post-connect sync (awaited directly
+// by connectMoodleAccount) could then block indefinitely instead of failing
+// fast, with no client-visible error until an unconfigured platform timeout
+// eventually kills the whole request.
+const MOODLE_CALL_TIMEOUT_MS = 20_000;
+
 export async function moodleCall<T>(
   siteUrl: string,
   token: string,
@@ -39,6 +51,7 @@ export async function moodleCall<T>(
         moodlewsrestformat: "json",
         ...params,
       }),
+      signal: AbortSignal.timeout(MOODLE_CALL_TIMEOUT_MS),
     });
   } catch (err) {
     throw new MoodleAuthError(

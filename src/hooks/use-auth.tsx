@@ -181,6 +181,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // never shown as a "timed out" message (the user knows why).
       if (isExplicitSignOut) {
         explicitSignOutRef.current = false;
+        // Review follow-up: unlike explicitSignOutRef just above,
+        // hadConfirmedUserRef was never reset anywhere, including here —
+        // so after a real sign-in followed by a real "Sign out" click, a
+        // later null-session event that isn't itself recognized as the
+        // just-consumed explicit sign-out (any future resolveSession call)
+        // would still see this as true and wrongly show "Your session has
+        // timed out" right after a normal, user-initiated sign-out.
+        hadConfirmedUserRef.current = false;
         setUser(null);
         setSessionLoading(false);
         return;

@@ -302,11 +302,26 @@ export const connectMoodleAccount = createServerFn({ method: "POST" })
     // no local session needed on this server-side client, just the id it
     // already asserts via that same token save_moodle_connection above
     // ran under.
-    const {
-      data: { user: callerUser },
-    } = await userScopedClient.auth.getUser(accessToken);
-    if (callerUser) {
-      await runImmediateMoodleSync(callerUser.id);
+    //
+    // Review follow-up: this used to run with no try/catch, after the
+    // connection was already durably saved above. A transient Supabase
+    // auth error here would throw uncaught and report the whole connect as
+    // failed to the client even though it had actually succeeded. Caught
+    // now so a hiccup here only ever costs the immediate sync (the next
+    // scheduled cron run still covers it — same degrade-gracefully
+    // discipline as runImmediateMoodleSync's own catch below), never the
+    // already-saved connection itself.
+    try {
+      const {
+        data: { user: callerUser },
+      } = await userScopedClient.auth.getUser(accessToken);
+      if (callerUser) {
+        await runImmediateMoodleSync(callerUser.id);
+      } else {
+        console.error("Couldn't resolve caller identity for immediate Moodle sync");
+      }
+    } catch (err) {
+      console.error("Failed to run immediate Moodle sync after connect", err);
     }
     return { connected: true, fullName: siteInfo.fullname };
   });

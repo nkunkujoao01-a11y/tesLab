@@ -40,6 +40,16 @@ function Login() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    // Review follow-up to the Google-sign-in offline fix below: this
+    // upfront check was only ever added to handleGoogleSignIn, never to
+    // this, the more commonly used path. Without it, submitting while
+    // offline sent the request anyway and surfaced a raw/generic network
+    // error instead of this app's own clear messaging — same bug, just on
+    // a different button.
+    if (!isOnline) {
+      setError("You're offline. Connect to the internet to sign in.");
+      return;
+    }
     setLoading(true);
 
     const trimmed = identifier.trim();
@@ -162,7 +172,8 @@ function Login() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isOnline}
+            title={!isOnline ? "Signing in needs a network connection" : undefined}
             className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-prestige-deep px-5 py-3 text-sm font-medium text-prestige-cream shadow-lg shadow-prestige-deep/20 transition-transform active:scale-[0.97] disabled:opacity-60"
           >
             <span>{loading ? "Signing in…" : "Sign in"}</span>

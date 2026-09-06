@@ -553,23 +553,67 @@ async function pullMoodleContent(userId: string): Promise<void> {
     allowSubmissionsFrom: a.allow_submissions_from ? toMs(a.allow_submissions_from) : undefined,
   }));
 
-  await Promise.all([
-    db.moodleCourses.clear().then(() => db.moodleCourses.bulkPut(localCourses)),
-    db.moodleCourseSections.clear().then(() => db.moodleCourseSections.bulkPut(localSections)),
-    db.moodleCourseModules.clear().then(() => db.moodleCourseModules.bulkPut(localModules)),
-    db.moodleGrades.clear().then(() => db.moodleGrades.bulkPut(localGrades)),
-    db.moodleAssignments.clear().then(() => db.moodleAssignments.bulkPut(localAssignments)),
-  ]);
+  // Review follow-up: these five clear-then-bulkPut pairs used to run as
+  // independent promises under one Promise.all, with no shared
+  // transaction. A mid-sync failure (e.g. the browser closing a
+  // connection) could then leave one table cleared but never repopulated
+  // while its siblings finished fine — e.g. grades wiped and never
+  // restored while courses/sections show fresh data, rendering "no
+  // grades" until the next fully-successful sync. Same
+  // db.transaction("rw", ...) pattern already used elsewhere in this
+  // codebase (use-downloads.ts, use-documents.ts) makes this one atomic
+  // unit: either every table ends up freshly repopulated, or (on any
+  // failure) none of them are touched at all.
+  await db.transaction(
+    "rw",
+    db.moodleCourses,
+    db.moodleCourseSections,
+    db.moodleCourseModules,
+    db.moodleGrades,
+    db.moodleAssignments,
+    async () => {
+      await Promise.all([
+        db.moodleCourses.clear().then(() => db.moodleCourses.bulkPut(localCourses)),
+        db.moodleCourseSections.clear().then(() => db.moodleCourseSections.bulkPut(localSections)),
+        db.moodleCourseModules.clear().then(() => db.moodleCourseModules.bulkPut(localModules)),
+        db.moodleGrades.clear().then(() => db.moodleGrades.bulkPut(localGrades)),
+        db.moodleAssignments.clear().then(() => db.moodleAssignments.bulkPut(localAssignments)),
+      ]);
+    },
+  );
 }
 
 const LAST_SYNCED_KEY = "lastSyncedAt";
+
+// Review follow-up: useAutoSync's three independent triggers (mount/sign-in,
+// the 'online' listener, the periodic interval) plus useManualSync's own
+// "Sync now" button all call syncProgress with no coordination between
+// them. Two overlapping runs for the same user each independently
+// read/write the same IndexedDB tables and remote rows, risking a lost
+// update or a just-deleted row resurrected by the other run's now-stale
+// read. De-duping here — one place, shared by every caller regardless of
+// which trigger fired — means a trigger that lands while a sync is already
+// running for that user just awaits the in-flight one instead of starting
+// a second, overlapping one.
+const inFlightSyncs = new Map<string, Promise<void>>();
 
 /** Pulls and pushes read state, activity history, and AI summaries against
  * Supabase, reconciling with local IndexedDB. Safe to call opportunistically
  * (sign-in, reconnect, a manual "Sync now") — each run is a full
  * pull-merge-push, not an incremental diff, since the data involved per
- * user is a few KB at most. */
-export async function syncProgress(userId: string): Promise<void> {
+ * user is a few KB at most. Concurrent calls for the same user share one
+ * in-flight run rather than racing — see inFlightSyncs above. */
+export function syncProgress(userId: string): Promise<void> {
+  const existing = inFlightSyncs.get(userId);
+  if (existing) return existing;
+  const run = runSyncProgress(userId).finally(() => {
+    inFlightSyncs.delete(userId);
+  });
+  inFlightSyncs.set(userId, run);
+  return run;
+}
+
+async function runSyncProgress(userId: string): Promise<void> {
   // Collections first, awaited on its own: personal_documents.collection_id
   // is a real foreign key (0007_document_collections.sql), so pushing a
   // locally-new document that references a locally-new collection would

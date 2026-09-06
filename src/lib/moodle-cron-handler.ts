@@ -205,17 +205,33 @@ export async function syncOneConnection(admin: AdminClient, userId: string): Pro
     // the just-fetched enrollment list (cascades to sections/modules/
     // grades via their FKs) makes this sync a real replace, not just an
     // upsert — also correctly drops a course the student simply left.
+    // Bug found on review: an empty `courses` here is indistinguishable
+    // from "genuinely unenrolled from everything" and "Moodle returned an
+    // empty list because of a transient glitch" (this call succeeded — no
+    // exception — so a real outage wouldn't even reach here, but a flaky
+    // upstream response can still come back empty without erroring). The
+    // old code treated empty the same as a real unenrollment and deleted
+    // every cached course (cascading to sections/modules/grades) for a
+    // student still enrolled in everything, with the cron run still
+    // recorded as success. Skipping the cleanup on empty instead means a
+    // genuine "unenrolled from everything" case leaves stale courses
+    // cached until the next sync notices — an acceptable tradeoff against
+    // silently wiping a student's real, current courses.
     const currentCourseIds = courses.map((c) => c.id);
-    await upsertOrThrow(
-      currentCourseIds.length > 0
-        ? admin
-            .from("moodle_courses")
-            .delete()
-            .eq("user_id", userId)
-            .not("id", "in", `(${currentCourseIds.join(",")})`)
-        : admin.from("moodle_courses").delete().eq("user_id", userId),
-      "Removing courses no longer enrolled in",
-    );
+    if (currentCourseIds.length > 0) {
+      await upsertOrThrow(
+        admin
+          .from("moodle_courses")
+          .delete()
+          .eq("user_id", userId)
+          .not("id", "in", `(${currentCourseIds.join(",")})`),
+        "Removing courses no longer enrolled in",
+      );
+    } else {
+      console.warn(
+        `core_enrol_get_users_courses returned no courses for user ${userId}; skipping course cleanup this run rather than risk wiping real data on a possibly-transient empty response`,
+      );
+    }
 
     for (const course of courses) {
       let lecturerName: string | null = null;
@@ -342,21 +358,25 @@ export async function syncOneConnection(admin: AdminClient, userId: string): Pro
           // Same "delete what's no longer there" reasoning as the top-level
           // moodle_courses cleanup above — an assignment removed or a
           // course re-fetched with a shrunk list must not linger forever.
-          await upsertOrThrow(
-            currentAssignmentIds.length > 0
-              ? admin
-                  .from("moodle_assignments")
-                  .delete()
-                  .eq("user_id", userId)
-                  .eq("course_id", course.id)
-                  .not("assignment_id", "in", `(${currentAssignmentIds.join(",")})`)
-              : admin
-                  .from("moodle_assignments")
-                  .delete()
-                  .eq("user_id", userId)
-                  .eq("course_id", course.id),
-            `Removing assignments no longer in course ${course.id}`,
-          );
+          // Same empty-list bug fixed the same way: an empty (but
+          // non-erroring) response for this course must not be read as
+          // "every assignment was removed" — skip cleanup instead of
+          // wiping real due dates on a possibly-transient empty response.
+          if (currentAssignmentIds.length > 0) {
+            await upsertOrThrow(
+              admin
+                .from("moodle_assignments")
+                .delete()
+                .eq("user_id", userId)
+                .eq("course_id", course.id)
+                .not("assignment_id", "in", `(${currentAssignmentIds.join(",")})`),
+              `Removing assignments no longer in course ${course.id}`,
+            );
+          } else {
+            console.warn(
+              `mod_assign_get_assignments returned no assignments for course ${course.id} (user ${userId}); skipping assignment cleanup this run`,
+            );
+          }
           for (const assignment of assignments) {
             await upsertOrThrow(
               admin.from("moodle_assignments").upsert({
