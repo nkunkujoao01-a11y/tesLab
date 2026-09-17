@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   UsersRound,
   ClipboardList,
+  History,
   ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
@@ -137,6 +138,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <NavItem to="/admin/super" icon={ShieldCheck} label="Overview" />
                 <NavItem to="/admin/super/users" icon={UsersRound} label="User directory" />
                 <NavItem to="/admin/super/research" icon={ClipboardList} label="Research data" />
+                <NavItem to="/admin/super/audit-log" icon={History} label="Audit log" />
               </div>
             </div>
           )}
@@ -181,6 +183,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <NavItem to="/admin/super" icon={ShieldCheck} label="" />
               <NavItem to="/admin/super/users" icon={UsersRound} label="" />
               <NavItem to="/admin/super/research" icon={ClipboardList} label="" />
+              <NavItem to="/admin/super/audit-log" icon={History} label="" />
             </>
           )}
           <Link

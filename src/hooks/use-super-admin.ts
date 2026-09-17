@@ -25,6 +25,17 @@ type SuperAdminFunctions = {
     Args: { target_user_id: string; new_is_lecturer: boolean };
     Returns: void;
   };
+  get_admin_audit_log: {
+    Args: Record<string, never>;
+    Returns: {
+      id: string;
+      actor_id: string;
+      action: string;
+      target_user_id: string | null;
+      details: Record<string, unknown> | null;
+      created_at: string;
+    }[];
+  };
 };
 const rpcClient = supabase as unknown as SupabaseClient<{
   public: {
@@ -96,6 +107,58 @@ export function useUserDirectory(): {
 
   const refetch = useCallback(() => setRefreshKey((k) => k + 1), []);
   return { users, loading, refetch };
+}
+
+export type AuditLogEntry = {
+  id: string;
+  actorId: string;
+  action: string;
+  targetUserId: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+/** The 500 most recent super-admin actions (ban/unban/delete/lecturer-grant
+ * — see 0044_admin_audit_log.sql), newest first. get_admin_audit_log()
+ * itself is already gated to is_super_admin() (returns nothing otherwise),
+ * same as get_all_users_admin_info above — this hook adds no further
+ * client-side check. Row values are raw actor_id/target_user_id uuids; the
+ * audit-log page joins those against useUserDirectory() for a readable
+ * name/email instead of duplicating that lookup here. */
+export function useAdminAuditLog(): {
+  entries: AuditLogEntry[];
+  loading: boolean;
+  refetch: () => void;
+} {
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void rpcClient.rpc("get_admin_audit_log").then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) console.error("Failed to load admin audit log", error);
+      setEntries(
+        (data ?? []).map((row) => ({
+          id: row.id,
+          actorId: row.actor_id,
+          action: row.action,
+          targetUserId: row.target_user_id,
+          details: row.details,
+          createdAt: row.created_at,
+        })),
+      );
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), []);
+  return { entries, loading, refetch };
 }
 
 async function currentAccessToken(): Promise<string | null> {

@@ -47,6 +47,7 @@ import { Route as DocumentsDocIdChatRouteImport } from './routes/documents.$docI
 import { Route as CoursesMoodleCourseIdRouteImport } from './routes/courses.moodle.$courseId'
 import { Route as AdminSuperUsersRouteImport } from './routes/admin.super.users'
 import { Route as AdminSuperResearchRouteImport } from './routes/admin.super.research'
+import { Route as AdminSuperAuditLogRouteImport } from './routes/admin.super.audit-log'
 import { Route as AdminModulesNewRouteImport } from './routes/admin.modules.new'
 import { Route as AdminModulesModuleIdRouteImport } from './routes/admin.modules.$moduleId'
 import { Route as DocumentsCollectionsCollectionIdIndexRouteImport } from './routes/documents.collections.$collectionId.index'
@@ -252,6 +253,11 @@ const AdminSuperResearchRoute = AdminSuperResearchRouteImport.update({
   path: '/research',
   getParentRoute: () => AdminSuperRoute,
 } as any)
+const AdminSuperAuditLogRoute = AdminSuperAuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
+  getParentRoute: () => AdminSuperRoute,
+} as any)
 const AdminModulesNewRoute = AdminModulesNewRouteImport.update({
   id: '/modules/new',
   path: '/modules/new',
@@ -349,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/admin/super/audit-log': typeof AdminSuperAuditLogRoute
   '/admin/super/research': typeof AdminSuperResearchRoute
   '/admin/super/users': typeof AdminSuperUsersRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
@@ -395,6 +402,7 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/admin/super/audit-log': typeof AdminSuperAuditLogRoute
   '/admin/super/research': typeof AdminSuperResearchRoute
   '/admin/super/users': typeof AdminSuperUsersRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
@@ -447,6 +455,7 @@ export interface FileRoutesById {
   '/documents/': typeof DocumentsIndexRoute
   '/admin/modules/$moduleId': typeof AdminModulesModuleIdRoute
   '/admin/modules/new': typeof AdminModulesNewRoute
+  '/admin/super/audit-log': typeof AdminSuperAuditLogRoute
   '/admin/super/research': typeof AdminSuperResearchRoute
   '/admin/super/users': typeof AdminSuperUsersRoute
   '/courses/moodle/$courseId': typeof CoursesMoodleCourseIdRoute
@@ -501,6 +510,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/admin/super/audit-log'
     | '/admin/super/research'
     | '/admin/super/users'
     | '/courses/moodle/$courseId'
@@ -547,6 +557,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/admin/super/audit-log'
     | '/admin/super/research'
     | '/admin/super/users'
     | '/courses/moodle/$courseId'
@@ -598,6 +609,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/admin/modules/$moduleId'
     | '/admin/modules/new'
+    | '/admin/super/audit-log'
     | '/admin/super/research'
     | '/admin/super/users'
     | '/courses/moodle/$courseId'
@@ -912,6 +924,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSuperResearchRouteImport
       parentRoute: typeof AdminSuperRoute
     }
+    '/admin/super/audit-log': {
+      id: '/admin/super/audit-log'
+      path: '/audit-log'
+      fullPath: '/admin/super/audit-log'
+      preLoaderRoute: typeof AdminSuperAuditLogRouteImport
+      parentRoute: typeof AdminSuperRoute
+    }
     '/admin/modules/new': {
       id: '/admin/modules/new'
       path: '/modules/new'
@@ -1000,12 +1019,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminSuperRouteChildren {
+  AdminSuperAuditLogRoute: typeof AdminSuperAuditLogRoute
   AdminSuperResearchRoute: typeof AdminSuperResearchRoute
   AdminSuperUsersRoute: typeof AdminSuperUsersRoute
   AdminSuperIndexRoute: typeof AdminSuperIndexRoute
 }
 
 const AdminSuperRouteChildren: AdminSuperRouteChildren = {
+  AdminSuperAuditLogRoute: AdminSuperAuditLogRoute,
   AdminSuperResearchRoute: AdminSuperResearchRoute,
   AdminSuperUsersRoute: AdminSuperUsersRoute,
   AdminSuperIndexRoute: AdminSuperIndexRoute,

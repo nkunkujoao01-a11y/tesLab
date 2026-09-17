@@ -25,12 +25,43 @@ type ProfilesTable = {
   };
 };
 
-async function verifyCallerIsSuperAdmin(accessToken: string): Promise<boolean> {
+// Typed locally for the same reason as ProfilesTable above — see
+// 0044_admin_audit_log.sql's own comment for why this table has no
+// client grants at all (service-role inserts only) and no FK on
+// actor_id/target_user_id.
+type AdminAuditLogTable = {
+  admin_audit_log: {
+    Row: {
+      id: string;
+      actor_id: string;
+      action: string;
+      target_user_id: string | null;
+      details: Record<string, unknown> | null;
+      created_at: string;
+    };
+    Insert: {
+      actor_id: string;
+      action: string;
+      target_user_id?: string | null;
+      details?: Record<string, unknown> | null;
+    };
+    Update: never;
+    Relationships: [];
+  };
+};
+
+/** Verifies the caller's own token asserts a real, current super admin —
+ * never trust a client-passed boolean — and returns the caller's own id
+ * alongside that verdict so the audit-log insert below can record who
+ * actually took the action, not just that "a" super admin did. */
+async function verifyCallerIsSuperAdmin(
+  accessToken: string,
+): Promise<{ authorized: boolean; callerId: string | null }> {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
     console.error("Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY on the server");
-    return false;
+    return { authorized: false, callerId: null };
   }
   const userScopedClient = createClient(url, anonKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -44,14 +75,14 @@ async function verifyCallerIsSuperAdmin(accessToken: string): Promise<boolean> {
   const {
     data: { user: callerUser },
   } = await userScopedClient.auth.getUser(accessToken);
-  if (!callerUser) return false;
+  if (!callerUser) return { authorized: false, callerId: null };
   const { data, error } = await userScopedClient
     .from("profiles")
     .select("is_super_admin")
     .eq("id", callerUser.id)
     .maybeSingle();
-  if (error || !data) return false;
-  return data.is_super_admin === true;
+  if (error || !data) return { authorized: false, callerId: callerUser.id };
+  return { authorized: data.is_super_admin === true, callerId: callerUser.id };
 }
 
 function serviceRoleClient() {
@@ -61,7 +92,30 @@ function serviceRoleClient() {
     console.error("Missing VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY on the server");
     return null;
   }
-  return createClient(url, serviceRoleKey);
+  return createClient(url, serviceRoleKey) as unknown as SupabaseClient<{
+    public: {
+      Tables: AdminAuditLogTable;
+      Views: Record<string, never>;
+      Functions: Record<string, never>;
+    };
+  }>;
+}
+
+/** Best-effort audit insert after a privileged action already succeeded —
+ * see 0044_admin_audit_log.sql. Never lets a logging failure undo or mask
+ * an already-completed ban/delete; only logged, same degrade-gracefully
+ * discipline as the rest of this file (and moodle-server.ts). */
+async function recordAdminAction(
+  admin: NonNullable<ReturnType<typeof serviceRoleClient>>,
+  actorId: string,
+  action: string,
+  targetUserId: string,
+  details?: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await admin
+    .from("admin_audit_log")
+    .insert({ actor_id: actorId, action, target_user_id: targetUserId, details });
+  if (error) console.error("Failed to record admin audit log entry", error);
 }
 
 type SetBannedInput = { targetUserId: string; banned: boolean; accessToken: string };
@@ -73,7 +127,8 @@ type SetBannedResult = { ok: true } | { ok: false; reason: "not_authorized" | "u
 export const setUserBanned = createServerFn({ method: "POST" })
   .validator((data: SetBannedInput) => data)
   .handler(async ({ data }): Promise<SetBannedResult> => {
-    if (!(await verifyCallerIsSuperAdmin(data.accessToken))) {
+    const { authorized, callerId } = await verifyCallerIsSuperAdmin(data.accessToken);
+    if (!authorized || !callerId) {
       return { ok: false, reason: "not_authorized" };
     }
     const admin = serviceRoleClient();
@@ -85,6 +140,15 @@ export const setUserBanned = createServerFn({ method: "POST" })
       console.error("Failed to set user ban state", error);
       return { ok: false, reason: "unexpected" };
     }
+    // Awaited, not fire-and-forget — a serverless invocation can be torn
+    // down the instant the response is sent, which would silently drop an
+    // un-awaited insert.
+    await recordAdminAction(
+      admin,
+      callerId,
+      data.banned ? "ban_user" : "unban_user",
+      data.targetUserId,
+    );
     return { ok: true };
   });
 
@@ -97,7 +161,8 @@ type DeleteUserResult = { ok: true } | { ok: false; reason: "not_authorized" | "
 export const deleteUserAccount = createServerFn({ method: "POST" })
   .validator((data: DeleteUserInput) => data)
   .handler(async ({ data }): Promise<DeleteUserResult> => {
-    if (!(await verifyCallerIsSuperAdmin(data.accessToken))) {
+    const { authorized, callerId } = await verifyCallerIsSuperAdmin(data.accessToken);
+    if (!authorized || !callerId) {
       return { ok: false, reason: "not_authorized" };
     }
     const admin = serviceRoleClient();
@@ -107,5 +172,6 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
       console.error("Failed to delete user account", error);
       return { ok: false, reason: "unexpected" };
     }
+    await recordAdminAction(admin, callerId, "delete_user", data.targetUserId);
     return { ok: true };
   });

@@ -52,7 +52,16 @@ export function ResearchConsentGate() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-prestige-deep">
+    // data-onboarding-gate: a plain DOM marker OnboardingTour polls for
+    // (see its own header comment) so it can defer to this gate without
+    // calling useResearchConsentGate() a second time — that hook owns a
+    // single component's worth of `responded` state; a second independent
+    // call from another component would get its own stale copy that never
+    // learns this gate was dismissed.
+    <div
+      className="fixed inset-0 z-[100] overflow-y-auto bg-prestige-deep"
+      data-onboarding-gate="research-consent"
+    >
       {/* A soft, off-center radial glow — the one deliberately decorative
           touch, restrained enough not to compete with the actual text. */}
       <div

@@ -82,12 +82,14 @@ function MaterialRow({
   isDownloaded,
   isPending,
   onDownload,
+  tourTarget,
 }: {
   mat: Material;
   moduleId: string;
   isDownloaded: boolean;
   isPending: boolean;
   onDownload: () => void;
+  tourTarget?: boolean;
 }) {
   const readProgress = useMaterialReadProgress(moduleId, mat.id);
   const rowContent = (
@@ -126,6 +128,7 @@ function MaterialRow({
         <Link
           to="/courses/$moduleId/read/$docId"
           params={{ moduleId, docId: mat.id }}
+          data-tour={tourTarget ? "tour-open-material" : undefined}
           className={cn(rowClassName, "group")}
         >
           {rowContent}
@@ -379,7 +382,7 @@ function ModuleDetail() {
               )}
             </div>
             <ul className="space-y-3">
-              {module.materials.map((mat: Material) => (
+              {module.materials.map((mat: Material, index) => (
                 <MaterialRow
                   key={mat.id}
                   mat={mat}
@@ -390,6 +393,7 @@ function ModuleDetail() {
                     mat.content &&
                     void downloadMaterial(mat.id, module.id, mat.sizeMb, mat.content, mat.kind)
                   }
+                  tourTarget={index === 0}
                 />
               ))}
             </ul>

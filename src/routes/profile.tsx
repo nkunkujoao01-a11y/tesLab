@@ -19,6 +19,7 @@ import {
   ClipboardList,
   ScrollText,
   GraduationCap,
+  Compass,
   Lightbulb,
   Heart,
   Mail,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { REPLAY_ONBOARDING_TOUR_EVENT } from "@/components/OnboardingTour";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { SettingsGroup } from "@/components/SettingsGroup";
 import {
@@ -99,7 +101,7 @@ function Profile() {
   const summariesMb = useSummariesStorageMb();
   const otherMb = byKind.other ?? 0;
   const downloadedMaterialCount = useDownloadedMaterialIds().size;
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, profileVerified, signOut } = useAuth();
   const navigate = useNavigate();
   // The synthetic email a NUST-number login creates (moodle-server.ts's
   // studentNumberToEmail) is an internal implementation detail — a real
@@ -731,7 +733,16 @@ function Profile() {
             {/* Settings list */}
             <section className="animate-rise overflow-hidden rounded-2xl bg-card ring-1 ring-border/60">
               <ul className="divide-y divide-border/60">
-                {profile?.is_lecturer && (
+                {/* Security-audit follow-up (real bug): this used to gate on
+                    `profile?.is_lecturer` alone, unlike admin.tsx/admin.super.tsx
+                    which both wait for `profileVerified` (a genuine live server
+                    fetch) before trusting that flag — see use-auth.tsx. A
+                    tampered cached profile (edited is_lecturer: true in
+                    devtools IndexedDB) could show this link on a cold/offline
+                    load before the live fetch resolves, even though navigating
+                    into /admin would still correctly block them. Same
+                    cache-cannot-elevate-privileges rule applied here too. */}
+                {profileVerified && profile?.is_lecturer && (
                   <li>
                     <Link
                       to="/admin"
@@ -781,6 +792,24 @@ function Profile() {
                     </div>
                     <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
                   </Link>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event(REPLAY_ONBOARDING_TOUR_EVENT))}
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <Compass className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-prestige-deep">Replay tour</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        See the getting-started walkthrough again
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                  </button>
                 </li>
                 <li>
                   <Link
