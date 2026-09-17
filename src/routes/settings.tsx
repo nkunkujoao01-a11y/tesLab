@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   Sparkles as SparklesIcon,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
@@ -33,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Carousel,
@@ -67,6 +69,7 @@ import { useMoodleConnection } from "@/hooks/use-moodle";
 import { Switch } from "@/components/ui/switch";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useClearCache } from "@/hooks/use-clear-cache";
+import { useDeleteAccount } from "@/hooks/use-delete-account";
 
 /** Reference screenshots of the actual Google AI Studio pages for the
  * "Exactly what you'll see on that page" steps below — real screenshots,
@@ -143,6 +146,81 @@ function WhatsNewDialog({
   );
 }
 
+/** Requires typing DELETE, not just a click, before the confirm button
+ * even enables — a plain AlertDialog (one tap on "Delete") is what the
+ * super admin console uses for *other* accounts, deliberately friction-
+ * free since a mis-click there is still reviewable in the audit log
+ * afterwards. Deleting your own account has no one else to catch a
+ * mis-click, and it's genuinely irreversible (see account-server.ts), so
+ * this needs its own stronger confirmation. */
+function DeleteAccountDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { deleteAccount, deleting } = useDeleteAccount();
+  const [confirmText, setConfirmText] = useState("");
+  const canConfirm = confirmText.trim().toUpperCase() === "DELETE";
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setConfirmText("");
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete your account?</DialogTitle>
+          <DialogDescription>
+            This permanently deletes your account and everything linked to it: downloads,
+            summaries, quizzes, flashcards, progress, and your NUST eLearning connection. This
+            cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-prestige-deep" htmlFor="delete-account-confirm">
+            Type DELETE to confirm
+          </label>
+          <input
+            id="delete-account-confirm"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="DELETE"
+            className="h-11 w-full rounded-lg border border-border/70 bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-destructive/40"
+          />
+        </div>
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmText("");
+              onOpenChange(false);
+            }}
+            className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-foreground ring-1 ring-border/70 transition-colors hover:bg-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canConfirm || deleting}
+            onClick={() => void deleteAccount()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground transition-all active:scale-[0.97] disabled:opacity-40"
+          >
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+            {deleting ? "Deleting…" : "Delete my account"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Settings() {
   const staleAiOperation = useStaleAiOperationWarning();
   const modelStatus = useAIModelStatus();
@@ -207,6 +285,7 @@ function Settings() {
   const { clearCacheAndReload, clearing } = useClearCache();
   const { hasUnseen: hasUnseenChangelog, markSeen: markChangelogSeen } = useChangelogSeen();
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
   const handleConnect = async (e: FormEvent) => {
     e.preventDefault();
@@ -983,6 +1062,35 @@ function Settings() {
             </button>
           </section>
         </SettingsGroup>
+
+        {/* Account — deliberately placed after Troubleshooting and before
+            About, not grouped with Integrations at the top: this is the
+            one destructive, irreversible action on this whole page. */}
+        <SettingsGroup label="Account">
+          <section className="animate-rise rounded-2xl bg-card p-6 ring-1 ring-border/60 lg:p-8">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
+                <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-prestige-deep">Delete account</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Permanently deletes your account and everything linked to it. This cannot be
+                  undone.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeleteAccountOpen(true)}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-destructive ring-1 ring-destructive/30 transition-all hover:bg-destructive/5 active:scale-[0.97]"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Delete my account
+            </button>
+          </section>
+        </SettingsGroup>
+        <DeleteAccountDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen} />
 
         {/* About — version tracker + "what's new", deliberately last on
             the page (the least frequently needed setting here). */}
