@@ -121,18 +121,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       {
         property: "og:url",
-        content: "https://elearn-n2wc7cnbv-jolynenkunku-7241s-projects.vercel.app/",
+        content: "https://elearn-mu-khaki.vercel.app/",
       },
       {
         property: "og:image",
-        content: "https://elearn-n2wc7cnbv-jolynenkunku-7241s-projects.vercel.app/icon-512.png",
+        content: "https://elearn-mu-khaki.vercel.app/icon-512.png",
       },
       { property: "og:image:width", content: "512" },
       { property: "og:image:height", content: "512" },
       { name: "twitter:card", content: "summary_large_image" },
       {
         name: "twitter:image",
-        content: "https://elearn-n2wc7cnbv-jolynenkunku-7241s-projects.vercel.app/icon-512.png",
+        content: "https://elearn-mu-khaki.vercel.app/icon-512.png",
       },
     ],
     links: [
