@@ -448,6 +448,7 @@ function Reader() {
             <button
               type="button"
               disabled={isSummarizing || !content}
+              data-tour="tour-summarise"
               onClick={() => {
                 void generateSummary(
                   doc.id,

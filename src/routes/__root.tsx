@@ -21,7 +21,7 @@ import {
 import { useServiceWorkerUpdateNotice } from "@/hooks/use-sw-update";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { Toaster } from "@/components/ui/sonner";
-import { WelcomeTour } from "@/components/WelcomeTour";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import { ByokPrompt } from "@/components/ByokPrompt";
 import { InstallAppPrompt } from "@/components/InstallAppPrompt";
 import { ResearchConsentGate } from "@/components/ResearchConsentGate";
@@ -205,7 +205,7 @@ function RootComponent() {
         <ReminderNotifications />
         <SessionTracking />
         <Outlet />
-        <WelcomeTour />
+        <OnboardingTour />
         <ByokPrompt />
         <InstallAppPrompt />
         <ResearchConsentGate />

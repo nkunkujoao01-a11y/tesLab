@@ -19,6 +19,7 @@ import {
   ClipboardList,
   ScrollText,
   GraduationCap,
+  Compass,
   Lightbulb,
   Heart,
   Mail,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { REPLAY_ONBOARDING_TOUR_EVENT } from "@/components/OnboardingTour";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { SettingsGroup } from "@/components/SettingsGroup";
 import {
@@ -790,6 +792,24 @@ function Profile() {
                     </div>
                     <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
                   </Link>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event(REPLAY_ONBOARDING_TOUR_EVENT))}
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
+                      <Compass className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-prestige-deep">Replay tour</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        See the getting-started walkthrough again
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-prestige-gold" strokeWidth={2} />
+                  </button>
                 </li>
                 <li>
                   <Link

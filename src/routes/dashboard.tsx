@@ -189,6 +189,7 @@ function Dashboard() {
                     to="/courses/$moduleId"
                     params={{ moduleId: featured.id }}
                     aria-label="Resume module"
+                    data-tour="tour-open-featured"
                     className="shrink-0 rounded-lg bg-prestige-gold p-2.5 text-prestige-deep transition-transform active:scale-[0.95]"
                   >
                     <Play className="h-4 w-4 fill-current" strokeWidth={2.5} />
@@ -261,7 +262,7 @@ function Dashboard() {
               }
             />
             <ul className="space-y-3">
-              {pendingDownloads.slice(0, 3).map((item) => {
+              {pendingDownloads.slice(0, 3).map((item, index) => {
                 const isPending = pendingIds.has(item.id);
                 return (
                   <li
@@ -298,6 +299,7 @@ function Dashboard() {
                       aria-disabled={!isOnline}
                       aria-label={`Download ${item.title}`}
                       title={!isOnline ? "You're offline, reconnect to download" : undefined}
+                      data-tour={index === 0 ? "tour-download" : undefined}
                       onClick={() => void downloadModule(item.id, item.sizeMb)}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/70 transition-all hover:bg-secondary active:scale-[0.95] disabled:opacity-40 disabled:active:scale-100"
                     >

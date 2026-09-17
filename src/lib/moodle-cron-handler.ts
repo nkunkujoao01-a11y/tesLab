@@ -104,6 +104,23 @@ function readEnvVar(env: unknown, name: string): string | undefined {
   return typeof process !== "undefined" ? process.env[name] : undefined;
 }
 
+/** Constant-time string comparison for the cron shared secret below — a
+ * plain `!==` short-circuits on the first mismatched character, so its
+ * response timing leaks how many leading characters of a guessed
+ * MOODLE_CRON_SECRET are correct. Always walks the full length of the
+ * longer input regardless of where (or whether) a mismatch occurs, so
+ * timing doesn't depend on how much of a guess is correct. Implemented
+ * without node:crypto to match readEnvVar's own dual Cloudflare
+ * Workers/Node support above. */
+function timingSafeEqual(a: string, b: string): boolean {
+  const compareLength = Math.max(a.length, b.length);
+  let diff = a.length === b.length ? 0 : 1;
+  for (let i = 0; i < compareLength; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
 type MoodleCourseApi = {
   id: number;
   fullname: string;
@@ -424,7 +441,7 @@ export async function handleMoodleCronSync(request: Request, env: unknown): Prom
     console.error("MOODLE_CRON_SECRET is not configured — refusing all cron-sync requests");
     return new Response("Not configured", { status: 503 });
   }
-  if (request.headers.get("x-cron-secret") !== expectedSecret) {
+  if (!timingSafeEqual(request.headers.get("x-cron-secret") ?? "", expectedSecret)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
