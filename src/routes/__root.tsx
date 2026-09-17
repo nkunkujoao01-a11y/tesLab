@@ -119,7 +119,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Download modules on Wi-Fi, study offline at home. AI summaries, progress tracking, and a reading library that fits in your pocket.",
       },
       { property: "og:type", content: "website" },
+      {
+        property: "og:url",
+        content: "https://elearn-n2wc7cnbv-jolynenkunku-7241s-projects.vercel.app/",
+      },
+      {
+        property: "og:image",
+        content: "https://elearn-n2wc7cnbv-jolynenkunku-7241s-projects.vercel.app/icon-512.png",
+      },
+      { property: "og:image:width", content: "512" },
+      { property: "og:image:height", content: "512" },
       { name: "twitter:card", content: "summary_large_image" },
+      {
+        name: "twitter:image",
+        content: "https://elearn-n2wc7cnbv-jolynenkunku-7241s-projects.vercel.app/icon-512.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
