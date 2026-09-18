@@ -351,6 +351,86 @@
   animation: orbit-spin 22s linear infinite;
 }
 
+/* Renders a Moodle "page" module's own (DOMPurify-sanitized) HTML body —
+   see PageContentViewer in courses.moodle.$courseId.tsx. Plain nested
+   selectors rather than a typography plugin, since this is the only place
+   raw third-party HTML gets rendered in the app. */
+.moodle-page-content {
+  font-size: 15px;
+  line-height: 1.75;
+  color: color-mix(in oklab, var(--foreground) 85%, transparent);
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sora);
+    letter-spacing: -0.01em;
+    color: var(--prestige-deep);
+    font-weight: 500;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+  }
+
+  h1:first-child, h2:first-child, h3:first-child {
+    margin-top: 0;
+  }
+
+  p {
+    margin-top: 0;
+    margin-bottom: 1em;
+  }
+
+  a {
+    color: var(--prestige-mid);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  a:hover {
+    color: var(--prestige-deep);
+  }
+
+  ul, ol {
+    margin-top: 0;
+    margin-bottom: 1em;
+    padding-left: 1.5em;
+  }
+
+  li {
+    margin-bottom: 0.35em;
+  }
+
+  strong, b {
+    color: var(--prestige-deep);
+    font-weight: 600;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-lg);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+  }
+
+  td, th {
+    vertical-align: top;
+    padding: 6px 10px;
+  }
+
+  td:first-child, th:first-child {
+    padding-left: 0;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid color-mix(in oklab, var(--prestige-deep) 10%, transparent);
+    margin: 1.5em 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-drift,
   .animate-drift-reverse,

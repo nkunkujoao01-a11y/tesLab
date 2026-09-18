@@ -60,6 +60,12 @@ export type MoodleSectionWithModules = {
   sectionId: number;
   name?: string;
   position: number;
+  // A section's own intro/summary HTML — some courses (e.g. a "Course Home
+  // Page" section) put their real dashboard content here (tables of
+  // linked cards, icon rows) rather than in any individual module. Synced
+  // as-is from Moodle (see sync.ts); untrusted, must be sanitized before
+  // ever rendering (see SanitizedHtml in courses.moodle.$courseId.tsx).
+  summary?: string;
   modules: MoodleCourseModule[];
 };
 
@@ -94,6 +100,7 @@ export function useMoodleCourseSections(courseId: number): MoodleSectionWithModu
           sectionId: section.sectionId,
           name: section.name,
           position: section.position,
+          summary: section.summary,
           modules: modulesBySection.get(section.sectionId) ?? [],
         }));
     }).subscribe({

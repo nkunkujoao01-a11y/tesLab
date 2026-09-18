@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type ComponentType } from "react";
 import {
   ArrowLeft,
+  ChevronDown,
   ClipboardList,
   Download,
   File,
@@ -22,10 +23,60 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import {
   extractModuleFiles,
+  extractPageContent,
   getMoodleFileUrl,
   type MoodleModuleFileMeta,
 } from "@/lib/moodle-files";
 import type { MoodleCourseModule } from "@/lib/db";
+import { cn } from "@/lib/utils";
+
+/** Sanitizes a synced Moodle "page" module's own HTML body — see
+ * extractPageContent — and forces every link to open safely in a new tab,
+ * since it points at the real NUST/SharePoint site, not this app.
+ * DOMPurify is dynamically imported so it never touches the SSR bundle (it
+ * needs a real DOM) and only loads once a student actually expands a page
+ * — same "load heavy stuff on demand" pattern as ai-model.ts. */
+async function sanitizePageHtml(rawHtml: string): Promise<string> {
+  const { default: DOMPurify } = await import("dompurify");
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A") {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+  const clean = DOMPurify.sanitize(rawHtml, { ADD_ATTR: ["target"] });
+  DOMPurify.removeHook("afterSanitizeAttributes");
+  return clean;
+}
+
+/** Renders Moodle-synced HTML in-app, sanitized — shared by a section's
+ * own always-visible summary (a course's "dashboard" content, e.g. cards
+ * linking to Learning Materials/Assessments/etc.) and a page module's
+ * expand-in-place body, so both go through the exact same sanitize path. */
+function SanitizedHtml({ html }: { html: string }) {
+  const [clean, setClean] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setClean(null);
+    void sanitizePageHtml(html).then((result) => {
+      if (!cancelled) setClean(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [html]);
+
+  if (clean === null) {
+    return (
+      <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+        Loading…
+      </div>
+    );
+  }
+  return <div className="moodle-page-content" dangerouslySetInnerHTML={{ __html: clean }} />;
+}
 
 export const Route = createFileRoute("/courses/moodle/$courseId")({
   head: () => ({
@@ -221,6 +272,9 @@ function ModuleRow({
 }) {
   const Icon = moduleIcon(module.modname);
   const files = extractModuleFiles(module.contents);
+  const page = files.length === 0 ? extractPageContent(module.contents) : null;
+  const [expanded, setExpanded] = useState(false);
+
   const content = (
     <>
       <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-prestige-deep/5 text-prestige-mid">
@@ -245,6 +299,37 @@ function ModuleRow({
       >
         {content}
       </button>
+    );
+  }
+  // A Moodle "page" module (e.g. a lecturer's week-by-week labs/notes hub)
+  // has no file to open, but its own body is already synced — expand it
+  // right here in the list instead of opening a separate viewer or
+  // linking out to the real site, so it reads as part of this app's own
+  // course page rather than an attachment.
+  if (page) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-secondary"
+        >
+          {content}
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-prestige-mid transition-transform",
+              expanded && "rotate-180",
+            )}
+            strokeWidth={1.75}
+          />
+        </button>
+        {expanded && (
+          <div className="border-t border-border/60 px-4 py-4">
+            <SanitizedHtml html={page.html} />
+          </div>
+        )}
+      </div>
     );
   }
   if (!module.url) {
@@ -324,8 +409,8 @@ function MoodleCourseDetail() {
           <p className="mt-3 text-sm text-muted-foreground">{course.lecturerName}</p>
         )}
         <p className="mt-4 text-[11px] text-muted-foreground">
-          Synced from your connected NUST eLearning account; files open right here, anything else
-          (forums, quizzes) opens the real NUST page in a new tab.
+          Synced from your connected NUST eLearning account; files open right here, pages expand
+          in place, anything else (forums, quizzes) opens the real NUST page in a new tab.
         </p>
 
         {grades.length > 0 && (
@@ -364,17 +449,28 @@ function MoodleCourseDetail() {
                 <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prestige-mid">
                   {section.name || "Untitled section"}
                 </p>
-                <div className="mt-2 space-y-1 rounded-2xl bg-card p-2 ring-1 ring-border/60">
-                  {section.modules.length === 0 ? (
-                    <p className="px-3 py-2.5 text-xs text-muted-foreground">
-                      Nothing in this section
-                    </p>
-                  ) : (
-                    section.modules.map((module) => (
-                      <ModuleRow key={module.key} module={module} onOpenFiles={handleOpenFiles} />
-                    ))
-                  )}
-                </div>
+                {/* Some courses (e.g. a "Course Home Page" section) put
+                    their real content here — a dashboard of linked cards —
+                    rather than in any individual module. Always visible,
+                    matching how it looks on the real NUST site. */}
+                {section.summary && section.summary.trim().length > 0 && (
+                  <div className="mt-2 rounded-2xl bg-card p-5 ring-1 ring-border/60">
+                    <SanitizedHtml html={section.summary} />
+                  </div>
+                )}
+                {(section.modules.length > 0 || !section.summary) && (
+                  <div className="mt-2 space-y-1 rounded-2xl bg-card p-2 ring-1 ring-border/60">
+                    {section.modules.length === 0 ? (
+                      <p className="px-3 py-2.5 text-xs text-muted-foreground">
+                        Nothing in this section
+                      </p>
+                    ) : (
+                      section.modules.map((module) => (
+                        <ModuleRow key={module.key} module={module} onOpenFiles={handleOpenFiles} />
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

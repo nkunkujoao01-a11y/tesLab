@@ -33,6 +33,27 @@ export function extractModuleFile(contents: unknown): MoodleModuleFileMeta | nul
   return extractModuleFiles(contents)[0] ?? null;
 }
 
+type RawMoodlePageContentEntry = { type?: string; content?: string; filename?: string };
+
+export type MoodlePageContent = { html: string };
+
+/** A Moodle "page" module (mod/page — e.g. a lecturer's week-by-week
+ * "labs and assessments" hub) exports its own rendered body as one
+ * `type: "content"` entry in the same `contents` array real files use, via
+ * the same core_course_get_contents call — no separate fetch needed, and
+ * already sitting in MoodleCourseModule.contents for every synced course.
+ * Untrusted HTML from Moodle, so callers must sanitize it (see
+ * PageContentViewer in courses.moodle.$courseId.tsx) before ever
+ * rendering it. */
+export function extractPageContent(contents: unknown): MoodlePageContent | null {
+  if (!Array.isArray(contents)) return null;
+  const entry = (contents as RawMoodlePageContentEntry[]).find(
+    (c): c is RawMoodlePageContentEntry & { content: string } =>
+      !!c && c.type === "content" && typeof c.content === "string" && c.content.trim().length > 0,
+  );
+  return entry ? { html: entry.content } : null;
+}
+
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
