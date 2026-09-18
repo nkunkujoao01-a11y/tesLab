@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { Play, Download, CheckCircle2, Loader2, CalendarClock, WifiOff } from "lucide-react";
 import { MobileShell, PageHeader, SectionHeader } from "@/components/MobileShell";
+import { ErrorState } from "@/components/StatePanels";
 import { LibrarySearchButton } from "@/components/LibrarySearch";
 import { formatMb } from "@/lib/mock-data";
 import { fetchModules } from "@/lib/modules-api";
@@ -69,41 +70,24 @@ function DashboardErrorComponent({ error, reset }: { error: Error; reset: () => 
     console.error(error);
     return (
       <MobileShell>
-        <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-          <p className="eyebrow mb-3">Something went wrong</p>
-          <h1 className="font-display text-xl font-medium text-foreground">
-            This page did not load
-          </h1>
-          <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">Try again in a moment.</p>
-          <button
-            onClick={retry}
-            className="mt-6 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-        </div>
+        <ErrorState
+          title="This page didn't load"
+          description="Something went wrong loading your dashboard. Try again in a moment."
+          primaryAction={{ label: "Try again", onClick: retry }}
+        />
       </MobileShell>
     );
   }
 
   return (
     <MobileShell>
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-        <div className="grid h-14 w-14 place-items-center rounded-full bg-prestige-deep/5 text-prestige-mid">
-          <WifiOff className="h-6 w-6" strokeWidth={1.75} />
-        </div>
-        <h1 className="mt-5 font-display text-xl font-medium text-prestige-deep">You're offline</h1>
-        <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-          Nothing is downloaded to this device yet, so there's no offline content to show. Connect
-          once to load your modules — after that, this dashboard works offline too.
-        </p>
-        <button
-          onClick={retry}
-          className="mt-6 inline-flex items-center justify-center rounded-lg bg-prestige-deep px-5 py-2.5 text-sm font-medium text-prestige-cream transition-transform active:scale-[0.97]"
-        >
-          Try again
-        </button>
-      </div>
+      <ErrorState
+        icon={WifiOff}
+        eyebrow="You're offline"
+        title="Nothing downloaded yet"
+        description="Nothing is on this device yet, so there's no offline content to show. Connect once to load your modules — after that, this dashboard works offline too."
+        primaryAction={{ label: "Try again", onClick: retry }}
+      />
     </MobileShell>
   );
 }

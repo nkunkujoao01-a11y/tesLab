@@ -2495,6 +2495,22 @@ Cleaned up all test artifacts and DB rows afterward: deleted the throwaway test 
 
 ---
 
+## Feature 89: a shared, respectful Empty/Error/Success state vocabulary, plus a `--radius` bump (5px → 7.5px)
+
+The user asked for consistent, respectful error/empty/success states across the app, having previously reviewed a large onboarding/UX brief earlier this session that laid out the tone principles (calm, specific, never blaming the student, always naming a real next step). A repo-wide search found the same empty-state card markup (icon + title + description, sometimes an action) copy-pasted with small drifts across 20+ route files, plus three separate near-duplicate full-page error layouts (`__root.tsx`'s 404/generic error, `dashboard.tsx`'s offline/generic error). Rather than writing new bespoke copy per page, extracted the existing pattern into one shared component file and reused it, so every page gets the same tone discipline by construction, not by every author remembering it.
+
+### What was added
+
+- **`src/components/StatePanels.tsx`** (new) — `EmptyState` (nothing to show yet, not a failure), `ErrorState` (a whole page/screen failed — the "broken page" case, centers a real recovery action), `InlineError` (a short section-level failure notice, distinct from a whole broken page), and `SuccessNote` (a brief, understated confirmation — no confetti, matching `OnboardingTour`'s own completion-screen tone). `StateAction`'s `href` is documented as external/hard-reload-only — every in-app action must go through `onClick` + the router's own `navigate()`, specifically to avoid reintroducing a real bug this codebase already found and fixed once (a raw `<a href="/dashboard">` in the root error boundary used to force a hard reload straight into a route's own loader, which could strand an offline user right back on the same error screen).
+- Wired into: `__root.tsx` (404 page, generic error boundary), `dashboard.tsx` (offline-with-nothing-cached error, generic error), `library.tsx` (nothing generated yet), `courses.moodle.index.tsx` (not connected / no courses synced yet, including its one action button). Left `admin.super.audit-log.tsx`'s inline empty row as-is — a single line inside an existing list container, a different shape than the standalone-card pattern these components model.
+- **`src/styles.css`** — `--radius: 5px` → `7.5px` (card corners land at roughly ~15.5px via the derived `--radius-2xl` scale — visibly softer than the very sharp 5px version, still noticeably tighter than the original 14px/`0.875rem`).
+
+### How it was validated
+
+`tsc --noEmit` and `eslint` clean on every touched file (pre-existing CRLF noise on `__root.tsx`/`admin.super.audit-log.tsx` unrelated, same repo-wide condition logged earlier this session); `npm run build` succeeds. Drove the real app with Playwright: screenshotted the 404 page, the dashboard (radius), the library empty state, and the Moodle-courses empty state — all render correctly and match the intended design. Specifically re-verified the one regression this refactor could have reintroduced: clicked `EmptyState`'s "Go to Settings" action button (real signed-in test user, real click, not just a render check) and confirmed it navigates via client-side routing to `/settings`, not a hard document reload. Test user created and deleted via the Admin API.
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.

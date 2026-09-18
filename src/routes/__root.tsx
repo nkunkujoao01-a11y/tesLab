@@ -1,16 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
-  Link,
   createRootRouteWithContext,
   useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { SearchX, TriangleAlert } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
+import { ErrorState } from "@/components/StatePanels";
 import { useAutoSync } from "@/hooks/use-sync";
 import { usePrecacheRoutes } from "@/hooks/use-precache-routes";
 import {
@@ -28,24 +29,15 @@ import { ResearchConsentGate } from "@/components/ResearchConsentGate";
 import { ResearchSurveyPrompt } from "@/components/ResearchSurveyPrompt";
 
 function NotFoundComponent() {
+  const router = useRouter();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <p className="eyebrow mb-3">Page not found</p>
-        <h1 className="font-display text-6xl font-medium text-foreground">404</h1>
-        <p className="mt-4 text-sm text-muted-foreground">
-          The page you are looking for is not part of this library.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Return home
-          </Link>
-        </div>
-      </div>
-    </div>
+    <ErrorState
+      icon={SearchX}
+      eyebrow="Page not found"
+      title="That page isn't part of eLearn"
+      description="The link or address you followed doesn't match anything here. Head back and try again from there."
+      primaryAction={{ label: "Return home", onClick: () => void router.navigate({ to: "/" }) }}
+    />
   );
 }
 
@@ -54,48 +46,34 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <p className="eyebrow mb-3">Something went wrong</p>
-        <h1 className="font-display text-2xl font-medium text-foreground">
-          This page did not load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">Try again or head back to the start.</p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              // reset() must wait for invalidate()'s re-run of the failed
-              // loader to actually finish — clearing the error boundary
-              // first (as this used to) could re-render with the same
-              // stale error before the fresh attempt had resolved either
-              // way, making the button look like it did nothing.
-              void router.invalidate().finally(() => reset());
-            }}
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          {/* Bug found from a user report: this used to be a raw
-              <a href="/dashboard">, which forces a full hard document
-              reload (not client-side routing) straight into /dashboard's
-              own loader — the same kind of live Supabase fetch that most
-              likely threw the error being shown here in the first place,
-              on a device with nothing cached yet. Offline, that reload
-              could land right back on this same error screen, trapping
-              the user with no working way out. Fixed to match
-              NotFoundComponent's already-correct pattern just above:
-              client-side navigation (works offline unconditionally) to
-              "/", a static route with no loader that can never itself
-              throw. */}
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            Go home
-          </Link>
-        </div>
-      </div>
-    </div>
+    <ErrorState
+      icon={TriangleAlert}
+      title="This page didn't load"
+      description="Something went wrong loading this page. Your other data is safe — try again, or head back to the start."
+      primaryAction={{
+        label: "Try again",
+        onClick: () => {
+          // reset() must wait for invalidate()'s re-run of the failed
+          // loader to actually finish — clearing the error boundary first
+          // (as this used to) could re-render with the same stale error
+          // before the fresh attempt had resolved either way, making the
+          // button look like it did nothing.
+          void router.invalidate().finally(() => reset());
+        },
+      }}
+      // Bug found from a user report: this used to be a raw
+      // <a href="/dashboard">, which forces a full hard document reload
+      // (not client-side routing) straight into /dashboard's own loader —
+      // the same kind of live Supabase fetch that most likely threw the
+      // error being shown here in the first place, on a device with
+      // nothing cached yet. Offline, that reload could land right back on
+      // this same error screen, trapping the user with no working way
+      // out. router.navigate() is client-side routing (works offline
+      // unconditionally) to "/", a static route with no loader that can
+      // never itself throw — see StatePanels.tsx's own comment on why
+      // ErrorState's `href` is deliberately never used for this.
+      secondaryAction={{ label: "Go home", onClick: () => void router.navigate({ to: "/" }) }}
+    />
   );
 }
 

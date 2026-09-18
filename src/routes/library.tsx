@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Layers, ListChecks, Folder, FileQuestion } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
+import { EmptyState } from "@/components/StatePanels";
 import { usePersonalDocuments, useDocumentCollections } from "@/hooks/use-documents";
 import { useAllFlashcardSets, useAllQuizzes } from "@/hooks/use-quiz";
 
@@ -93,14 +94,11 @@ function QuizLibrary() {
 
       <div className="px-6 pb-16 lg:px-10">
         {docsWithContent.length === 0 ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <FileQuestion className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">Nothing generated yet</p>
-            <p className="mt-2 max-w-[40ch] mx-auto text-sm text-muted-foreground">
-              Open a document and generate flashcards or a quiz. They'll show up here afterward,
-              grouped by collection.
-            </p>
-          </div>
+          <EmptyState
+            icon={FileQuestion}
+            title="Nothing generated yet"
+            description="Open a document and generate flashcards or a quiz. They'll show up here afterward, grouped by collection."
+          />
         ) : (
           <div className="space-y-8">
             {collections.map((collection) => {

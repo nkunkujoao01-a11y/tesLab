@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ChevronRight, GraduationCap } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
+import { EmptyState } from "@/components/StatePanels";
 import { useMoodleCourses } from "@/hooks/use-moodle-courses";
 import { useMoodleConnection } from "@/hooks/use-moodle";
 
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/courses/moodle/")({
 function MoodleCourses() {
   const courses = useMoodleCourses();
   const moodle = useMoodleConnection();
+  const navigate = useNavigate();
 
   return (
     <MobileShell>
@@ -36,33 +38,22 @@ function MoodleCourses() {
 
       <div className="space-y-4 px-6 pb-16 lg:px-10">
         {!moodle.loaded ? null : !moodle.connected ? (
-          <div className="animate-rise mx-auto max-w-[440px] rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <GraduationCap className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">
-              Connect your NUST eLearning account
-            </p>
-            <p className="mt-2 max-w-[38ch] mx-auto text-sm text-muted-foreground">
-              Once connected, your real courses, materials, and grades sync in here automatically.
-            </p>
-            <Link
-              to="/settings"
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-5 py-2.5 text-sm font-medium text-prestige-cream transition-transform active:scale-[0.97]"
-            >
-              Go to Settings
-            </Link>
-          </div>
+          <EmptyState
+            icon={GraduationCap}
+            title="Connect your NUST eLearning account"
+            description="Once connected, your real courses, materials, and grades sync in here automatically."
+            action={{ label: "Go to Settings", onClick: () => void navigate({ to: "/settings" }) }}
+          />
         ) : courses.length === 0 ? (
-          <div className="animate-rise mx-auto max-w-[440px] rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <GraduationCap className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">
-              {moodle.lastSyncAt ? "No courses found" : "Not synced yet"}
-            </p>
-            <p className="mt-2 max-w-[38ch] mx-auto text-sm text-muted-foreground">
-              {moodle.lastSyncAt
+          <EmptyState
+            icon={GraduationCap}
+            title={moodle.lastSyncAt ? "No courses found" : "Not synced yet"}
+            description={
+              moodle.lastSyncAt
                 ? "Your NUST eLearning account is connected, but no enrolled courses came back from the last sync."
-                : "Your courses will appear here after the first automatic sync. This can take a little while."}
-            </p>
-          </div>
+                : "Your courses will appear here after the first automatic sync. This can take a little while."
+            }
+          />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {courses.map((course) => (
