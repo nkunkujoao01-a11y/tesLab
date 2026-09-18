@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { MessageSquareText, ImageOff } from "lucide-react";
 import { fetchAdminFeedback, type AdminFeedbackItem } from "@/lib/admin-console-api";
 import { formatRelative } from "@/lib/mock-data";
+import { HintPanel, InlineError } from "@/components/StatePanels";
 
 export const Route = createFileRoute("/admin/feedback")({
   component: AdminFeedbackPage,
@@ -68,16 +69,13 @@ function AdminFeedbackPage() {
       </p>
 
       {error && (
-        <p className="mt-5 rounded-2xl bg-destructive/10 p-4 text-sm text-destructive ring-1 ring-destructive/30">
-          Couldn't load the feedback inbox. Try refreshing.
-        </p>
+        <InlineError className="mt-5" message="Couldn't load the feedback inbox. Try refreshing." />
       )}
 
       {!error && items?.length === 0 && (
-        <div className="animate-rise mt-6 rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-          <MessageSquareText className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
-          <p className="mt-3 text-sm text-muted-foreground">No feedback submitted yet.</p>
-        </div>
+        <HintPanel icon={MessageSquareText} className="mt-6">
+          No feedback submitted yet.
+        </HintPanel>
       )}
 
       <div className="mt-6 space-y-3">

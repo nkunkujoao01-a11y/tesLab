@@ -2511,6 +2511,22 @@ The user asked for consistent, respectful error/empty/success states across the 
 
 ---
 
+## Feature 90: migrated the remaining 19 duplicated empty/chat-placeholder states onto StatePanels.tsx
+
+Follow-up to Feature 89, which introduced `EmptyState`/`ErrorState`/`InlineError`/`SuccessNote` but only wired them into a first proof-of-concept slice (404, root error boundary, dashboard, library, Moodle courses). The user asked for the rest. A repo-wide search turned up 19 more route files still carrying the old copy-pasted markup, split across two real shapes: full "nothing here yet" cards with a title (courses/documents flashcards, quiz, summary, notes, empty document/collection lists) and a lighter chat-placeholder shape (icon + one instructional line shown before any messages exist, or a single-line empty list row like the admin feedback inbox) that `EmptyState` didn't actually fit.
+
+### What was added
+
+- **`src/components/StatePanels.tsx`** — new `HintPanel` component for the lighter shape (smaller icon, no title, `children` instead of a fixed description so callers needing extra content — e.g. a row of source-document chips — aren't fighting the component's shape). Extended `StateAction` with `icon`, `tone` (`"deep"` vs `"gold"` — navigation actions read differently from generative ones like "Open reader") and `disabled` (for an action that does real work in place, like "Generate notes", rather than navigating), all previously-real distinctions in the duplicated markup that a naive migration would have flattened away.
+- Migrated all 19 files: `admin.feedback.tsx`, `assistant.tsx`, the four `courses.$moduleId.*` chat/flashcards/quiz/summary pages, the six `documents.$docId.*` and `documents.collections.$collectionId.*` equivalents, `documents.index.tsx`, and `summaries.tsx`. Every `<Link>`-based action became `onClick` + the route's own `navigate()` (adding `useNavigate` where a file didn't already have it) — the same "never a raw `<a>`/hard-reload for an in-app destination" discipline `StatePanels.tsx` documents on its `StateAction` type.
+- Deliberately **not** migrated: `ChatModelDownloadPrompt.tsx` — despite superficially similar card markup, it's a genuinely distinct, stateful component (real download-progress UI, two branching model paths, a real bug fix already recorded in its own header comment), not copy-pasted boilerplate; forcing it into `EmptyState` would risk real functionality for no real benefit.
+
+### How it was validated
+
+`tsc --noEmit` clean; `eslint` clean on every touched file (one real prettier formatting fix applied, rest was the same pre-existing CRLF noise already logged this session). `npm run build` succeeds. Manually confirmed no import in any migrated file went unused despite removing `<Link>` usages (this project runs with `noUnusedLocals`/`@typescript-eslint/no-unused-vars` both off, so neither tool catches that automatically) — every file still has at least one remaining real `<Link>` for a back button or similar. Drove the real app with Playwright against a real signed-in test user (created and deleted via the Admin API): screenshotted `documents.tsx`'s empty state (no action) and `summaries.tsx`'s empty state (gold-tone pill action) — both render exactly as intended. The chat-placeholder `HintPanel` path itself wasn't reachable in this quick pass (a fresh account's on-device chat model isn't downloaded yet, so `ChatModelDownloadPrompt` shows first, correctly) — not re-verified separately since it's the identical, already-proven markup pattern as the rest, just smaller.
+
+---
+
 ## What to build next
 
 1. ~~Deployment `BLOCKED`~~ — root cause found by the user this session, checking their own Vercel dashboard directly: **"The deployment was blocked because the commit author did not have contributing access to the project on Vercel. The Hobby Plan does not support collaboration for private repositories."** A plan/access limitation, not a code or settings problem — commits from a GitHub identity without collaborator access to the Vercel project get blocked outright on a private repo under Hobby. (`vercel whoami` in this environment resolves to `jolynenkunku-7241`, and `vercel inspect` showed one older production deployment as `● Ready` — that one was presumably pushed by an authorized identity; it doesn't mean the block is resolved for commits from other authors.) No fix available without either upgrading to Pro, making the repo public, or ensuring only the authorized account's commits reach the connected branch.

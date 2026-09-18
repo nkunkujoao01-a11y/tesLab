@@ -4,6 +4,7 @@ import { Bot, Loader2, Send, Sparkles, TriangleAlert, Trash2, User } from "lucid
 import { MobileShell, PageHeader } from "@/components/MobileShell";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
 import { AssistantMessageBubble } from "@/components/AssistantMessageBubble";
+import { HintPanel } from "@/components/StatePanels";
 import {
   useChatEngineReadiness,
   useChatModelOfflineCapable,
@@ -146,13 +147,10 @@ function Assistant() {
               </div>
             )}
             {messages.length === 0 && !streamingText && (
-              <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-                <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about your coursework, or anything else. Answered by your connected cloud AI
-                  when you're online, or on-device when you're not.
-                </p>
-              </div>
+              <HintPanel icon={Sparkles}>
+                Ask about your coursework, or anything else. Answered by your connected cloud AI
+                when you're online, or on-device when you're not.
+              </HintPanel>
             )}
             {messages.map((msg) => (
               <div

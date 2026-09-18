@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowUpRight, Download, NotebookPen, Share2, Sparkles } from "lucide-react";
 import { usePersonalDocument, useGenerateNotes } from "@/hooks/use-documents";
 import { useCloudAiKey } from "@/hooks/use-cloud-ai";
 import { StructuredText } from "@/components/StructuredText";
+import { EmptyState } from "@/components/StatePanels";
 import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 import { useCanShareFiles } from "@/hooks/use-online-status";
 
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/documents/$docId/notes")({
  * just "has notes or doesn't": no cloud key connected at all, a key
  * connected but notes not generated yet, and notes already generated. */
 function DocumentNotesPage() {
+  const navigate = useNavigate();
   const { docId } = Route.useParams();
   const doc = usePersonalDocument(docId);
   const { connected } = useCloudAiKey();
@@ -69,39 +71,30 @@ function DocumentNotesPage() {
 
       <article className="mx-auto max-w-[680px] px-6 pb-32 pt-10 lg:pt-14">
         {connected === false ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <NotebookPen className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">Connect free AI notes</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              AI notes use your own free Google AI key. Takes about 30 seconds to connect, costs you
-              nothing.
-            </p>
-            <Link
-              to="/settings"
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Go to AI settings
-            </Link>
-          </div>
+          <EmptyState
+            icon={NotebookPen}
+            title="Connect free AI notes"
+            description="AI notes use your own free Google AI key. Takes about 30 seconds to connect, costs you nothing."
+            action={{
+              label: "Go to AI settings",
+              icon: ArrowUpRight,
+              tone: "gold",
+              onClick: () => void navigate({ to: "/settings" }),
+            }}
+          />
         ) : !doc.aiNotes ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <NotebookPen className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">No notes yet</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Generate clear, revision-ready study notes for this document using your connected
-              cloud AI.
-            </p>
-            <button
-              type="button"
-              disabled={isGenerating || connected === undefined}
-              onClick={() => void generateNotes(docId, doc.text)}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97] disabled:opacity-60"
-            >
-              <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {isGenerating ? "Generating…" : "Generate notes"}
-            </button>
-          </div>
+          <EmptyState
+            icon={NotebookPen}
+            title="No notes yet"
+            description="Generate clear, revision-ready study notes for this document using your connected cloud AI."
+            action={{
+              label: isGenerating ? "Generating…" : "Generate notes",
+              icon: Sparkles,
+              tone: "gold",
+              disabled: isGenerating || connected === undefined,
+              onClick: () => void generateNotes(docId, doc.text),
+            }}
+          />
         ) : (
           <>
             <p className="eyebrow">{doc.pageCount} pages</p>

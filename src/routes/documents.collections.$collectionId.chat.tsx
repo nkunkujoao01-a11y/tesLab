@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
 import { MobileShell } from "@/components/MobileShell";
 import { AssistantMessageBubble } from "@/components/AssistantMessageBubble";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
+import { EmptyState, HintPanel } from "@/components/StatePanels";
 import { useDocumentCollection, usePersonalDocuments } from "@/hooks/use-documents";
 import {
   useChatEngineReadiness,
@@ -52,6 +53,7 @@ export const Route = createFileRoute("/documents/collections/$collectionId/chat"
 });
 
 function CollectionChat() {
+  const navigate = useNavigate();
   const { collectionId } = Route.useParams();
   const collection = useDocumentCollection(collectionId);
   const allDocs = usePersonalDocuments();
@@ -134,21 +136,19 @@ function CollectionChat() {
 
       {members.length === 0 ? (
         <div className="px-6 lg:px-10">
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <FileText className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">No documents yet</p>
-            <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-              Add at least one document to this collection before asking it questions. There's
-              nothing to ground answers in yet.
-            </p>
-            <Link
-              to="/documents/collections/$collectionId"
-              params={{ collectionId }}
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97]"
-            >
-              Back to collection
-            </Link>
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="No documents yet"
+            description="Add at least one document to this collection before asking it questions. There's nothing to ground answers in yet."
+            action={{
+              label: "Back to collection",
+              onClick: () =>
+                void navigate({
+                  to: "/documents/collections/$collectionId",
+                  params: { collectionId },
+                }),
+            }}
+          />
         </div>
       ) : !chatReady ? (
         <ChatModelDownloadPrompt />
@@ -179,13 +179,10 @@ function CollectionChat() {
               </div>
             )}
             {messages.length === 0 && !streamingText && (
-              <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-                <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about {members.length === 1 ? "this document" : "these documents"}. Answers
-                  are grounded in {members.length === 1 ? "its" : "their"} actual text.
-                </p>
-              </div>
+              <HintPanel icon={Sparkles}>
+                Ask about {members.length === 1 ? "this document" : "these documents"}. Answers are
+                grounded in {members.length === 1 ? "its" : "their"} actual text.
+              </HintPanel>
             )}
             {messages.map((msg) => (
               <div

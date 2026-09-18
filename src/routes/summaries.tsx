@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, Check, Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
+import { EmptyState } from "@/components/StatePanels";
 import { formatRelative } from "@/lib/mock-data";
 import { fetchModules } from "@/lib/modules-api";
 import { useAllSummaries } from "@/hooks/use-summaries";
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/summaries")({
 });
 
 function Summaries() {
+  const navigate = useNavigate();
   const modules = Route.useLoaderData();
   const summaries = useAllSummaries();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -63,19 +65,16 @@ function Summaries() {
 
       <div className="px-6 lg:px-10 lg:pb-16">
         {summaries.length === 0 ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <Sparkles className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">No summaries yet</p>
-            <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-              Open a downloaded material and tap "Summarise this page" and it'll show up here.
-            </p>
-            <Link
-              to="/courses"
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
-            >
-              Browse the library
-            </Link>
-          </div>
+          <EmptyState
+            icon={Sparkles}
+            title="No summaries yet"
+            description={`Open a downloaded material and tap "Summarise this page" and it'll show up here.`}
+            action={{
+              label: "Browse the library",
+              tone: "gold",
+              onClick: () => void navigate({ to: "/courses" }),
+            }}
+          />
         ) : (
           <ul className="space-y-4">
             {summaries.map((s, i) => {

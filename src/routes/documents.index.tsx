@@ -12,6 +12,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { MobileShell, PageHeader } from "@/components/MobileShell";
+import { EmptyState } from "@/components/StatePanels";
 import { formatMb, formatRelative } from "@/lib/mock-data";
 import {
   usePersonalDocuments,
@@ -244,14 +245,11 @@ function DocumentsIndex() {
 
         {/* Uncategorized documents */}
         {docs.length === 0 ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <FileText className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">No documents yet</p>
-            <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-              Upload a PDF or Word document to get started. It'll show up here, fully readable and
-              summarisable offline.
-            </p>
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="No documents yet"
+            description="Upload a PDF or Word document to get started. It'll show up here, fully readable and summarisable offline."
+          />
         ) : (
           <>
             {collections.length > 0 && (

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -18,6 +18,7 @@ import { useOnlineStatus, useCanShareFiles } from "@/hooks/use-online-status";
 import { buildQuizExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 import { QuizPanel } from "@/components/QuizFlashcards";
+import { EmptyState } from "@/components/StatePanels";
 
 export const Route = createFileRoute("/courses/$moduleId/quiz/$docId")({
   loader: async ({ params }) => {
@@ -42,6 +43,7 @@ export const Route = createFileRoute("/courses/$moduleId/quiz/$docId")({
  * reachable from the reader's "Quiz" action and reusing the exact same
  * QuizPanel (with real attempt history) the tab used to render. */
 function MaterialQuizPage() {
+  const navigate = useNavigate();
   const { module, doc } = Route.useLoaderData();
   const key = materialKey(module.id, doc.id);
   const quiz = useQuiz(key);
@@ -96,21 +98,21 @@ function MaterialQuizPage() {
 
       <article className="mx-auto max-w-[680px] px-6 pb-32 pt-10 lg:pt-14">
         {!quiz || quiz.questions.length === 0 ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <ListChecks className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">No quiz yet</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Go back to the reader and tap "Quiz". It'll show up here.
-            </p>
-            <Link
-              to="/courses/$moduleId/read/$docId"
-              params={{ moduleId: module.id, docId: doc.id }}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Open reader
-            </Link>
-          </div>
+          <EmptyState
+            icon={ListChecks}
+            title="No quiz yet"
+            description={`Go back to the reader and tap "Quiz". It'll show up here.`}
+            action={{
+              label: "Open reader",
+              icon: ArrowUpRight,
+              tone: "gold",
+              onClick: () =>
+                void navigate({
+                  to: "/courses/$moduleId/read/$docId",
+                  params: { moduleId: module.id, docId: doc.id },
+                }),
+            }}
+          />
         ) : (
           <>
             <p className="eyebrow">

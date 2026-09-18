@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -16,6 +16,7 @@ import { useOnlineStatus, useCanShareFiles } from "@/hooks/use-online-status";
 import { buildQuizExportText } from "@/lib/quiz-gen";
 import { buildStructuredExportHtml, shareOrDownloadBlob } from "@/lib/structured-export";
 import { QuizPanel } from "@/components/QuizFlashcards";
+import { EmptyState } from "@/components/StatePanels";
 
 export const Route = createFileRoute("/documents/collections/$collectionId/quiz")({
   head: () => ({
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/documents/collections/$collectionId/quiz"
  * documents.collections.$collectionId.index.tsx's own comment on why
  * flashcards/quiz are generic over an arbitrary string key). */
 function CollectionQuizPage() {
+  const navigate = useNavigate();
   const { collectionId } = Route.useParams();
   const collection = useDocumentCollection(collectionId);
   const quiz = useQuiz(collectionId);
@@ -93,21 +95,21 @@ function CollectionQuizPage() {
 
       <article className="mx-auto max-w-[680px] px-6 pb-32 pt-10 lg:pt-14">
         {!quiz || quiz.questions.length === 0 ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <ListChecks className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">No quiz yet</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Go back to the collection and tap "Quiz for this collection". It'll show up here.
-            </p>
-            <Link
-              to="/documents/collections/$collectionId"
-              params={{ collectionId }}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Open collection
-            </Link>
-          </div>
+          <EmptyState
+            icon={ListChecks}
+            title="No quiz yet"
+            description={`Go back to the collection and tap "Quiz for this collection". It'll show up here.`}
+            action={{
+              label: "Open collection",
+              icon: ArrowUpRight,
+              tone: "gold",
+              onClick: () =>
+                void navigate({
+                  to: "/documents/collections/$collectionId",
+                  params: { collectionId },
+                }),
+            }}
+          />
         ) : (
           <>
             <h1 className="font-display text-3xl font-medium leading-[1.15] tracking-tight text-prestige-deep lg:text-4xl">

@@ -1,9 +1,10 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, Copy, Sparkles, ArrowUpRight } from "lucide-react";
 import { fetchModule } from "@/lib/modules-api";
 import { useMaterialSummary } from "@/hooks/use-summaries";
 import { groupIntoParagraphs } from "@/lib/summarize";
+import { EmptyState } from "@/components/StatePanels";
 
 export const Route = createFileRoute("/courses/$moduleId/summary/$docId")({
   loader: async ({ params }) => {
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/courses/$moduleId/summary/$docId")({
  * short, well-organized document of its own instead of one paragraph that
  * quietly only covered the first page. */
 function MaterialSummaryPage() {
+  const navigate = useNavigate();
   const { module, doc } = Route.useLoaderData();
   const summary = useMaterialSummary(module.id, doc.id);
   const [copied, setCopied] = useState(false);
@@ -69,21 +71,21 @@ function MaterialSummaryPage() {
 
       <article className="mx-auto max-w-[680px] px-6 pb-32 pt-10 lg:pt-14">
         {!summary ? (
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <Sparkles className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">No summary yet</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Go back to the reader and tap "Summarise". It'll show up here.
-            </p>
-            <Link
-              to="/courses/$moduleId/read/$docId"
-              params={{ moduleId: module.id, docId: doc.id }}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-prestige-gold px-4 py-2 text-xs font-semibold text-prestige-deep transition-transform active:scale-[0.97]"
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Open reader
-            </Link>
-          </div>
+          <EmptyState
+            icon={Sparkles}
+            title="No summary yet"
+            description={`Go back to the reader and tap "Summarise". It'll show up here.`}
+            action={{
+              label: "Open reader",
+              icon: ArrowUpRight,
+              tone: "gold",
+              onClick: () =>
+                void navigate({
+                  to: "/courses/$moduleId/read/$docId",
+                  params: { moduleId: module.id, docId: doc.id },
+                }),
+            }}
+          />
         ) : (
           <>
             <p className="eyebrow">

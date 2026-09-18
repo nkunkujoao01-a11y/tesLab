@@ -4,6 +4,7 @@ import { ArrowLeft, Bot, Loader2, Send, Sparkles, Trash2, TriangleAlert, User } 
 import { MobileShell } from "@/components/MobileShell";
 import { AssistantMessageBubble } from "@/components/AssistantMessageBubble";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
+import { HintPanel } from "@/components/StatePanels";
 import { usePersonalDocument } from "@/hooks/use-documents";
 import {
   useChatEngineReadiness,
@@ -153,12 +154,9 @@ function DocumentChat() {
               </div>
             )}
             {messages.length === 0 && !streamingText && (
-              <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-                <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about this document. Answers are grounded in its actual text.
-                </p>
-              </div>
+              <HintPanel icon={Sparkles}>
+                Ask about this document. Answers are grounded in its actual text.
+              </HintPanel>
             )}
             {messages.map((msg) => (
               <div

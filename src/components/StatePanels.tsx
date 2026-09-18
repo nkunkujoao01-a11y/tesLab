@@ -7,6 +7,7 @@
 // visual language AND the same tone discipline: calm, specific, never
 // blaming the student ("couldn't load" / "try again", never "invalid" or
 // "error occurred"), and always naming a real next step — never a dead end.
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,16 @@ type StateAction = {
   label: string;
   onClick?: () => void;
   href?: string;
+  icon?: LucideIcon;
+  // "deep" (the default) reads as a navigation/neutral action; "gold"
+  // reads as the generative/primary one (e.g. "Open reader" after
+  // downloading, versus "Back to module"). Only meaningful on the
+  // primary action — secondary is always the same quiet outline style.
+  tone?: "deep" | "gold";
+  // For an action that kicks off real work in place (e.g. "Generate
+  // notes") rather than navigating — disables the button and lets the
+  // caller swap in a "…ing" label while it runs. Meaningless with `href`.
+  disabled?: boolean;
 };
 
 function ActionButton({
@@ -33,22 +44,31 @@ function ActionButton({
   action: StateAction;
   variant: "primary" | "secondary";
 }) {
+  const ActionIcon = action.icon;
   const className = cn(
-    "inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-medium transition-transform active:scale-[0.97]",
+    "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-transform active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100",
     variant === "primary"
-      ? "bg-prestige-deep text-prestige-cream shadow-lg shadow-prestige-deep/20"
+      ? action.tone === "gold"
+        ? "bg-prestige-gold text-prestige-deep"
+        : "bg-prestige-deep text-prestige-cream shadow-lg shadow-prestige-deep/20"
       : "text-prestige-mid ring-1 ring-border/70 hover:bg-secondary",
+  );
+  const content = (
+    <>
+      {ActionIcon && <ActionIcon className="h-3.5 w-3.5" strokeWidth={1.75} />}
+      {action.label}
+    </>
   );
   if (action.href) {
     return (
       <a href={action.href} className={className}>
-        {action.label}
+        {content}
       </a>
     );
   }
   return (
-    <button type="button" onClick={action.onClick} className={className}>
-      {action.label}
+    <button type="button" disabled={action.disabled} onClick={action.onClick} className={className}>
+      {content}
     </button>
   );
 }
@@ -84,6 +104,34 @@ export function EmptyState({
           <ActionButton action={action} variant="primary" />
         </div>
       )}
+    </div>
+  );
+}
+
+/** A lighter cousin of EmptyState — a single instructional line (chat
+ * placeholders shown before any messages exist, or a simple "nothing in
+ * this list yet" row) rather than a title+description card. Smaller
+ * icon, no title, `children` instead of a fixed `description` prop so
+ * callers that need extra content below the line (e.g. a row of source
+ * document chips) can add it without fighting the component's shape. */
+export function HintPanel({
+  icon: Icon,
+  className,
+  children,
+}: {
+  icon: LucideIcon;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60",
+        className,
+      )}
+    >
+      <Icon className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
+      <div className="mt-3 text-sm text-muted-foreground">{children}</div>
     </div>
   );
 }

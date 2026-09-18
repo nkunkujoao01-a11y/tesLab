@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
 import { MobileShell } from "@/components/MobileShell";
 import { AssistantMessageBubble } from "@/components/AssistantMessageBubble";
 import { ChatModelDownloadPrompt } from "@/components/ChatModelDownloadPrompt";
+import { EmptyState, HintPanel } from "@/components/StatePanels";
 import { fetchModule } from "@/lib/modules-api";
 import { materialKey } from "@/lib/db";
 import { useDownloadedMaterialContent, useDownloadedMaterialIds } from "@/hooks/use-downloads";
@@ -64,6 +65,7 @@ export const Route = createFileRoute("/courses/$moduleId/chat/$docId")({
  * sourcing its single "document" from the downloaded catalog content
  * (use-downloads.ts) instead of a personal upload's own text. */
 function MaterialChat() {
+  const navigate = useNavigate();
   const { module, doc } = Route.useLoaderData();
   const key = materialKey(module.id, doc.id);
   const downloadedMaterialIds = useDownloadedMaterialIds();
@@ -152,20 +154,19 @@ function MaterialChat() {
 
       {!isDownloaded ? (
         <div className="px-6 lg:px-10">
-          <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-            <CloudDownload className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-            <p className="mt-4 font-display text-lg text-prestige-deep">Not downloaded yet</p>
-            <p className="mt-2 max-w-[36ch] mx-auto text-sm text-muted-foreground">
-              Download this material first. Asking AI about it needs the actual text on this device.
-            </p>
-            <Link
-              to="/courses/$moduleId/read/$docId"
-              params={{ moduleId: module.id, docId: doc.id }}
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-prestige-deep px-4 py-2.5 text-xs font-semibold text-prestige-cream transition-all active:scale-[0.97]"
-            >
-              Open reader
-            </Link>
-          </div>
+          <EmptyState
+            icon={CloudDownload}
+            title="Not downloaded yet"
+            description="Download this material first. Asking AI about it needs the actual text on this device."
+            action={{
+              label: "Open reader",
+              onClick: () =>
+                void navigate({
+                  to: "/courses/$moduleId/read/$docId",
+                  params: { moduleId: module.id, docId: doc.id },
+                }),
+            }}
+          />
         </div>
       ) : !chatReady ? (
         <ChatModelDownloadPrompt />
@@ -196,12 +197,9 @@ function MaterialChat() {
               </div>
             )}
             {messages.length === 0 && !streamingText && (
-              <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-                <Sparkles className="mx-auto h-6 w-6 text-prestige-gold" strokeWidth={1.5} />
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Ask about this material. Answers are grounded in its actual text.
-                </p>
-              </div>
+              <HintPanel icon={Sparkles}>
+                Ask about this material. Answers are grounded in its actual text.
+              </HintPanel>
             )}
             {messages.map((msg) => (
               <div

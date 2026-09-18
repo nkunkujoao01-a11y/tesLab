@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
+import { EmptyState } from "@/components/StatePanels";
 import { formatMb, formatRelative } from "@/lib/mock-data";
 import {
   usePersonalDocuments,
@@ -405,14 +406,11 @@ function CollectionDetail() {
 
         <div className="mt-8">
           {members.length === 0 ? (
-            <div className="animate-rise rounded-2xl bg-card p-8 text-center ring-1 ring-border/60">
-              <FileText className="mx-auto h-8 w-8 text-prestige-gold" strokeWidth={1.5} />
-              <p className="mt-4 font-display text-lg text-prestige-deep">No documents yet</p>
-              <p className="mt-2 max-w-[36ch] text-sm text-muted-foreground">
-                Upload a new PDF or Word document straight into this collection, or add one you've
-                already uploaded.
-              </p>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="No documents yet"
+              description="Upload a new PDF or Word document straight into this collection, or add one you've already uploaded."
+            />
           ) : (
             <ul className="space-y-3">
               {members.map((doc, i) => (
