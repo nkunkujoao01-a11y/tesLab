@@ -154,9 +154,17 @@ function Login() {
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="password" className="text-xs font-medium text-prestige-mid">
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="text-xs font-medium text-prestige-mid">
+                Password
+              </label>
+              <Link
+                to="/forgot-password"
+                className="text-xs font-medium text-prestige-mid hover:text-prestige-deep hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <PasswordInput
               id="password"
               required
@@ -208,6 +216,12 @@ function Login() {
         )}
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
+          <Link to="/magic-link" className="gold-underline font-medium text-prestige-deep">
+            Email me a sign-in link instead
+          </Link>
+        </p>
+
+        <p className="mt-2 text-center text-sm text-muted-foreground">
           New here?{" "}
           <Link to="/signup" className="gold-underline font-medium text-prestige-deep">
             Create an account

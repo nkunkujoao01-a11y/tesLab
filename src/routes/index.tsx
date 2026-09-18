@@ -106,8 +106,8 @@ const SLIDES: Slide[] = [
   },
   {
     eyebrow: "Chapter two",
-    title: "Watch a lecture become a page you can hold.",
-    body: "The on-device model reads your slides and writes a clean summary right here, no internet needed to generate it, no waiting on a server.",
+    title: "Turn your slides into a summary you can read.",
+    body: "Your phone reads the slides and writes a short, clear summary by itself, right there on your phone. No internet needed. No waiting for a server.",
     icon: Sparkles,
     motif: () => (
       <div className="relative h-full w-full overflow-hidden">

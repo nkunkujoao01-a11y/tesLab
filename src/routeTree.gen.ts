@@ -13,11 +13,14 @@ import { Route as TutorialsRouteImport } from './routes/tutorials'
 import { Route as SummariesRouteImport } from './routes/summaries'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as MagicLinkRouteImport } from './routes/magic-link'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as LegalRouteImport } from './routes/legal'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoursesRouteImport } from './routes/courses'
@@ -81,6 +84,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgressRoute = ProgressRouteImport.update({
   id: '/progress',
   path: '/progress',
@@ -89,6 +97,11 @@ const ProgressRoute = ProgressRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MagicLinkRoute = MagicLinkRouteImport.update({
+  id: '/magic-link',
+  path: '/magic-link',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -104,6 +117,11 @@ const LibraryRoute = LibraryRouteImport.update({
 const LegalRoute = LegalRouteImport.update({
   id: '/legal',
   path: '/legal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -337,11 +355,14 @@ export interface FileRoutesByFullPath {
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/documents': typeof DocumentsRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/legal': typeof LegalRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
+  '/magic-link': typeof MagicLinkRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
@@ -387,11 +408,14 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/assistant': typeof AssistantRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/legal': typeof LegalRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
+  '/magic-link': typeof MagicLinkRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
@@ -437,11 +461,14 @@ export interface FileRoutesById {
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/documents': typeof DocumentsRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/legal': typeof LegalRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
+  '/magic-link': typeof MagicLinkRoute
   '/profile': typeof ProfileRoute
   '/progress': typeof ProgressRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/summaries': typeof SummariesRoute
@@ -492,11 +519,14 @@ export interface FileRouteTypes {
     | '/courses'
     | '/dashboard'
     | '/documents'
+    | '/forgot-password'
     | '/legal'
     | '/library'
     | '/login'
+    | '/magic-link'
     | '/profile'
     | '/progress'
+    | '/reset-password'
     | '/settings'
     | '/signup'
     | '/summaries'
@@ -542,11 +572,14 @@ export interface FileRouteTypes {
     | '/about'
     | '/assistant'
     | '/dashboard'
+    | '/forgot-password'
     | '/legal'
     | '/library'
     | '/login'
+    | '/magic-link'
     | '/profile'
     | '/progress'
+    | '/reset-password'
     | '/settings'
     | '/signup'
     | '/summaries'
@@ -591,11 +624,14 @@ export interface FileRouteTypes {
     | '/courses'
     | '/dashboard'
     | '/documents'
+    | '/forgot-password'
     | '/legal'
     | '/library'
     | '/login'
+    | '/magic-link'
     | '/profile'
     | '/progress'
+    | '/reset-password'
     | '/settings'
     | '/signup'
     | '/summaries'
@@ -645,11 +681,14 @@ export interface RootRouteChildren {
   CoursesRoute: typeof CoursesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   DocumentsRoute: typeof DocumentsRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LegalRoute: typeof LegalRoute
   LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
+  MagicLinkRoute: typeof MagicLinkRoute
   ProfileRoute: typeof ProfileRoute
   ProgressRoute: typeof ProgressRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   SummariesRoute: typeof SummariesRoute
@@ -686,6 +725,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/progress': {
       id: '/progress'
       path: '/progress'
@@ -698,6 +744,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/magic-link': {
+      id: '/magic-link'
+      path: '/magic-link'
+      fullPath: '/magic-link'
+      preLoaderRoute: typeof MagicLinkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -719,6 +772,13 @@ declare module '@tanstack/react-router' {
       path: '/legal'
       fullPath: '/legal'
       preLoaderRoute: typeof LegalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -1170,11 +1230,14 @@ const rootRouteChildren: RootRouteChildren = {
   CoursesRoute: CoursesRouteWithChildren,
   DashboardRoute: DashboardRoute,
   DocumentsRoute: DocumentsRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LegalRoute: LegalRoute,
   LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
+  MagicLinkRoute: MagicLinkRoute,
   ProfileRoute: ProfileRoute,
   ProgressRoute: ProgressRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   SummariesRoute: SummariesRoute,

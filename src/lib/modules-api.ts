@@ -106,14 +106,28 @@ function mapModule(
   };
 }
 
-// Both functions below: try the network first (with a short timeout so a
-// bad connection fails fast rather than hanging), fall back to whatever
-// was last cached in IndexedDB on failure. This is what makes a module a
-// student already looked at — downloaded or not — still *open* while
-// offline; see Feature 30. Reading a module's page still doesn't require
-// having downloaded it, same as before — the cache just means "the app
-// has seen this module's metadata at least once," independent of the
-// separate, explicit "download for offline reading" action.
+// Both functions below: if this device has already cached this data (any
+// earlier visit, online or off), serve that cache immediately and refresh
+// it from the network in the background — never make an already-cached
+// page wait out NETWORK_TIMEOUT_MS just to show the same thing it already
+// had. Only a genuine first-ever load (nothing cached yet) waits on the
+// network, since there's nothing else to show.
+//
+// Real user-facing bug this fixes: every route using these (dashboard,
+// courses, progress, summaries, the reader…) re-runs its loader on every
+// visit (no route-level staleTime is set), and the old network-first
+// version tried a real Supabase round trip on every single one of those,
+// even offline with a full local cache — the router's own RoutePending
+// splash (300ms defaultPendingMs) would then sit on screen for the full
+// 6s NETWORK_TIMEOUT_MS before falling back, on every dashboard visit
+// while offline. Cache-first removes that wait entirely for any page
+// that's been seen before; the background refresh keeps the cache from
+// ever going stale for next time. This is what makes a module a student
+// already looked at — downloaded or not — still *open* while offline; see
+// Feature 30. Reading a module's page still doesn't require having
+// downloaded it, same as before — the cache just means "the app has seen
+// this module's metadata at least once," independent of the separate,
+// explicit "download for offline reading" action.
 
 // The list views this feeds (dashboard, courses grid, progress, summaries —
 // every current caller) only ever read a material's id/title/kind/pages/
@@ -130,6 +144,20 @@ function mapModule(
 // populates the real offline cache exactly as before — this only changes
 // what the *server-rendered, unused-by-this-page* copy carries.
 export async function fetchModules(): Promise<Module[]> {
+  if (isBrowser) {
+    const cached = await deviceDb.catalogModules.toArray();
+    if (cached.length > 0) {
+      // Fire-and-forget — this call's own catch already falls back to
+      // whatever's cached on failure, so there's nothing further to
+      // handle here beyond not letting a rejection go unhandled.
+      void fetchModulesFromNetwork().catch(() => {});
+      return cached.map((row) => row.data as Module).sort((a, b) => a.code.localeCompare(b.code));
+    }
+  }
+  return fetchModulesFromNetwork();
+}
+
+async function fetchModulesFromNetwork(): Promise<Module[]> {
   try {
     const materialsSelect = isBrowser
       ? "materials(*)"
@@ -160,6 +188,17 @@ export async function fetchModules(): Promise<Module[]> {
 }
 
 export async function fetchModule(id: string): Promise<Module | null> {
+  if (isBrowser) {
+    const cached = await deviceDb.catalogModules.get(id);
+    if (cached) {
+      void fetchModuleFromNetwork(id).catch(() => {});
+      return cached.data as Module;
+    }
+  }
+  return fetchModuleFromNetwork(id);
+}
+
+async function fetchModuleFromNetwork(id: string): Promise<Module | null> {
   try {
     const { data, error } = await withTimeout(
       supabase
